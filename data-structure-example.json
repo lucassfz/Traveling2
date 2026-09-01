@@ -1,0 +1,71 @@
+{
+  "SouthAmerica": {
+    "countryKey": "Bolivia",
+    "namePt": "Bolívia",
+    "hubAirport": "VVI",
+    "landmark": {
+      "name": "Basílica de Nossa Senhora de Copacabana",
+      "city": "Copacabana",
+      "coordinates": [
+        -16.1667,
+        -69.0833
+      ],
+      "disambiguation": "Copacabana, Bolívia, Lago Titicaca; não Copacabana, Rio de Janeiro, Brasil."
+    }
+  },
+  "NorthAmerica": {
+    "United States of America": {
+      "namePt": "Estados Unidos",
+      "hubAirport": "JFK",
+      "majorAirports": [
+        "JFK",
+        "LAX",
+        "ORD",
+        "ATL",
+        "MIA"
+      ]
+    },
+    "Canada": {
+      "namePt": "Canadá",
+      "hubAirport": "YYZ",
+      "majorAirports": [
+        "YYZ",
+        "YVR"
+      ]
+    },
+    "Mexico": {
+      "namePt": "México",
+      "hubAirport": "MEX",
+      "majorAirports": [
+        "MEX"
+      ]
+    }
+  },
+  "CentralAmerica": {
+    "Belize": {
+      "hubAirport": "BZE"
+    },
+    "Costa Rica": {
+      "hubAirport": "SJO"
+    },
+    "El Salvador": {
+      "hubAirport": "SAL"
+    },
+    "Guatemala": {
+      "hubAirport": "GUA"
+    },
+    "Honduras": {
+      "hubAirport": "SAP"
+    },
+    "Nicaragua": {
+      "hubAirport": "MGA"
+    },
+    "Panama": {
+      "hubAirport": "PTY"
+    }
+  },
+  "mediaPolicy": {
+    "overlay": "city-only",
+    "subjectVerification": "required before marking an external asset verified"
+  }
+}

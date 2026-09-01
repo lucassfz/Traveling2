@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Traveling — globo 3D interativo com guias de países, rotas e estimativas de milhas.">
+  <title>Traveling — Explore o mundo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="splash-screen" id="splash-screen" role="status" aria-label="Abrindo Traveling">
+    <div class="splash-screen__wordmark" aria-hidden="true">TRAVELING</div>
+    <svg class="splash-screen__scene" viewBox="0 0 720 360" aria-hidden="true">
+      <defs>
+        <linearGradient id="splash-ocean" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="#0f172a"></stop>
+          <stop offset="100%" stop-color="#070a12"></stop>
+        </linearGradient>
+        <clipPath id="splash-globe-clip"><circle cx="360" cy="204" r="132"></circle></clipPath>
+      </defs>
+      <circle class="splash-screen__globe" cx="360" cy="204" r="132"></circle>
+      <g class="splash-screen__graticule" clip-path="url(#splash-globe-clip)">
+        <ellipse cx="360" cy="204" rx="132" ry="42"></ellipse>
+        <ellipse cx="360" cy="204" rx="132" ry="84"></ellipse>
+        <ellipse cx="360" cy="204" rx="52" ry="132"></ellipse>
+        <ellipse cx="360" cy="204" rx="100" ry="132"></ellipse>
+      </g>
+      <path class="splash-screen__flight-path" d="M 12 268 C 132 104, 258 286, 374 176 S 548 62, 708 132"></path>
+      <g class="splash-screen__airliner">
+        <path class="splash-screen__airliner-wing" d="M 20 -5 L -20 -7 L -94 -47 L -104 -43 L -56 -3 L 8 3 Z"></path>
+        <path class="splash-screen__airliner-wing" d="M 20 5 L -20 7 L -94 47 L -104 43 L -56 3 L 8 -3 Z"></path>
+        <path class="splash-screen__airliner-tail" d="M -42 -4 L -76 -35 L -86 -31 L -68 -2 Z"></path>
+        <path class="splash-screen__airliner-tail" d="M -42 4 L -76 35 L -86 31 L -68 2 Z"></path>
+        <ellipse class="splash-screen__airliner-engine" cx="-42" cy="-23" rx="13" ry="7"></ellipse>
+        <ellipse class="splash-screen__airliner-engine" cx="-42" cy="23" rx="13" ry="7"></ellipse>
+        <path class="splash-screen__airliner-body" d="M -78 0 C -60 -6 -36 -8 -5 -8 L 26 -7 L 50 -3 L 70 0 L 50 3 L 26 7 L -5 8 C -36 8 -60 6 -78 0 Z"></path>
+        <path class="splash-screen__airliner-cockpit" d="M 47 -2 L 63 0 L 47 2 Q 51 0 47 -2 Z"></path>
+        <animateMotion id="splash-flight" begin="indefinite" dur="2.55s" rotate="auto" path="M 12 268 C 132 104, 258 286, 374 176 S 548 62, 708 132" keyTimes="0;0.68;0.88;1" keySplines="0.2 0.75 0.24 1;0.14 0.55 0.25 1;0.1 0 0.4 1" calcMode="spline" fill="freeze"></animateMotion>
+        <animateTransform id="splash-flight-scale" attributeName="transform" additive="sum" type="scale" begin="splash-flight.begin" dur="2.55s" values=".76 .76;1.05 1.05;1.34 1.34;4.8 4.8" keyTimes="0;.68;.88;1" calcMode="spline" keySplines=".2 .75 .24 1;.14 .55 .25 1;.1 0 .4 1" fill="freeze"></animateTransform>
+        <animate id="splash-flight-fade" attributeName="opacity" begin="splash-flight.begin" dur="2.55s" values="0;1;1;0" keyTimes="0;.08;.82;1" fill="freeze"></animate>
+      </g>
+    </svg>
+  </div>
+
+  <header class="app-header">
+    <button class="app-header__brand" id="home-button" type="button" aria-label="Voltar à visão global">
+      <span class="app-header__brand-accent">TRAVEL</span>ING
+    </button>
+
+    <div class="app-header__actions">
+      <div class="explorer-counter" aria-label="Países marcados como visitados">
+        <span aria-hidden="true">🌍</span>
+        <span class="explorer-counter__label">Visitados</span>
+        <strong class="explorer-counter__value" id="visited-count">0</strong>
+        <span class="explorer-counter__total">/ 193</span>
+      </div>
+
+      <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
+        <span class="visa-filter__flag" aria-hidden="true">🇧🇷</span>
+        <span class="visa-filter__label">Isento de visto</span>
+        <strong class="visa-filter__count" id="visa-free-count">0</strong>
+      </button>
+
+      <button class="icon-button" id="theme-button" type="button" aria-label="Ativar modo claro">☀️</button>
+
+      <div class="search" id="country-search">
+        <label class="sr-only" for="country-search-input">Buscar país</label>
+        <input
+          class="search__input"
+          id="country-search-input"
+          type="search"
+          placeholder="Buscar país..."
+          autocomplete="off"
+          spellcheck="false"
+          aria-autocomplete="list"
+          aria-controls="country-search-results"
+        >
+        <span class="search__icon" aria-hidden="true">⌕</span>
+        <div class="search__results" id="country-search-results" role="listbox" aria-label="Sugestões de países"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="globe" id="globe">
+    <canvas class="starfield" id="starfield-canvas" aria-hidden="true"></canvas>
+    <div class="globe__stage" id="globe-stage" aria-label="Globo 3D interativo"></div>
+    <div class="globe__visual-overlay" aria-hidden="true"></div>
+    <div class="globe__status" id="globe-status">
+      <span class="globe__spinner" aria-hidden="true"></span>
+      <span>Construindo países em 3D…</span>
+    </div>
+    <div class="globe__fallback" id="globe-fallback" role="status">
+      <strong>Globo 3D indisponível</strong>
+      <span>Use a busca para abrir os guias de países.</span>
+    </div>
+  </main>
+
+  <nav class="continent-nav" aria-label="Selecionar continente">
+    <button class="continent-nav__button" type="button" data-continent="EU"><span class="continent-nav__dot continent-nav__dot--europe"></span>Europa</button>
+    <button class="continent-nav__button" type="button" data-continent="NA"><span class="continent-nav__dot continent-nav__dot--north-america"></span>Am. Norte</button>
+    <button class="continent-nav__button" type="button" data-continent="SA"><span class="continent-nav__dot continent-nav__dot--south-america"></span>Am. Sul</button>
+    <button class="continent-nav__button" type="button" data-continent="AF"><span class="continent-nav__dot continent-nav__dot--africa"></span>África</button>
+    <button class="continent-nav__button" type="button" data-continent="AS"><span class="continent-nav__dot continent-nav__dot--asia"></span>Ásia</button>
+    <button class="continent-nav__button" type="button" data-continent="OC"><span class="continent-nav__dot continent-nav__dot--oceania"></span>Oceania</button>
+  </nav>
+
+  <div class="navigation-trail" id="navigation-trail" aria-label="Histórico de navegação"></div>
+
+  <button class="miles-launcher" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub">
+    <span class="miles-launcher__icon" aria-hidden="true">✦</span>
+    <span class="miles-launcher__label">Milhas</span>
+  </button>
+
+  <aside class="miles-hub" id="miles-hub" aria-label="Hub de milhas">
+    <header class="miles-hub__header">
+      <div>
+        <span class="eyebrow">Micro-learning</span>
+        <h2 class="miles-hub__title">Milhas sem ruído</h2>
+      </div>
+      <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar hub de milhas">✕</button>
+    </header>
+    <p class="miles-hub__note">Regras de programas, lounges e upgrades mudam. Use este hub como estrutura de decisão e confirme a regra do emissor/companhia antes de agir.</p>
+    <div class="miles-filters" id="miles-filters" aria-label="Filtrar conhecimento de milhas"></div>
+    <div class="knowledge-grid" id="miles-flashcards"></div>
+  </aside>
+
+  <aside class="country-panel" id="country-panel" aria-label="Guia do país">
+    <header class="country-panel__toolbar">
+      <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel">✕</button>
+      <div class="country-panel__path" id="country-path">Mundo</div>
+      <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
+    </header>
+
+    <div class="country-panel__identity">
+      <span class="country-panel__flag" id="country-flag" aria-hidden="true">🌍</span>
+      <div>
+        <div class="country-panel__region" id="country-region">—</div>
+        <h1 class="country-panel__name" id="country-name">—</h1>
+        <div class="data-badge" id="country-data-badge">Dados base</div>
+      </div>
+    </div>
+
+    <div class="country-tabs" role="tablist" aria-label="Seções do guia">
+      <button class="country-tabs__button country-tabs__button--active" type="button" role="tab" data-tab="overview" aria-selected="true">Visão geral</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="entry" aria-selected="false">Entrada</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="culture" aria-selected="false">Cultura</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="flights" aria-selected="false">Voos</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="checklist" aria-selected="false">Checklist</button>
+    </div>
+
+    <div class="country-panel__content">
+      <section class="country-tab country-tab--active" id="tab-overview" data-tab-panel="overview" role="tabpanel">
+        <div class="media-strip" id="country-media" aria-label="Fotos do destino"></div>
+        <div class="info-grid" id="country-basics"></div>
+        <div id="currency-converter" aria-live="polite"></div>
+        <section class="content-section">
+          <div class="section-heading">Melhor época</div>
+          <div class="month-chart" id="month-chart"></div>
+          <p class="body-copy" id="best-time-copy"></p>
+        </section>
+      </section>
+
+      <section class="country-tab" id="tab-entry" data-tab-panel="entry" role="tabpanel">
+        <div class="notice-card">
+          <strong>Informação dinâmica</strong>
+          <span>Vistos, fronteiras e requisitos sanitários podem mudar. Confirme em fonte oficial antes da viagem.</span>
+        </div>
+        <div class="stack" id="entry-content"></div>
+      </section>
+
+      <section class="country-tab" id="tab-culture" data-tab-panel="culture" role="tabpanel">
+        <div class="content-section">
+          <div class="section-heading">Sabores</div>
+          <div class="stack" id="food-content"></div>
+        </div>
+        <div class="content-section">
+          <div class="section-heading">Etiqueta</div>
+          <div class="stack" id="etiquette-content"></div>
+        </div>
+        <div class="tag-list" id="vibe-content"></div>
+      </section>
+
+      <section class="country-tab" id="tab-flights" data-tab-panel="flights" role="tabpanel">
+        <div class="route-builder">
+          <div class="route-builder__airports">
+            <div><span class="eyebrow">Origem</span><strong id="route-origin-code">—</strong><small id="route-origin-city">Selecione um aeroporto</small></div>
+            <div class="route-builder__line" aria-hidden="true"><span>✈</span></div>
+            <div><span class="eyebrow">Destino</span><strong id="route-destination-code">—</strong><small id="route-destination-city">—</small></div>
+          </div>
+
+          <div class="form-grid">
+            <label class="form-field form-field--wide">
+              <span class="form-field__label">Aeroporto de origem — IATA ou ICAO</span>
+              <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off">
+              <datalist id="airport-suggestions"></datalist>
+            </label>
+            <label class="form-field">
+              <span class="form-field__label">Cabine</span>
+              <select class="form-field__control" id="cabin-select">
+                <option value="economy">Econômica</option>
+                <option value="premium">Premium Economy</option>
+                <option value="business">Executiva</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span class="form-field__label">Mês</span>
+              <select class="form-field__control" id="travel-month-select"></select>
+            </label>
+          </div>
+
+          <button class="primary-button" id="calculate-route-button" type="button">Calcular rota</button>
+          <div class="route-result" id="route-result" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="country-tab" id="tab-checklist" data-tab-panel="checklist" role="tabpanel">
+        <div class="checklist" id="checklist-content"></div>
+        <div class="checklist__actions">
+          <button class="secondary-button" id="checklist-complete-button" type="button">Marcar tudo</button>
+          <button class="secondary-button" id="checklist-clear-button" type="button">Limpar</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="country-tooltip" id="country-tooltip" role="tooltip"></div>
+
+  <script>
+  window.__travelingBoot = { interactive: false };
+  window.setTimeout(function () {
+    if (window.__travelingBoot && window.__travelingBoot.interactive) return;
+    var splash = document.getElementById('splash-screen');
+    var fallback = document.getElementById('globe-fallback');
+    var status = document.getElementById('globe-status');
+    if (status) status.classList.add('globe__status--hidden');
+    if (fallback) fallback.classList.add('globe__fallback--visible');
+    if (splash) splash.classList.add('splash-screen--exit');
+  }, 8000);
+  </script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
