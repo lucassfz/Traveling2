@@ -44,15 +44,15 @@
   --color-overlay-soft: rgba(255, 255, 255, .80);
   --color-shadow: rgba(15, 23, 42, .12);
   --color-focus: #0284c7;
-  --color-ocean: #e2e8f0;
-  --color-ocean-emissive: #f1f5f9;
+  --color-ocean: #d4e0ec;
+  --color-ocean-emissive: #e4edf5;
   --color-graticule: #0284c7;
   --color-globe-atmosphere: #38bdf8;
   --color-globe-ambient: rgba(2, 132, 199, .10);
-  --color-land: #cbd5e1;
-  --color-land-hover: #94a3b8;
-  --color-land-dimmed: #e8eef5;
-  --color-land-border: #94a3b8;
+  --color-land: #9aafc3;
+  --color-land-hover: #7894ae;
+  --color-land-dimmed: #d7e2ec;
+  --color-land-border: #71869d;
   --color-land-selected: #0284c7;
   --color-border-selected: #0369a1;
   --color-land-visited: #10b981;
@@ -629,7 +629,9 @@ select:focus-visible {
 [data-theme='light'] .detail-card,
 [data-theme='light'] .route-result__card,
 [data-theme='light'] .checklist__group,
-[data-theme='light'] .knowledge-card,
+[data-theme='light'] .miles-path,
+[data-theme='light'] .miles-detail,
+[data-theme='light'] .miles-airport,
 [data-theme='light'] .currency-converter-card {
   border-color: #e2e8f0;
   background: rgba(255, 255, 255, .78);
@@ -656,10 +658,10 @@ select:focus-visible {
 .globe__visual-overlay::before {
   content: '';
   position: absolute;
-  inset: 7% 12% 5%;
+  inset: 13% 23% 10%;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, transparent 51%, color-mix(in srgb, var(--color-globe-atmosphere) 16%, transparent) 72%, transparent 78%);
-  opacity: .38;
+  background: radial-gradient(ellipse at center, transparent 57%, color-mix(in srgb, var(--color-globe-atmosphere) 12%, transparent) 73%, transparent 79%);
+  opacity: .22;
 }
 
 .globe__visual-overlay::after {
@@ -874,22 +876,25 @@ select:focus-visible {
   bottom: 0;
   left: 0;
   z-index: 170;
-  width: min(680px, 96vw);
+  width: min(620px, 96vw);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  gap: var(--space-5);
+  padding: var(--space-6);
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 1px solid var(--color-border-soft);
-  background: color-mix(in srgb, var(--color-overlay) 96%, transparent);
+  background: color-mix(in srgb, var(--color-overlay) 97%, transparent);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(16px);
   transform: translateX(-104%);
   transition: transform var(--motion-slow);
+  pointer-events: none;
 }
 
 .miles-hub--open {
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .miles-hub__header {
@@ -912,12 +917,19 @@ select:focus-visible {
 
 .miles-hub__title {
   margin: var(--space-1) 0 0;
-  font-family: var(--font-sans);
-  font-size: 1.55rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3vw, 2rem);
+  font-weight: 600;
 }
 
-.miles-hub__note,
+.miles-hub__subtitle {
+  margin: var(--space-2) 0 0;
+  max-width: 42ch;
+  color: var(--color-text-secondary);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
 .notice-card,
 .body-copy {
   color: var(--color-text-secondary);
@@ -925,127 +937,228 @@ select:focus-visible {
   line-height: 1.65;
 }
 
-.miles-filters {
+.miles-tabs {
+  position: sticky;
+  top: calc(var(--space-6) * -1);
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  margin: 0 calc(var(--space-6) * -1);
+  padding: var(--space-3) var(--space-6);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-block: 1px solid var(--color-border-soft);
+  background: var(--color-background-subtle);
 }
 
-.miles-filter {
+.miles-tabs::-webkit-scrollbar { display: none; }
+
+.miles-tab {
   appearance: none;
-  min-height: 30px;
-  padding: 5px 9px;
-  border: 1px solid var(--color-border-soft);
-  border-radius: 999px;
-  background: var(--color-surface);
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
   color: var(--color-text-secondary);
-  font-size: .75rem;
+  font-size: .8rem;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color var(--motion-fast), color var(--motion-fast), background-color var(--motion-fast);
 }
 
-.miles-filter:hover,
-.miles-filter--active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+.miles-tab:hover,
+.miles-tab--active {
+  border-bottom-color: var(--color-accent);
   color: var(--color-accent-strong);
 }
 
-.miles-filter:focus-visible,
-.knowledge-card__toggle:focus-visible,
-.checklist__item:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+.miles-hub__content,
+.miles-panel {
+  min-width: 0;
 }
 
-.knowledge-grid {
+.miles-panel[hidden],
+.miles-text-button[hidden] {
+  display: none;
+}
+
+.miles-section-header h3 {
+  margin: var(--space-2) 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.miles-section-header p,
+.miles-section-copy,
+.miles-footnote,
+.miles-detail__body,
+.miles-airport__body,
+.miles-soft-note p {
+  color: var(--color-text-secondary);
+  font-size: .875rem;
+  line-height: 1.65;
+}
+
+.miles-section-header p {
+  max-width: 58ch;
+  margin: 0 0 var(--space-6);
+}
+
+.miles-paths,
+.miles-detail-list,
+.miles-airport-results {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.knowledge-card {
-  overflow: hidden;
+.miles-path,
+.miles-detail,
+.miles-airport {
+  min-width: 0;
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-  transition: border-color var(--motion-fast), background-color var(--motion-fast), transform var(--motion-fast);
 }
 
-.knowledge-card:hover {
+.miles-path[open],
+.miles-detail[open],
+.miles-airport[open] {
   border-color: var(--color-border-strong);
-  background: var(--color-surface-hover);
-  transform: translateY(-1px);
 }
 
-.knowledge-card--expanded {
-  grid-column: 1 / -1;
-  border-color: color-mix(in srgb, var(--color-accent) 56%, var(--color-border-soft));
-}
-
-.knowledge-card__toggle {
-  appearance: none;
-  width: 100%;
-  display: grid;
-  gap: 8px;
-  padding: var(--space-4);
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.knowledge-card__meta {
+.miles-path summary,
+.miles-detail summary,
+.miles-airport summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  cursor: pointer;
+  list-style: none;
 }
 
-.knowledge-card__icon {
+.miles-path summary::-webkit-details-marker,
+.miles-detail summary::-webkit-details-marker,
+.miles-airport summary::-webkit-details-marker {
+  display: none;
+}
+
+.miles-path summary:focus-visible,
+.miles-detail summary:focus-visible,
+.miles-airport summary:focus-visible,
+.miles-text-button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.miles-path__number {
+  align-self: flex-start;
+  min-width: 2rem;
   color: var(--color-accent-strong);
-  font-weight: 800;
+  font-size: .8rem;
+  font-weight: 700;
 }
 
-.knowledge-card__tag {
-  color: var(--color-text-muted);
-  font-size: .75rem;
-  font-weight: 700;
-  letter-spacing: .04em;
+.miles-path__text,
+.miles-detail summary > span:first-child,
+.miles-airport__identity {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.miles-path__text strong {
+  font-size: .82rem;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
-.knowledge-card__title {
-  font-size: .875rem;
-  font-weight: 800;
-}
-
-.knowledge-card__preview,
-.knowledge-card__drawer {
+.miles-path__text > span,
+.miles-detail__summary,
+.miles-airport__identity small {
   color: var(--color-text-secondary);
-  font-size: .875rem;
-  line-height: 1.55;
+  font-size: .82rem;
+  line-height: 1.5;
 }
 
-.knowledge-card__action {
-  display: flex;
-  justify-content: space-between;
+.miles-path__action,
+.miles-detail__chevron,
+.miles-airport__more {
+  margin-left: auto;
   color: var(--color-accent-strong);
   font-size: .75rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.knowledge-card__drawer {
+.miles-path[open] .miles-path__action span,
+.miles-detail[open] .miles-detail__chevron,
+.miles-airport[open] .miles-airport__more {
+  display: inline-block;
+  transform: rotate(45deg);
+}
+
+.miles-path__body,
+.miles-detail__body,
+.miles-airport__body {
   padding: 0 var(--space-4) var(--space-4);
   border-top: 1px solid var(--color-border-soft);
 }
 
-.knowledge-card__drawer[hidden] { display: none; }
-.knowledge-card__drawer ul { margin: var(--space-3) 0 0; padding-left: 1.1rem; }
-.knowledge-card__drawer li + li { margin-top: 7px; }
+.miles-copy-list {
+  margin: var(--space-4) 0 0;
+  padding-left: 1.25rem;
+  color: var(--color-text-secondary);
+  font-size: .875rem;
+  line-height: 1.65;
+}
+
+.miles-copy-list li + li { margin-top: var(--space-3); }
+.miles-detail__body p,
+.miles-airport__body p { margin: var(--space-4) 0 0; }
+.miles-footnote { margin: var(--space-6) 0 0; }
+.miles-pending { color: var(--color-text-muted); }
+.miles-trust { display: block; margin-top: var(--space-4); color: var(--color-text-muted); font-size: .75rem; }
+.miles-trust a { color: var(--color-accent-strong); }
+
+.miles-journey {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.miles-journey li {
+  position: relative;
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.miles-section-copy { margin: 0 0 var(--space-5); }
+.miles-soft-note { margin-top: var(--space-5); padding: var(--space-4); border-left: 2px solid var(--color-accent); background: var(--color-accent-soft); }
+.miles-soft-note p { margin: var(--space-2) 0 0; }
+.miles-subheading { margin: var(--space-6) 0 var(--space-3); font-size: .95rem; }
+.miles-text-button { display: inline-flex; align-items: center; gap: var(--space-2); margin-top: var(--space-5); padding: 7px 0; border: 0; background: none; color: var(--color-accent-strong); font-size: .85rem; font-weight: 700; cursor: pointer; }
+.miles-text-button:hover { text-decoration: underline; }
+.miles-connection { margin: 0 0 var(--space-6); color: var(--color-text-secondary); font-size: .77rem; line-height: 1.7; }
+.miles-connection span { color: var(--color-accent-strong); }
+.miles-search-label { display: block; margin-bottom: var(--space-2); font-size: .8rem; font-weight: 700; }
+.miles-search { width: 100%; min-height: 44px; margin-bottom: var(--space-5); padding: 0 var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-input); color: var(--color-text); }
+.miles-airport__code { flex: 0 0 auto; min-width: 3.2rem; color: var(--color-accent-strong); font-weight: 800; }
+.miles-airport__identity small { overflow-wrap: anywhere; }
+.miles-airport__body h4 { margin: var(--space-4) 0 0; font-size: .9rem; }
+.miles-empty { color: var(--color-text-secondary); font-size: .875rem; }
 
 .country-panel {
   position: fixed;
@@ -1847,7 +1960,7 @@ select:focus-visible {
   .search { width: min(230px, 44vw); }
   .country-panel { max-width: 520px; }
   .continent-nav { left: var(--space-2); bottom: var(--space-2); max-width: calc(100vw - 16px); }
-  .miles-launcher { display: none; }
+  .miles-hub { width: min(620px, 100vw); }
 }
 
 @media (max-width: 600px) {
@@ -1865,7 +1978,15 @@ select:focus-visible {
   .form-grid,
   .route-result__summary,
   .route-result__programs,
-  .knowledge-grid { grid-template-columns: 1fr; }
+  .miles-launcher { top: auto; bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); height: 44px; min-width: 104px; flex-direction: row; transform: none; border-left: 1px solid var(--color-border-strong); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+  .miles-launcher__label { writing-mode: horizontal-tb; transform: none; }
+  .miles-hub,
+  [data-theme='light'] .miles-hub { width: 100vw; gap: var(--space-4); padding: var(--space-4); background: var(--color-background-subtle); backdrop-filter: none; }
+  .miles-tabs { top: calc(var(--space-4) * -1); margin-inline: calc(var(--space-4) * -1); padding-inline: var(--space-4); }
+  .miles-tab { padding-inline: 7px; font-size: .75rem; }
+  .miles-path__action { font-size: 0; }
+  .miles-path__action span { font-size: 1rem; }
+  .miles-journey { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .month-chart { gap: 2px; }
   .route-builder__airports { grid-template-columns: 1fr 54px 1fr; padding: var(--space-3); }
   .country-tooltip { display: none; }

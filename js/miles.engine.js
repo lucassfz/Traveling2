@@ -1,157 +1,13 @@
-const CATEGORIES = Object.freeze([
-  { key: 'all', label: 'Todos' },
-  { key: 'card-strategy', label: 'Card Strategy' },
-  { key: 'lounges', label: 'Lounges' },
-  { key: 'upgrades', label: 'Upgrades' },
-  { key: 'redemption', label: 'Redemption Sweet Spots' }
-]);
-
-const KNOWLEDGE_CARDS = Object.freeze([
-  {
-    id: 'transferable-vs-cobranded', category: 'card-strategy', icon: '↔',
-    title: 'Transferível vs. co-branded', preview: 'Flexibilidade costuma valer mais do que acumular tudo em um único programa.',
-    detail: [
-      'Pontos transferíveis preservam opções até você encontrar disponibilidade-prêmio.',
-      'Cartões co-branded podem fazer sentido quando benefícios específicos da companhia têm uso recorrente.',
-      'Compare taxa anual, earn rate, validade e parceiros antes de concentrar gastos.'
-    ]
-  },
-  {
-    id: 'category-multipliers', category: 'card-strategy', icon: '×',
-    title: 'Multiplicadores por categoria', preview: 'Direcione gastos para a categoria que realmente bonifica aquele cartão.',
-    detail: [
-      'Mapeie alimentação, viagem, combustível, assinaturas e compras internacionais separadamente.',
-      'O maior multiplicador nominal não compensa uma anuidade alta se seu volume na categoria for baixo.',
-      'Evite criar gasto extra apenas para gerar pontos.'
-    ]
-  },
-  {
-    id: 'transfer-bonus', category: 'card-strategy', icon: '%',
-    title: 'Bônus de transferência', preview: 'Bônus só é vantagem quando existe um uso definido depois da transferência.',
-    detail: [
-      'Campanhas podem elevar significativamente o saldo recebido, mas percentuais e regras variam por emissor e programa.',
-      'Confirme validade, elegibilidade e prazo de crédito antes de transferir.',
-      'Não transfira pontos especulativamente se o programa de destino tiver expiração ou desvalorização frequente.'
-    ]
-  },
-  {
-    id: 'cpp', category: 'card-strategy', icon: '¢',
-    title: 'CPP / valor por ponto', preview: 'Meça o valor do resgate em vez de olhar só para a quantidade de milhas.',
-    detail: [
-      'CPP = (preço em dinheiro evitado − taxas do resgate) ÷ pontos usados.',
-      'Compare sempre com a tarifa que você realmente compraria, não com a tarifa cheia mais cara disponível.',
-      'Um CPP alto não justifica uma viagem que você não faria em dinheiro.'
-    ]
-  },
-  {
-    id: 'priority-pass', category: 'lounges', icon: 'P',
-    title: 'Priority Pass', preview: 'A marca da rede não define sozinha quantas visitas ou convidados você possui.',
-    detail: [
-      'Planos emitidos por cartões podem ter regras diferentes de uma assinatura comprada diretamente.',
-      'Número de visitas, política de convidados e cobrança adicional dependem do emissor/plano.',
-      'Cheque o lounge e seu terminal antes de passar pela segurança ou imigração.'
-    ]
-  },
-  {
-    id: 'dragonpass-loungekey', category: 'lounges', icon: 'D',
-    title: 'DragonPass & LoungeKey', preview: 'Acesso é uma combinação de rede + benefício contratado pelo seu cartão.',
-    detail: [
-      'Ter um cartão compatível não significa automaticamente visitas ilimitadas.',
-      'Alguns emissores exigem cadastro prévio ou cobrança por visita/convidado.',
-      'Use o aplicativo/site do benefício e do aeroporto para confirmar operação no dia.'
-    ]
-  },
-  {
-    id: 'centurion-airline', category: 'lounges', icon: '◈',
-    title: 'Centurion & lounges de companhia', preview: 'Regras de cartão, status, cabine e itinerário podem ser totalmente diferentes.',
-    detail: [
-      'Centurion Lounges seguem regras do produto e do mercado emissor do cartão.',
-      'Lounges de companhia/aliança normalmente consideram cabine, status e voo elegível do mesmo dia.',
-      'Convidados nunca devem ser presumidos: valide a regra específica antes da viagem.'
-    ]
-  },
-  {
-    id: 'layover-lounge', category: 'lounges', icon: '⌛',
-    title: 'Layover com lounge', preview: 'O lounge certo reduz atrito; o lounge errado pode aumentar risco de perder a conexão.',
-    detail: [
-      'Priorize lounges no mesmo terminal/área segura do próximo embarque.',
-      'Considere imigração, nova inspeção de segurança e tempo de caminhada até o portão.',
-      'Saia do lounge com margem; horário de fechamento de portão pode anteceder a partida.'
-    ]
-  },
-  {
-    id: 'opup', category: 'upgrades', icon: '↑',
-    title: 'Operational Upgrade (OpUp)', preview: 'É uma correção operacional, não um benefício garantido nem uma estratégia comprável.',
-    detail: [
-      'Pode ocorrer quando há desequilíbrio de cabine, oversale ou necessidade operacional.',
-      'Status, tarifa e regras internas podem influenciar prioridade, mas não criam direito ao upgrade.',
-      'Nunca compre uma tarifa esperando OpUp como parte do valor da viagem.'
-    ]
-  },
-  {
-    id: 'upgrade-eligibility', category: 'upgrades', icon: 'Y',
-    title: 'Fare class importa', preview: 'Y/B/M e tarifas descontadas podem ter elegibilidade de upgrade diferente.',
-    detail: [
-      'A letra da classe tarifária é diferente da cabine comercial mostrada no site.',
-      'Alguns instrumentos de upgrade exigem classes específicas; tarifas muito descontadas podem ser excluídas.',
-      'Leia a tabela do programa antes de escolher uma tarifa apenas pelo preço.'
-    ]
-  },
-  {
-    id: 'bid-upgrade', category: 'upgrades', icon: '⇧',
-    title: 'Bid / cash upgrade', preview: 'Compare o lance com a diferença real de tarifa e com o que você valoriza na cabine.',
-    detail: [
-      'Convites e valores mínimos dependem da companhia, rota, tarifa e inventário.',
-      'Considere bagagem, lounge, assento e crédito de milhas: nem todo upgrade pós-compra herda todos os benefícios.',
-      'Defina um teto antes de ofertar para evitar pagar mais que uma tarifa superior vendida diretamente.'
-    ]
-  },
-  {
-    id: 'mileage-upgrade', category: 'upgrades', icon: 'M',
-    title: 'Mileage Upgrade Award', preview: 'Milhas para upgrade exigem dois inventários: tarifa elegível e espaço de upgrade.',
-    detail: [
-      'Disponibilidade de assento à venda não significa disponibilidade para upgrade com milhas.',
-      'Copay, taxas e regras de lista de espera podem existir.',
-      'Compare com emitir a cabine premium diretamente com pontos; às vezes é mais eficiente.'
-    ]
-  },
-  {
-    id: 'award-release', category: 'redemption', icon: 'T',
-    title: 'T-365 vs. T-14', preview: 'Procure no início do calendário e novamente perto da partida — sem tratar nenhuma janela como regra universal.',
-    detail: [
-      'Companhias e programas liberam calendário em horizontes diferentes; ~T-365 é apenas uma referência comum.',
-      'Algumas empresas liberam assentos adicionais nas últimas semanas quando a cabine não vendeu como previsto.',
-      'T-14 é uma janela de busca útil, não uma promessa de disponibilidade.'
-    ]
-  },
-  {
-    id: 'mct', category: 'redemption', icon: 'MCT',
-    title: 'Minimum Connection Time', preview: 'MCT é o mínimo operacional publicado; não é necessariamente o tempo confortável para você.',
-    detail: [
-      'O valor varia por aeroporto, combinação doméstico/internacional, terminais e companhia.',
-      'Bilhetes separados podem exigir retirada de bagagem e novo check-in, aumentando muito o risco.',
-      'Para conexões críticas, prefira margem acima do mínimo e um único bilhete quando possível.'
-    ]
-  },
-  {
-    id: 'partner-awards', category: 'redemption', icon: 'A',
-    title: 'Star Alliance / oneworld / SkyTeam', preview: 'O parceiro que opera o voo e o programa usado para emitir enxergam inventários diferentes.',
-    detail: [
-      'Nem todo assento-prêmio do programa da companhia operadora aparece para parceiros.',
-      'Pesquise segmento por segmento para descobrir onde a disponibilidade desaparece.',
-      'Compare tabelas, taxas e regras de alteração do programa emissor antes de transferir pontos.'
-    ]
-  },
-  {
-    id: 'positioning', category: 'redemption', icon: '◎',
-    title: 'Positioning flight', preview: 'Sair de outro hub pode abrir disponibilidade, mas transforme a economia em custo total da viagem.',
-    detail: [
-      'Some voo de posicionamento, hotel, bagagem, transporte e margem contra atraso.',
-      'Em bilhetes separados, a companhia do longo curso normalmente não protege uma conexão perdida causada pelo primeiro bilhete.',
-      'Quando a economia permanece relevante após esses custos, o posicionamento pode ser racional.'
-    ]
-  }
-]);
+import {
+  AIRLINE_UPGRADE_EXAMPLES,
+  AIRPORT_GUIDES,
+  CARD_OFFERS,
+  CARD_PROFILES,
+  LEARNING_PATHS,
+  LOUNGE_TYPES,
+  MILES_TABS,
+  UPGRADE_METHODS
+} from './miles.data.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -162,66 +18,234 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function officialUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function isVerified(item) {
+  const match = /^(\d{4})-(\d{2})$/.exec(item?.verifiedAt ?? '');
+  return Boolean(item?.status === 'verified' && match && Number(match[2]) >= 1 && Number(match[2]) <= 12 && officialUrl(item.officialSource));
+}
+
+function trustLine(item) {
+  if (item?.status === 'outdated') return '<span class="miles-trust">Informação desatualizada · confirme as regras atuais em fonte oficial</span>';
+  if (!isVerified(item)) return '<span class="miles-trust">Dados específicos pendentes de verificação</span>';
+  const [year, month] = item.verifiedAt.split('-').map(Number);
+  const date = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(year, month - 1, 1)));
+  return `<span class="miles-trust">Verificado em ${escapeHtml(date)} · <a href="${escapeHtml(officialUrl(item.officialSource))}" target="_blank" rel="noopener noreferrer">Fonte oficial</a></span>`;
+}
+
+function normalize(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function detailRow(title, summary, body) {
+  return `<details class="miles-detail">
+    <summary><span><strong>${escapeHtml(title)}</strong><span class="miles-detail__summary">${escapeHtml(summary)}</span></span><span class="miles-detail__chevron" aria-hidden="true">+</span></summary>
+    <div class="miles-detail__body">${body}</div>
+  </details>`;
+}
+
+function list(items) {
+  return `<ul class="miles-copy-list">${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+}
+
+function sectionHeading(kicker, title, intro) {
+  return `<header class="miles-section-header"><span class="eyebrow">${escapeHtml(kicker)}</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(intro)}</p></header>`;
+}
+
+function renderOverview() {
+  return `${sectionHeading('Comece por aqui', 'Milhas que fazem sentido para sua viagem', 'Pontos e milhas são ferramentas para pagar melhor e viajar com mais conforto. Primeiro entenda de onde vêm, depois compare o uso.')}
+    <div class="miles-paths" aria-label="Três caminhos para começar">
+      ${LEARNING_PATHS.map((path, index) => `<details class="miles-path">
+        <summary><span class="miles-path__number">0${index + 1}</span><span class="miles-path__text"><strong>${escapeHtml(path.title)}</strong><span>${escapeHtml(path.summary)}</span></span><span class="miles-path__action">Saiba mais <span aria-hidden="true">+</span></span></summary>
+        <div class="miles-path__body">${list(path.lessons)}</div>
+      </details>`).join('')}
+    </div>
+    <p class="miles-footnote">Antes de transferir ou resgatar, confira disponibilidade, taxas e validade nas fontes oficiais.</p>`;
+}
+
+function renderCardRecord(card) {
+  const name = `${card.name || 'Cartão'} · ${card.issuer || 'Emissor a confirmar'}`;
+  if (!isVerified(card)) return detailRow(name, 'Informações pendentes de verificação', `<p>Benefícios e condições serão exibidos após conferência em fonte oficial.</p>${trustLine(card)}`);
+  const facts = [
+    `Acúmulo: ${card.earning?.value ?? 'não informado'} ${card.earning?.unit ?? ''}. ${card.earning?.notes ?? ''}`,
+    `Programa: ${card.loyaltyProgram || 'não informado'}`,
+    `Salas VIP: ${card.loungeAccess?.networks?.join(', ') || 'não informado'}; visitas: ${card.loungeAccess?.visits || 'não informado'}; condições: ${card.loungeAccess?.conditions || 'consulte o emissor'}`,
+    `Anuidade: ${card.annualFee || 'não informada'}`,
+    `Benefícios de viagem: ${card.travelBenefits || 'não informados'}`,
+    `Perfil ideal: ${card.idealFor || 'não informado'}`
+  ];
+  return detailRow(name, card.idealFor || 'Veja os critérios', `${list(facts)}${trustLine(card)}`);
+}
+
+function renderCards() {
+  return `${sectionHeading('Escolha pelo uso', 'Cartões em destaque por perfil', 'Não existe um cartão melhor para todas as pessoas. Compare seu gasto, renda, anuidade, banco, companhia preferida e frequência de viagem.')}
+    <div class="miles-detail-list">${CARD_PROFILES.map(profile => {
+      const cards = CARD_OFFERS.filter(card => card.profile === profile.id);
+      const body = `<p>${escapeHtml(profile.guidance)}</p>${cards.length ? cards.map(renderCardRecord).join('') : '<p class="miles-pending">Produtos e condições atuais aguardam verificação em fontes oficiais.</p>'}`;
+      return detailRow(profile.label, profile.guidance, body);
+    }).join('')}</div>
+    <p class="miles-footnote">A pontuação anunciada sozinha não revela o custo real do cartão. Confira também regras para isenção e validade dos pontos.</p>`;
+}
+
+function renderLounges() {
+  return `${sectionHeading('Acesso sem surpresa', 'Como entrar em uma sala VIP?', 'O benefício só funciona quando as quatro partes da sua viagem são compatíveis.')}
+    <ol class="miles-journey" aria-label="Caminho para acessar uma sala VIP"><li>Cartão elegível</li><li>Rede parceira</li><li>Aeroporto</li><li>Sala compatível</li></ol>
+    <p class="miles-section-copy">A mesma rede pode oferecer regras diferentes conforme cartão e emissor. O logotipo não garante entrada gratuita ou ilimitada.</p>
+    <div class="miles-detail-list">${LOUNGE_TYPES.map(type => detailRow(type.name, 'Entenda como funciona', `<p>${escapeHtml(type.explanation)}</p>`)).join('')}</div>
+    ${detailRow('Antes de sair de casa', 'Confira as condições do seu acesso', list([
+      'Categoria do cartão, emissor e eventual gasto mínimo exigido.',
+      'Quantidade de visitas, política de convidados e possíveis cobranças.',
+      'Aeroporto, terminal, horário e contrato atual da sala com a rede.'
+    ]))}
+    <button class="miles-text-button" type="button" data-miles-go="airports">Explorar aeroportos <span aria-hidden="true">→</span></button>`;
+}
+
+function renderUpgradeExample(example) {
+  const title = `${example.airline || 'Companhia'} · ${example.method || 'Método'}`;
+  if (!isVerified(example)) return detailRow(title, 'Regra pendente de verificação', `<p>Confira as condições atuais com a companhia aérea.</p>${trustLine(example)}`);
+  return detailRow(title, example.eligibleRouteCabin || 'Condições da companhia', `${list([
+    `Rota ou cabine: ${example.eligibleRouteCabin || 'consulte a companhia'}`,
+    `Quando solicitar: ${example.timing || 'consulte a companhia'}`,
+    `Pontos ou milhas: ${example.milesRequired || 'consulte a companhia'}`,
+    `Restrições: ${example.restrictions || 'consulte a companhia'}`
+  ])}${trustLine(example)}`);
+}
+
+function renderUpgrades() {
+  return `${sectionHeading('Guia prático', 'Quatro caminhos para um upgrade', 'Upgrade é uma mudança de cabine sujeita às regras e à disponibilidade do seu voo.')}
+    <div class="miles-detail-list">${UPGRADE_METHODS.map(method => detailRow(method.title, method.summary, `<p>${escapeHtml(method.detail)}</p>`)).join('')}</div>
+    <div class="miles-soft-note"><strong>Antes de decidir</strong><p>Veja a classe tarifária do bilhete, o custo total e quais benefícios da cabine superior estarão incluídos.</p></div>
+    ${AIRLINE_UPGRADE_EXAMPLES.length ? `<h4 class="miles-subheading">Exemplos por companhia</h4>${AIRLINE_UPGRADE_EXAMPLES.map(renderUpgradeExample).join('')}` : '<p class="miles-footnote">Exemplos por companhia serão incluídos quando suas regras forem verificadas em fonte oficial.</p>'}`;
+}
+
+function airportFacts(label, items) {
+  return items?.length ? `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(items.join(', '))}</p>` : '';
+}
+
+function renderAirport(guide, airport) {
+  const city = airport?.city || 'Cidade a confirmar';
+  const country = airport?.country ? new Intl.DisplayNames('pt-BR', { type: 'region' }).of(airport.country) : 'País a confirmar';
+  const heading = `${guide.iata} · ${city}`;
+  let facts = '<p>Terminais, companhias, salas VIP, conexões e benefícios locais aguardam verificação em fonte oficial.</p>';
+  if (isVerified(guide)) {
+    const verifiedLounges = guide.lounges?.filter(isVerified) ?? [];
+    facts = `${airportFacts('Terminais', guide.terminals)}${airportFacts('Companhias', guide.airlines)}
+      ${verifiedLounges.length ? `<p><strong>Salas VIP:</strong></p>${list(verifiedLounges.map(lounge => `${lounge.name} · ${lounge.terminal || 'terminal a confirmar'} · ${lounge.networks?.join(', ') || 'rede a confirmar'}`))}` : '<p>Salas VIP ainda não verificadas para este aeroporto.</p>'}
+      ${guide.fastTrack ? `<p><strong>Fast Track:</strong> ${escapeHtml(guide.fastTrack)}</p>` : ''}
+      ${guide.connectionNotes ? `<p><strong>Conexões:</strong> ${escapeHtml(guide.connectionNotes)}</p>` : ''}`;
+  }
+  return `<details class="miles-airport"><summary><span class="miles-airport__code">${escapeHtml(guide.iata)}</span><span class="miles-airport__identity"><strong>${escapeHtml(city)}</strong><small>${escapeHtml(country)} · ${escapeHtml(airport?.name || 'Aeroporto')}</small></span><span class="miles-airport__more" aria-hidden="true">+</span></summary>
+    <div class="miles-airport__body"><h4>${escapeHtml(heading)}</h4>${facts}${trustLine(guide)}</div></details>`;
+}
+
+function renderAirports() {
+  return `${sectionHeading('Na prática', 'Aeroportos e seus benefícios', 'Encontre o aeroporto e abra os detalhes. Salas e serviços só aparecem como informação atual depois de verificados.')}
+    <p class="miles-connection">Aeroporto <span>→</span> terminal <span>→</span> companhia <span>→</span> sala VIP <span>→</span> conexão <span>→</span> benefícios</p>
+    <label class="miles-search-label" for="miles-airport-search">Buscar aeroporto por código ou cidade</label>
+    <input class="miles-search" id="miles-airport-search" type="search" placeholder="Ex.: GRU, Lisboa, Miami" autocomplete="off">
+    <div class="miles-airport-results" id="miles-airport-results" aria-live="polite"></div>
+    <button class="miles-text-button" id="miles-airports-more" type="button" aria-expanded="false">Ver todos os aeroportos <span aria-hidden="true">→</span></button>`;
+}
+
+const RENDERERS = { overview: renderOverview, cards: renderCards, lounges: renderLounges, upgrades: renderUpgrades, airports: renderAirports };
+
 export class MilesEngine {
-  constructor({ filtersElement, gridElement }) {
-    this.filtersElement = filtersElement;
-    this.gridElement = gridElement;
-    this.activeCategory = 'all';
-    this.expanded = new Set();
-    this.onFilterClick = event => {
-      const button = event.target.closest('[data-miles-category]');
-      if (!button) return;
-      this.activeCategory = button.dataset.milesCategory;
-      this.render();
+  constructor({ tabsElement, contentElement, airportRepository }) {
+    this.tabsElement = tabsElement;
+    this.contentElement = contentElement;
+    this.airportRepository = airportRepository;
+    this.activeTab = 'overview';
+    this.airportQuery = '';
+    this.showAllAirports = false;
+    this.onTabClick = event => {
+      const tab = event.target.closest('[data-miles-tab]');
+      if (tab) this.selectTab(tab.dataset.milesTab);
     };
-    this.onGridClick = event => {
-      const button = event.target.closest('[data-miles-card]');
-      if (!button) return;
-      const id = button.dataset.milesCard;
-      if (this.expanded.has(id)) this.expanded.delete(id);
-      else this.expanded.add(id);
-      this.render();
-      this.gridElement.querySelector(`[data-miles-card="${CSS.escape(id)}"]`)?.focus();
+    this.onTabKeydown = event => {
+      const tab = event.target.closest('[data-miles-tab]');
+      if (!tab) return;
+      const keys = MILES_TABS.map(item => item.key);
+      const current = keys.indexOf(tab.dataset.milesTab);
+      let next = current;
+      if (event.key === 'ArrowRight') next = (current + 1) % keys.length;
+      else if (event.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = keys.length - 1;
+      else return;
+      event.preventDefault();
+      this.selectTab(keys[next], true);
+    };
+    this.onContentClick = event => {
+      const destination = event.target.closest('[data-miles-go]');
+      if (destination) this.selectTab(destination.dataset.milesGo, true);
+      if (event.target.closest('#miles-airports-more')) {
+        this.showAllAirports = !this.showAllAirports;
+        this.renderAirportResults();
+      }
+    };
+    this.onContentInput = event => {
+      if (event.target.id !== 'miles-airport-search') return;
+      this.airportQuery = event.target.value.trim();
+      this.renderAirportResults();
     };
   }
 
   mount() {
-    this.filtersElement.addEventListener('click', this.onFilterClick);
-    this.gridElement.addEventListener('click', this.onGridClick);
-    this.render();
+    this.tabsElement.innerHTML = MILES_TABS.map(tab => `<button class="miles-tab" id="miles-tab-${tab.key}" type="button" role="tab" data-miles-tab="${tab.key}" aria-controls="miles-panel-${tab.key}" aria-selected="false" tabindex="-1">${escapeHtml(tab.label)}</button>`).join('');
+    this.contentElement.innerHTML = MILES_TABS.map(tab => `<section class="miles-panel" id="miles-panel-${tab.key}" role="tabpanel" aria-labelledby="miles-tab-${tab.key}" tabindex="0" hidden>${RENDERERS[tab.key]()}</section>`).join('');
+    this.tabsElement.addEventListener('click', this.onTabClick);
+    this.tabsElement.addEventListener('keydown', this.onTabKeydown);
+    this.contentElement.addEventListener('click', this.onContentClick);
+    this.contentElement.addEventListener('input', this.onContentInput);
+    this.selectTab('overview');
+    this.renderAirportResults();
   }
 
-  render() {
-    this.filtersElement.innerHTML = CATEGORIES.map(category => `
-      <button class="miles-filter ${this.activeCategory === category.key ? 'miles-filter--active' : ''}"
-        type="button" data-miles-category="${category.key}" aria-pressed="${this.activeCategory === category.key}">
-        ${escapeHtml(category.label)}
-      </button>
-    `).join('');
+  selectTab(key, focus = false) {
+    if (!MILES_TABS.some(tab => tab.key === key)) return;
+    this.activeTab = key;
+    for (const tab of this.tabsElement.querySelectorAll('[data-miles-tab]')) {
+      const active = tab.dataset.milesTab === key;
+      tab.classList.toggle('miles-tab--active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    }
+    for (const panel of this.contentElement.querySelectorAll('.miles-panel')) {
+      panel.hidden = panel.id !== `miles-panel-${key}`;
+    }
+    this.contentElement.closest('.miles-hub')?.scrollTo({ top: 0, behavior: 'auto' });
+  }
 
-    const visible = KNOWLEDGE_CARDS.filter(card => this.activeCategory === 'all' || card.category === this.activeCategory);
-    this.gridElement.innerHTML = visible.map(card => {
-      const expanded = this.expanded.has(card.id);
-      return `
-        <article class="knowledge-card ${expanded ? 'knowledge-card--expanded' : ''}">
-          <button class="knowledge-card__toggle" type="button" data-miles-card="${escapeHtml(card.id)}" aria-expanded="${expanded}">
-            <span class="knowledge-card__meta"><span class="knowledge-card__icon">${escapeHtml(card.icon)}</span><span class="knowledge-card__tag">${escapeHtml(CATEGORIES.find(item => item.key === card.category)?.label || '')}</span></span>
-            <span class="knowledge-card__title">${escapeHtml(card.title)}</span>
-            <span class="knowledge-card__preview">${escapeHtml(card.preview)}</span>
-            <span class="knowledge-card__action">${expanded ? 'Fechar' : 'Abrir análise'} <span aria-hidden="true">${expanded ? '−' : '+'}</span></span>
-          </button>
-          <div class="knowledge-card__drawer" ${expanded ? '' : 'hidden'}>
-            <ul>${card.detail.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
-          </div>
-        </article>
-      `;
-    }).join('');
+  renderAirportResults() {
+    const container = this.contentElement.querySelector('#miles-airport-results');
+    const more = this.contentElement.querySelector('#miles-airports-more');
+    if (!container || !more) return;
+    const query = normalize(this.airportQuery);
+    const airportByCode = new Map(this.airportRepository.coreAirports.map(airport => [airport.iata, airport]));
+    const matches = AIRPORT_GUIDES.filter(guide => {
+      const airport = airportByCode.get(guide.iata);
+      return !query || normalize([guide.iata, airport?.name, airport?.city, airport?.country].join(' ')).includes(query);
+    });
+    const visible = query || this.showAllAirports ? matches : matches.slice(0, 3);
+    container.innerHTML = visible.length ? visible.map(guide => renderAirport(guide, airportByCode.get(guide.iata))).join('') : '<p class="miles-empty">Nenhum aeroporto encontrado nesta seleção.</p>';
+    more.hidden = Boolean(query) || matches.length <= 3;
+    more.setAttribute('aria-expanded', String(this.showAllAirports));
+    more.innerHTML = `${this.showAllAirports ? 'Mostrar menos' : `Ver todos os ${matches.length} aeroportos`} <span aria-hidden="true">${this.showAllAirports ? '↑' : '→'}</span>`;
   }
 
   destroy() {
-    this.filtersElement.removeEventListener('click', this.onFilterClick);
-    this.gridElement.removeEventListener('click', this.onGridClick);
+    this.tabsElement.removeEventListener('click', this.onTabClick);
+    this.tabsElement.removeEventListener('keydown', this.onTabKeydown);
+    this.contentElement.removeEventListener('click', this.onContentClick);
+    this.contentElement.removeEventListener('input', this.onContentInput);
   }
 }
-
-export { CATEGORIES, KNOWLEDGE_CARDS };

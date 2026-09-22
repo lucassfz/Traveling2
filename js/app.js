@@ -68,8 +68,8 @@ const elements = {
   milesLauncher: document.getElementById('miles-launcher'),
   milesHub: document.getElementById('miles-hub'),
   milesClose: document.getElementById('miles-close-button'),
-  milesFilters: document.getElementById('miles-filters'),
-  milesFlashcards: document.getElementById('miles-flashcards')
+  milesTabs: document.getElementById('miles-tabs'),
+  milesContent: document.getElementById('miles-content')
 };
 
 function readJsonStorage(key, fallback) {
@@ -649,6 +649,14 @@ function showTooltip(countryKey, clientX, clientY) {
   elements.tooltip.classList.add('country-tooltip--visible');
 }
 
+function setMilesOpen(open, restoreFocus = false) {
+  elements.milesHub.classList.toggle('miles-hub--open', open);
+  elements.milesHub.inert = !open;
+  elements.milesLauncher.setAttribute('aria-expanded', String(open));
+  if (open) elements.milesClose.focus();
+  else if (restoreFocus) elements.milesLauncher.focus();
+}
+
 function bindUiEvents() {
   elements.homeButton.addEventListener('click', home);
   elements.themeButton.addEventListener('click', () => {
@@ -740,19 +748,14 @@ function bindUiEvents() {
 
   elements.milesLauncher.addEventListener('click', () => {
     const open = !elements.milesHub.classList.contains('miles-hub--open');
-    elements.milesHub.classList.toggle('miles-hub--open', open);
-    elements.milesLauncher.setAttribute('aria-expanded', String(open));
+    setMilesOpen(open);
   });
-  elements.milesClose.addEventListener('click', () => {
-    elements.milesHub.classList.remove('miles-hub--open');
-    elements.milesLauncher.setAttribute('aria-expanded', 'false');
-  });
+  elements.milesClose.addEventListener('click', () => setMilesOpen(false, true));
 
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
     if (elements.milesHub.classList.contains('miles-hub--open')) {
-      elements.milesHub.classList.remove('miles-hub--open');
-      elements.milesLauncher.setAttribute('aria-expanded', 'false');
+      setMilesOpen(false, true);
     } else if (elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
   });
 }
@@ -795,8 +798,9 @@ function initialize() {
   updateAirportSuggestions();
   bindUiEvents();
   state.milesEngine = new MilesEngine({
-    filtersElement: elements.milesFilters,
-    gridElement: elements.milesFlashcards
+    tabsElement: elements.milesTabs,
+    contentElement: elements.milesContent,
+    airportRepository
   });
   state.milesEngine.mount();
   markInterfaceReady();
