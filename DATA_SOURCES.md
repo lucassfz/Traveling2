@@ -34,6 +34,15 @@ O catálogo lista salas concretas, não todos os lounges de cada aeroporto. Aces
 
 Disponibilidade nunca é garantida; a tarifa e a rota podem excluir o benefício.
 
+## Entrada nos seis destinos americanos completados
+
+- México: [Embaixada do México no Brasil — vistos e e-visa](https://embamex.sre.gob.mx/brasil/index.php/servicios-consulares/visas). A modalidade eletrônica para brasileiros por via aérea iniciou em 5/2/2026; entrada terrestre/marítima e isenções exigem checagem própria.
+- Cuba: [turismo oficial — vistos, DViajeros e seguro](https://www.cuba.travel/en/useful-information/regulations-and-formalities) e [Embaixada do Brasil em Havana — febre amarela e meios de pagamento](https://www.gov.br/mre/pt-br/embaixada-havana/consular-1/recomendacoes-a-turistas-e-visitantes-brasileiros).
+- Haiti: [Embaixada do Haiti — visto turístico](https://www.haiti.org/tourist-visa/) e [FCDO — alerta de segurança](https://www.gov.uk/foreign-travel-advice/haiti). Prazo de permanência para brasileiros e condições efetivas de viagem seguem `needs-review`.
+- República Dominicana: [turismo oficial — entrada e exceção de validade do passaporte](https://www.godominicanrepublic.com/travel/entry-requirements) e [imigração — e-ticket gratuito obrigatório](https://migracion.gob.do/servicio/solicitud-de-e-ticket-entrada-y-salida-de-pasajeros/).
+- Bahamas: [turismo oficial — vistos e documentos](https://www.bahamas.com/plan-your-trip/island-faq/visa-immigration) e [versão em português — febre amarela](https://www.bahamas.com/pt/plan-your-trip/island-faq/visa-immigration). As páginas oficiais divergem sobre a validade mínima do passaporte; o campo está em `needs-review` e recomenda planejar seis meses.
+- Jamaica: [agência de imigração — isenção brasileira de 90 dias](https://www.pica.gov.jm/node/101), [documentos e formulário C5](https://www.pica.gov.jm/immigration/travel-documents-required) e [turismo oficial — bilhete de saída](https://www.visitjamaica.com/plan-your-adventure/travel-tips/entry-requirements/).
+
 ## Fronteiras europeias e saúde
 
 - [Comissão Europeia: travessia de fronteiras Schengen](https://home-affairs.ec.europa.eu/policies/schengen/border-crossing_en) e [calculadora de estadias curtas](https://home-affairs.ec.europa.eu/policies/schengen/border-crossing/short-stay-calculator_en).
@@ -47,6 +56,6 @@ Os resumos de cultura, história, clima e melhor época são orientação editor
 
 ## Marcos e mídia
 
-Identidade e localização: [Wikidata](https://www.wikidata.org/). Arquivo, autoria e licença: [Wikimedia Commons](https://commons.wikimedia.org/). Cada mídia curada guarda a página específica de seu arquivo em `js/landmarks.media.js`; o drawer a expõe como crédito clicável. A seleção é estática e não depende de busca externa em tempo de execução. Os marcos legados sem identidade verificada ficam sem mídia e com `status: needs-review`.
+Identidade e localização: [Wikidata](https://www.wikidata.org/). Arquivo, autoria e licença: [Wikimedia Commons](https://commons.wikimedia.org/). Cada mídia curada guarda a página específica de seu arquivo em `js/landmarks.media.js`; o drawer a expõe como crédito clicável. Os novos arquivos americanos usam o redirecionamento oficial `Special:FilePath` com largura de 960 px e título verificado; não há busca externa por assunto em tempo de execução. Os marcos legados sem identidade verificada ficam sem mídia e com `status: needs-review`.
 
-Limitações de cobertura: 25 mídias/identidades curadas em 23 países, incluindo um marco por cada um dos 20 países europeus prioritários. A meta de 2–3 marcos verificados por país europeu e auditoria geográfica integral dos marcos legados ainda não foi alcançada. Não foram inventadas imagens ou coordenadas para completar a meta.
+Cobertura atual: 58 mídias/identidades curadas em 56 destinos; 36/36 destinos americanos do catálogo têm imagem (35 países soberanos e a Guiana Francesa). Os 20 europeus previamente curados mantêm ao menos uma imagem cada. A meta preferencial de 2–3 marcos por destino e a auditoria geográfica integral dos 21 marcos legados em `needs-review` ainda não foram alcançadas. Não foram inventadas imagens ou coordenadas para completar a meta.

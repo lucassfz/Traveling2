@@ -883,6 +883,15 @@ export class MapEngine {
   }
 
   flyTo(latitude, longitude, distance = 2.05, duration = 850) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.cameraFlight = null;
+      this.controls.enabled = true;
+      this.camera.position.copy(latLngToCartesian(latitude, longitude, distance, GLOBE_YAW, GLOBE_ORIGIN));
+      this.camera.lookAt(GLOBE_ORIGIN);
+      this.controls.target.copy(GLOBE_ORIGIN);
+      this.controls.update();
+      return;
+    }
     const startVector = this.camera.position.clone().sub(GLOBE_ORIGIN);
     const startDistance = startVector.length();
     const startDirection = startVector.normalize();

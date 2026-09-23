@@ -1,7 +1,9 @@
 import { CENTRAL_AMERICA_ENRICHMENT } from './centralAmerica.dataset.js';
 import { SOUTH_AMERICA_ENRICHMENT } from './southAmerica.dataset.js';
 import { LANDMARK_MEDIA } from './landmarks.media.js';
-import { EUROPE_ENRICHMENT } from './europe.dataset.js';
+import { EUROPE_COMPLETE_ENRICHMENT } from './europe.complete.dataset.js';
+import { AMERICAS_PRIORITY_ENRICHMENT } from './americas.priority.dataset.js';
+import { flagFromAlpha2 } from './country.exploration.js';
 
 /**
  * Traveling country data.
@@ -7608,6 +7610,7 @@ function normalizeChecklist(source) {
   return (source ?? BASE_CHECKLIST).map(group => ({
     group: group.group,
     items: (group.items ?? []).map(item => ({
+      ...(item.id ? { id: item.id } : {}),
       icon: item.icon ?? item.ico ?? '•',
       label: item.label ?? item.l ?? ''
     }))
@@ -7620,7 +7623,7 @@ function baseCountry(key, meta) {
     key,
     alpha2: meta.alpha2,
     namePt: meta.namePt,
-    flag: meta.flag,
+    flag: flagFromAlpha2(meta.alpha2),
     capital: meta.capital,
     region: meta.region,
     continent: meta.cont,
@@ -7755,13 +7758,13 @@ export { LANDMARK_MEDIA };
 function curatedLandmarks(key, legacy = []) {
   const output = [];
   const names = new Set();
-  const aliases = { 'statue of liberty': 'estátua da liberdade' };
+  const aliases = { 'statue of liberty': 'estatua da liberdade', 'mitad del mundo': 'ciudad mitad del mundo' };
   for (const item of LANDMARK_MEDIA[key] ?? []) {
     output.push({ ...item, status: 'verified' });
-    names.add(item.name.toLocaleLowerCase('pt-BR'));
+    names.add(normalizeLookupKey(item.name));
   }
   for (const { imageUrl, ...item } of legacy) {
-    const originalName = item.name?.toLocaleLowerCase('pt-BR');
+    const originalName = normalizeLookupKey(item.name);
     const name = aliases[originalName] ?? originalName;
     if (!name || names.has(name)) continue;
     output.push({ ...item, status: 'needs-review' });
@@ -7774,8 +7777,8 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
   Object.entries(COUNTRY_CATALOG).map(([key, meta]) => {
     const base = baseCountry(key, meta);
     const curated = CURATED_COUNTRIES[key] ?? null;
-    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(EUROPE_ENRICHMENT[key] ?? {}) };
-    if (!curated && !Object.keys(regional).length) return [key, base];
+    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}) };
+    if (!curated && !Object.keys(regional).length) return [key, { ...base, landmarks: curatedLandmarks(key) }];
     const merged = { ...base, ...(curated ?? {}), ...(regional ?? {}) };
     return [key, {
       ...merged,
@@ -7784,6 +7787,7 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
       latlng: merged.latlng ?? base.latlng,
       capital: merged.capital ?? base.capital,
       alpha2: merged.alpha2 ?? base.alpha2,
+      flag: flagFromAlpha2(merged.alpha2 ?? base.alpha2),
       namePt: merged.namePt ?? base.namePt,
       timezoneLabel: merged.timezoneLabel ?? base.timezoneLabel,
       visaPolicyBR: merged.visaPolicyBR ?? {

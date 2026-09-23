@@ -65,6 +65,9 @@
       </button>
 
       <button class="icon-button" id="theme-button" type="button" aria-label="Ativar modo claro">☀️</button>
+      <button class="discover-button" id="discover-button" type="button" aria-label="Descobrir destino" title="Descobrir destino">
+        <span aria-hidden="true">✦</span><span class="discover-button__label">Descobrir destino</span>
+      </button>
 
       <div class="search" id="country-search">
         <label class="sr-only" for="country-search-input">Buscar país</label>
@@ -135,10 +138,10 @@
     </header>
 
     <div class="country-panel__identity">
-      <span class="country-panel__flag" id="country-flag" aria-hidden="true">🌍</span>
+      <span class="country-panel__flag" id="country-flag" role="img" aria-label="Bandeira do país">🌍</span>
       <div>
         <div class="country-panel__region" id="country-region">—</div>
-        <h1 class="country-panel__name" id="country-name">—</h1>
+        <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
         <div class="data-badge" id="country-data-badge">Dados base</div>
       </div>
     </div>
@@ -191,6 +194,7 @@
             <div class="route-builder__line" aria-hidden="true"><span>✈</span></div>
             <div><span class="eyebrow">Destino</span><strong id="route-destination-code">—</strong><small id="route-destination-city">—</small></div>
           </div>
+          <p class="route-builder__destination-note" id="route-destination-note"></p>
 
           <div class="form-grid">
             <label class="form-field form-field--wide">
@@ -218,6 +222,11 @@
       </section>
 
       <section class="country-tab" id="tab-checklist" data-tab-panel="checklist" role="tabpanel">
+        <div class="checklist__header">
+          <div><strong>Pronto para viajar?</strong><span id="checklist-progress-text" aria-live="polite">0 de 0 itens</span></div>
+          <div class="checklist__meter" id="checklist-progress-meter" role="progressbar" aria-label="Preparação da viagem" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><span id="checklist-progress-fill"></span></div>
+        </div>
+        <label class="checklist__month" id="checklist-month-wrap" hidden>Mês da viagem <select id="checklist-month-select" aria-label="Mês da viagem"></select></label>
         <div class="checklist" id="checklist-content"></div>
         <div class="checklist__actions">
           <button class="secondary-button" id="checklist-complete-button" type="button">Marcar tudo</button>

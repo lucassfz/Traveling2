@@ -1,22 +1,22 @@
 // Camada regional para o mesmo modelo consumido pelo drawer. As regras de
 // fronteira foram consultadas em 2026-09; continuam sujeitas a mudança.
-const EU_BORDER = 'https://home-affairs.ec.europa.eu/policies/schengen/border-crossing_en';
+const EU_BORDER = 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:22025X01998';
 const EES_SOURCE = 'https://home-affairs.ec.europa.eu/news/entry-exit-system-fully-operational-10-april-2026-who-exempt-2026-07-27_en';
-const ETIAS_SOURCE = 'https://www.travel-europe.europa.eu/etias/how-to-apply/what-you-need-to-apply';
+const ETIAS_SOURCE = 'https://travel-europe.europa.eu/etias';
 const SCHENGEN_ENTRY = Object.freeze({
-  visaPolicyBR: 'Turismo de curta duração sem visto para passaporte brasileiro comum. O acordo UE–Brasil usa a definição de até 3 meses em um período de 6 meses contado da primeira entrada; calcule seu itinerário e confirme no consulado.',
-  maxStay: 'Até 3 meses em 6 meses, conforme acordo UE–Brasil; não some 90 dias para cada país.',
+  visaPolicyBR: 'Passaporte brasileiro comum: turismo curto sem visto no espaço Schengen. A permanência é compartilhada entre os países participantes.',
+  maxStay: 'Até 90 dias em qualquer período móvel de 180 dias no conjunto Schengen (acordo UE–Brasil vigente desde 1º/3/2026).',
   passportValidity: 'Documento emitido há menos de 10 anos e válido por ao menos 3 meses após a saída prevista.',
   documents: 'Passagem de saída, hospedagem e recursos podem ser solicitados na fronteira.',
-  health: 'Exigências sanitárias e recomendações dependem do itinerário; confirme antes da viagem.',
+  health: 'Seguro médico de viagem é recomendado; não há exigência sanitária geral para turismo vindo do Brasil.',
   ees: { status: 'operacional', notes: 'Registro de entradas/saídas e biometria em fronteiras externas para viajantes elegíveis.', officialSource: EES_SOURCE },
-  etias: { status: 'ainda não operacional em 2026-09', notes: 'Previsto pela UE para o último trimestre de 2026; data efetiva ainda precisa ser confirmada.', officialSource: ETIAS_SOURCE },
+  etias: { status: 'não exigido em 2026-09', notes: 'A UE prevê início no último trimestre de 2026, sem data definitiva anunciada.', officialSource: ETIAS_SOURCE },
   officialSource: EU_BORDER, verifiedAt: '2026-09', status: 'verified'
 });
 
 const ASSOCIATED_SCHENGEN_ENTRY = Object.freeze({
   ...SCHENGEN_ENTRY,
-  visaPolicyBR: 'Brasileiros com passaporte comum podem fazer turismo curto sem visto; para Suíça e Noruega, planeje o limite Schengen usual de 90 dias em qualquer período de 180 dias.',
+  visaPolicyBR: 'Passaporte brasileiro comum: turismo curto sem visto; a permanência conta no limite conjunto do espaço Schengen.',
   maxStay: 'Até 90 dias em 180 dias no conjunto Schengen, sujeito às regras nacionais aplicáveis.',
   officialSource: 'https://home-affairs.ec.europa.eu/policies/schengen/border-crossing/short-stay-calculator_en'
 });

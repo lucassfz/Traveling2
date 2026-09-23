@@ -2,7 +2,6 @@ import {
   AIRLINE_UPGRADE_EXAMPLES,
   AIRPORT_GUIDES,
   CARD_OFFERS,
-  CARD_PROFILES,
   LEARNING_PATHS,
   LOUNGE_TYPES,
   MILES_TABS,
@@ -73,20 +72,17 @@ function renderOverview() {
 
 function renderCardRecord(card) {
   const facts = [
-    ['Bandeira', card.network], ['Programa', card.loyaltyProgram], ['Anuidade', card.annualFee],
+    ['Bandeira', card.network], ['Programa', card.loyaltyProgram], ['Salas VIP', card.loungeAccess], ['Anuidade', card.annualFee],
     ['Isenção', card.feeWaiver], ['Convidados', card.guests], ['Viagem', card.travelBenefits]
   ].filter(([, value]) => value);
-  return `<details class="miles-detail miles-card-record"><summary><span class="miles-card-record__intro"><strong>${escapeHtml(card.name)}</strong><small>${escapeHtml(card.issuer)}</small><span>${escapeHtml(card.earning)}</span><span>${escapeHtml(card.loungeAccess)}</span><em>${escapeHtml(card.idealFor)}</em></span><span class="miles-detail__chevron" aria-hidden="true">+</span></summary><div class="miles-detail__body"><div class="miles-tags">${(card.tags || []).map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div><dl class="miles-facts">${facts.map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${trustLine(card)}</div></details>`;
+  return `<details class="miles-detail miles-card-record"><summary><span class="miles-card-record__intro"><strong>${escapeHtml(card.name)}</strong><small>${escapeHtml(card.issuer)}</small><span>${escapeHtml(card.earning)}</span><em>${escapeHtml(card.idealFor)}</em></span><span class="miles-detail__chevron" aria-hidden="true">+</span></summary><div class="miles-detail__body"><div class="miles-tags">${(card.tags || []).map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div><dl class="miles-facts">${facts.map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${trustLine(card)}</div></details>`;
 }
 
 function renderCards() {
-  return `${sectionHeading('Escolha pelo uso', 'Cartões em destaque por perfil', 'Não existe um cartão melhor para todas as pessoas. Compare seu gasto, renda, anuidade, banco, companhia preferida e frequência de viagem.')}
-    <div class="miles-detail-list">${CARD_PROFILES.map(profile => {
-      const cards = CARD_OFFERS.filter(card => card.profile === profile.id);
-      const body = cards.map(renderCardRecord).join('');
-      return detailRow(profile.label, `${cards.length} ${cards.length === 1 ? 'cartão pesquisado' : 'cartões pesquisados'}`, body);
-    }).join('')}</div>
-    <p class="miles-footnote">A pontuação anunciada sozinha não revela o custo real do cartão. Confira também regras para isenção e validade dos pontos.</p>`;
+  const featuredIds = new Set(['santander-unlimited', 'itau-personnalite-black']);
+  return `${sectionHeading('Seleção curada', 'Cartões em destaque', 'Duas propostas para perfis diferentes: acesso frequente a salas VIP ou acúmulo flexível de pontos. Compare custo, isenção e condições de uso.')}
+    <div class="miles-detail-list">${CARD_OFFERS.filter(card => featuredIds.has(card.id)).map(renderCardRecord).join('')}</div>
+    <p class="miles-footnote">Benefícios e tarifas mudam. Confirme as condições atuais com o emissor antes de solicitar.</p>`;
 }
 
 function renderLounges() {

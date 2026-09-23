@@ -6,6 +6,8 @@ import {
 } from './countries.dataset.js';
 import { MilesEngine } from './miles.engine.js';
 import { getCountryMedia } from './media.service.js';
+import { chooseDiscoveryKey, discoveryCountryKeys, flagImageUrl } from './country.exploration.js';
+import { checklistGroups, checklistProgress, hasSeasonalChecklist } from './checklist.engine.js';
 import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
 import {
@@ -24,6 +26,7 @@ const elements = {
   globeFallback: document.getElementById('globe-fallback'),
   homeButton: document.getElementById('home-button'),
   themeButton: document.getElementById('theme-button'),
+  discoverButton: document.getElementById('discover-button'),
   visitedCount: document.getElementById('visited-count'),
   visaFreeFilter: document.getElementById('visa-free-filter'),
   visaFreeCount: document.getElementById('visa-free-count'),
@@ -61,9 +64,15 @@ const elements = {
   routeOriginCity: document.getElementById('route-origin-city'),
   routeDestinationCode: document.getElementById('route-destination-code'),
   routeDestinationCity: document.getElementById('route-destination-city'),
+  routeDestinationNote: document.getElementById('route-destination-note'),
   routeButton: document.getElementById('calculate-route-button'),
   routeResult: document.getElementById('route-result'),
   checklist: document.getElementById('checklist-content'),
+  checklistProgressText: document.getElementById('checklist-progress-text'),
+  checklistProgressMeter: document.getElementById('checklist-progress-meter'),
+  checklistProgressFill: document.getElementById('checklist-progress-fill'),
+  checklistMonthWrap: document.getElementById('checklist-month-wrap'),
+  checklistMonthSelect: document.getElementById('checklist-month-select'),
   checklistComplete: document.getElementById('checklist-complete-button'),
   checklistClear: document.getElementById('checklist-clear-button'),
   milesLauncher: document.getElementById('miles-launcher'),
@@ -95,11 +104,15 @@ const state = {
   splash: null,
   starfield: null,
   milesEngine: null,
-  destinationAirport: null
+  destinationAirport: null,
+  mediaObserver: null,
+  visibleChecklistGroups: [],
+  previousDiscoveryKey: null
 };
 
 const airportRepository = new AirportRepository();
 const destinationAirportCache = new Map();
+const discoveryKeys = discoveryCountryKeys(COUNTRIES);
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -240,7 +253,14 @@ function switchTab(tabName) {
   }
 }
 
+function clearMedia() {
+  state.mediaObserver?.disconnect();
+  state.mediaObserver = null;
+  elements.media.replaceChildren();
+}
+
 function renderMedia(countryKey, country) {
+  clearMedia();
   elements.media.innerHTML = '<div class="media-empty">Carregando mídia…</div>';
   getCountryMedia(countryKey, country).then(media => {
     if (state.countryKey !== countryKey) return;
@@ -249,11 +269,27 @@ function renderMedia(countryKey, country) {
       return;
     }
     elements.media.innerHTML = media.map((item, index) => `
-      <figure class="media-card ${index === 0 ? 'media-card--primary' : ''}">
-        <img class="media-card__image" src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)} em ${escapeHtml(item.city)}" loading="lazy" decoding="async">
+      <figure class="media-card ${index === 0 ? 'media-card--primary' : ''}" aria-busy="true">
+        <div class="media-card__visual"><img class="media-card__image" ${index === 0 ? `src="${escapeHtml(item.url)}" loading="eager"` : `data-src="${escapeHtml(item.url)}" loading="lazy"`} alt="${escapeHtml(item.name)} em ${escapeHtml(item.city)}" decoding="async"></div>
         <figcaption class="media-card__city"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.city)}</span><a href="${escapeHtml(item.sourcePage)}" target="_blank" rel="noopener noreferrer" aria-label="Crédito da imagem de ${escapeHtml(item.name)}">${escapeHtml(item.author)} · ${escapeHtml(item.license)}</a></figcaption>
       </figure>
     `).join('');
+    const deferred = [...elements.media.querySelectorAll('img[data-src]')];
+    if (!deferred.length) return;
+    if (!('IntersectionObserver' in window)) {
+      for (const image of deferred) image.src = image.dataset.src;
+      return;
+    }
+    state.mediaObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const image = entry.target;
+        image.src = image.dataset.src;
+        image.removeAttribute('data-src');
+        state.mediaObserver?.unobserve(image);
+      }
+    }, { root: elements.panel.querySelector('.country-panel__content'), rootMargin: '120px 0px' });
+    for (const image of deferred) state.mediaObserver.observe(image);
   });
 }
 
@@ -359,24 +395,24 @@ function entryTone(country) {
 }
 
 function renderEntry(country) {
+  const entry = country.entryRequirements;
   const items = [
-    ['Fronteiras', country.borderNote || 'Confirmar regras atuais'],
-    ['Visto', stripHtml(country.visaText) || 'Confirmar em fonte consular oficial'],
-    ['Passaporte', country.passport || 'Confirmar validade mínima exigida'],
-    ['Saúde e vacinas', country.vaccines || 'Confirmar requisitos sanitários']
-  ];
+    ['Status de entrada', country.borderNote],
+    ['Passaporte', entry?.passportValidity || country.passport],
+    ['Visto / autorização', entry?.visaPolicyBR || stripHtml(country.visaText)],
+    ['Permanência', entry?.maxStay],
+    ['Saúde e vacinas', entry?.health || country.vaccines],
+    ['Documentos', entry?.documents]
+  ].filter(([, value]) => String(value ?? '').trim());
   if (country.entryDeclaration) items.push(['Formulários', country.entryDeclaration]);
-  if (country.entryRequirements) {
-    const entry = country.entryRequirements;
-    items.push(['Permanência', entry.maxStay]);
-    items.push(['Documentos', entry.documents]);
-    items.push(['EES', `${entry.ees.status}: ${entry.ees.notes}`]);
-    items.push(['ETIAS', `${entry.etias.status}: ${entry.etias.notes}`]);
+  if (entry) {
+    if (entry.ees) items.push(['EES', `${entry.ees.status}: ${entry.ees.notes}`]);
+    if (entry.etias) items.push(['ETIAS', `${entry.etias.status}: ${entry.etias.notes}`]);
   }
   if (country.conflict?.text) items.unshift(['Segurança', country.conflict.text]);
   const tone = entryTone(country);
-  elements.entry.innerHTML = items.map(([label, value]) => `
-    <article class="detail-card ${tone}">
+  elements.entry.innerHTML = items.map(([label, value], index) => `
+    <article class="detail-card ${index === 0 ? tone : ''}">
       <div class="detail-card__label">${escapeHtml(label)}</div>
       <div class="detail-card__value">${escapeHtml(value)}</div>
     </article>
@@ -404,19 +440,18 @@ function renderCulture(country) {
   elements.vibe.innerHTML = (country.vibe ?? []).map(value => `<span class="tag">${escapeHtml(value)}</span>`).join('');
 }
 
-function checklistKey(countryKey, groupIndex, itemIndex) {
-  return `${countryKey}:${groupIndex}:${itemIndex}`;
-}
-
 function renderChecklist(countryKey, country) {
-  elements.checklist.innerHTML = (country.checklist ?? []).map((group, groupIndex) => `
+  const groups = checklistGroups(countryKey, country, Number(elements.monthSelect.value));
+  state.visibleChecklistGroups = groups;
+  elements.checklistMonthWrap.hidden = !hasSeasonalChecklist(country);
+  elements.checklistMonthSelect.value = elements.monthSelect.value;
+  elements.checklist.innerHTML = groups.map(group => `
     <section class="checklist__group">
       <h3 class="checklist__title">${escapeHtml(group.group)}</h3>
-      ${(group.items ?? []).map((item, itemIndex) => {
-        const key = checklistKey(countryKey, groupIndex, itemIndex);
-        const complete = Boolean(state.checklist[key]);
+      ${group.items.map(item => {
+        const complete = Boolean(state.checklist[item.key]);
         return `
-          <button class="checklist__item ${complete ? 'checklist__item--complete' : ''}" type="button" data-checklist-key="${escapeHtml(key)}">
+          <button class="checklist__item ${complete ? 'checklist__item--complete' : ''}" type="button" aria-pressed="${complete}" data-checklist-key="${escapeHtml(item.key)}">
             <span class="checklist__box">${complete ? '✓' : ''}</span>
             <span aria-hidden="true">${escapeHtml(item.icon || '•')}</span>
             <span class="checklist__label">${escapeHtml(item.label)}</span>
@@ -425,11 +460,21 @@ function renderChecklist(countryKey, country) {
       }).join('')}
     </section>
   `).join('');
+  updateChecklistProgress();
+}
+
+function updateChecklistProgress() {
+  const { done, total } = checklistProgress(state.visibleChecklistGroups, state.checklist);
+  elements.checklistProgressText.textContent = `${done} de ${total} ${total === 1 ? 'item' : 'itens'} concluídos`;
+  elements.checklistProgressMeter.setAttribute('aria-valuenow', String(done));
+  elements.checklistProgressMeter.setAttribute('aria-valuemax', String(total));
+  elements.checklistProgressFill.style.width = `${total ? (done / total) * 100 : 0}%`;
 }
 
 async function resolveDestinationAirport(countryKey) {
   if (destinationAirportCache.has(countryKey)) return destinationAirportCache.get(countryKey);
   const country = COUNTRIES[countryKey];
+  if (country.flightUnavailable) return null;
   let airport = null;
   if (country.airport && country.airport !== '—') airport = await airportRepository.resolve(country.airport);
   if (!airport && country.latlng) airport = await airportRepository.findNearest(country.latlng[0], country.latlng[1]);
@@ -439,8 +484,9 @@ async function resolveDestinationAirport(countryKey) {
 
 async function primeDestinationAirport(countryKey) {
   const country = COUNTRIES[countryKey];
-  elements.routeDestinationCode.textContent = country.airport && country.airport !== '—' ? country.airport : '…';
+  elements.routeDestinationCode.textContent = country.flightUnavailable ? '—' : country.airport && country.airport !== '—' ? country.airport : '…';
   elements.routeDestinationCity.textContent = country.airportCity || country.capital || country.namePt;
+  elements.routeDestinationNote.textContent = country.flightNote || (country.majorAirports?.length > 1 ? `Outros aeroportos no país: ${country.majorAirports.filter(code => code !== country.airport).join(', ')}.` : '');
   state.destinationAirport = null;
   try {
     const airport = await resolveDestinationAirport(countryKey);
@@ -458,7 +504,11 @@ function renderCountry(countryKey) {
   if (!country) return;
   state.countryKey = countryKey;
   state.continent = country.continent;
-  elements.countryFlag.textContent = country.flag;
+  const flagUrl = flagImageUrl(country.alpha2);
+  elements.countryFlag.setAttribute('aria-label', `${flagUrl ? 'Bandeira de' : 'Bandeira não disponível para'} ${country.namePt}`);
+  elements.countryFlag.innerHTML = flagUrl
+    ? `<img src="${flagUrl}" alt="" width="56" height="42" decoding="async">`
+    : `<span class="country-panel__flag-fallback">${escapeHtml(country.alpha2 || '🌍')}</span>`;
   elements.countryRegion.textContent = country.region || CONTINENT_LABELS[country.continent];
   elements.countryName.textContent = country.namePt;
   elements.path.textContent = `Mundo › ${country.region || CONTINENT_LABELS[country.continent]} › ${country.namePt}`;
@@ -491,8 +541,17 @@ function selectCountry(countryKey, { recordHistory = true } = {}) {
   if (recordHistory) addHistory({ type: 'country', key: countryKey, label: country.namePt });
 }
 
+function discoverDestination() {
+  const countryKey = chooseDiscoveryKey(discoveryKeys, state.previousDiscoveryKey);
+  if (!countryKey) return;
+  state.previousDiscoveryKey = countryKey;
+  selectCountry(countryKey);
+  elements.countryName.focus({ preventScroll: true });
+}
+
 function closeCountryPanel() {
   elements.panel.classList.remove('country-panel--open');
+  clearMedia();
   state.map?.clearSelection();
   state.countryKey = null;
 }
@@ -501,6 +560,7 @@ function selectContinent(continent, { recordHistory = true } = {}) {
   state.continent = continent;
   state.countryKey = null;
   elements.panel.classList.remove('country-panel--open');
+  clearMedia();
   state.map?.clearSelection();
   state.map?.setContinent(continent);
   renderContinentState();
@@ -512,6 +572,7 @@ function home() {
   state.continent = null;
   state.history = [];
   elements.panel.classList.remove('country-panel--open');
+  clearMedia();
   state.map?.home();
   renderContinentState();
   renderHistory();
@@ -535,8 +596,10 @@ function updateChecklistItem(button) {
   if (!key) return;
   state.checklist[key] = !state.checklist[key];
   button.classList.toggle('checklist__item--complete', state.checklist[key]);
+  button.setAttribute('aria-pressed', String(Boolean(state.checklist[key])));
   button.querySelector('.checklist__box').textContent = state.checklist[key] ? '✓' : '';
   savePersistentState();
+  updateChecklistProgress();
 }
 
 function setAllChecklistItems(complete) {
@@ -549,8 +612,11 @@ function setAllChecklistItems(complete) {
 }
 
 function populateMonthSelect() {
-  elements.monthSelect.innerHTML = MONTHS.map((month, index) => `<option value="${index}">${month}</option>`).join('');
+  const options = MONTHS.map((month, index) => `<option value="${index}">${month}</option>`).join('');
+  elements.monthSelect.innerHTML = options;
+  elements.checklistMonthSelect.innerHTML = options;
   elements.monthSelect.value = String(new Date().getMonth());
+  elements.checklistMonthSelect.value = elements.monthSelect.value;
 }
 
 function updateAirportSuggestions(query = '') {
@@ -682,6 +748,7 @@ function bindUiEvents() {
   elements.themeButton.addEventListener('click', () => {
     setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   });
+  elements.discoverButton.addEventListener('click', discoverDestination);
   elements.visaFreeFilter.addEventListener('click', () => {
     state.isVisaFreeBRFilterActive = !state.isVisaFreeBRFilterActive;
     renderVisaFreeFilter();
@@ -766,8 +833,22 @@ function bindUiEvents() {
   });
   elements.media.addEventListener('error', event => {
     if (event.target.tagName !== 'IMG') return;
-    event.target.closest('figure')?.classList.add('media-card--failed');
+    const card = event.target.closest('figure');
+    card?.classList.add('media-card--failed');
+    card?.setAttribute('aria-busy', 'false');
     event.target.remove();
+  }, true);
+  elements.media.addEventListener('load', event => {
+    if (event.target.tagName !== 'IMG') return;
+    const card = event.target.closest('figure');
+    card?.classList.add('media-card--loaded');
+    card?.setAttribute('aria-busy', 'false');
+  }, true);
+  elements.countryFlag.addEventListener('error', event => {
+    if (event.target.tagName !== 'IMG') return;
+    const country = COUNTRIES[state.countryKey];
+    elements.countryFlag.setAttribute('aria-label', `Bandeira não disponível para ${country?.namePt || 'este país'}`);
+    elements.countryFlag.innerHTML = `<span class="country-panel__flag-fallback">${escapeHtml(country?.alpha2 || '🌍')}</span>`;
   }, true);
 
   elements.checklist.addEventListener('click', event => {
@@ -776,6 +857,14 @@ function bindUiEvents() {
   });
   elements.checklistComplete.addEventListener('click', () => setAllChecklistItems(true));
   elements.checklistClear.addEventListener('click', () => setAllChecklistItems(false));
+  elements.checklistMonthSelect.addEventListener('change', () => {
+    elements.monthSelect.value = elements.checklistMonthSelect.value;
+    if (state.countryKey) renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
+  });
+  elements.monthSelect.addEventListener('change', () => {
+    elements.checklistMonthSelect.value = elements.monthSelect.value;
+    if (state.countryKey && hasSeasonalChecklist(COUNTRIES[state.countryKey])) renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
+  });
 
   elements.originInput.addEventListener('input', () => updateAirportSuggestions(elements.originInput.value));
   elements.originInput.addEventListener('focus', () => {
@@ -828,6 +917,8 @@ function markInterfaceReady() {
 
 function initialize() {
   initializeTheme();
+  elements.discoverButton.disabled = discoveryKeys.length === 0;
+  elements.discoverButton.title = discoveryKeys.length ? 'Descobrir um destino com conteúdo curado' : 'Nenhum destino curado disponível';
   state.splash = new SplashEngine(elements.splash);
   state.starfield = new StarfieldEngine(elements.starfield);
   renderVisaFreeFilter();

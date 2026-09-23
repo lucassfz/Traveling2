@@ -16,8 +16,9 @@ Read-only data audits:
 ```sh
 node scripts/validate-content.js
 node scripts/validate-landmarks.js
+node scripts/validate-exploration.js
 ```
 
 The landmark audit lists legacy `needs-review` identities as warnings; it does not rewrite records. The optional research helper (`node scripts/research-landmarks.js 3`) reads up to three built-in candidate queries from Wikidata/Commons and prints them without changing production data. API rate limits and ambiguous search results mean its output is not a verified media record.
 
-External dependencies still use CDN: Three.js, OrbitControls, TopoJSON, world-atlas, Google Fonts, and optional airport/FX data. The app degrades to search/panels/miles if the 3D map cannot initialize.
+External dependencies still use CDN: Three.js, OrbitControls, TopoJSON, world-atlas, Google Fonts, the selected country's Flagcdn image (with ISO fallback), and optional airport/FX data. The app degrades to search/panels/miles if the 3D map cannot initialize.

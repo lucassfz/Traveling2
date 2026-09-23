@@ -428,6 +428,7 @@ select:focus-visible {
 }
 
 .icon-button,
+.discover-button,
 .visit-button,
 .primary-button,
 .secondary-button,
@@ -446,6 +447,7 @@ select:focus-visible {
 }
 
 .icon-button:hover,
+.discover-button:hover,
 .visit-button:hover,
 .secondary-button:hover,
 .miles-launcher:hover,
@@ -456,6 +458,7 @@ select:focus-visible {
 }
 
 .icon-button:active,
+.discover-button:active,
 .visit-button:active,
 .primary-button:active,
 .secondary-button:active,
@@ -471,6 +474,22 @@ select:focus-visible {
   place-items: center;
   border-radius: var(--radius-sm);
 }
+
+.discover-button {
+  height: var(--control-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
+  color: var(--color-accent-strong);
+  font-size: .75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.discover-button:disabled { opacity: .5; cursor: not-allowed; }
 
 .search {
   position: relative;
@@ -1248,8 +1267,19 @@ select:focus-visible {
 }
 
 .country-panel__flag {
-  font-size: 2.8rem;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 4px;
+  background: var(--color-surface);
 }
+
+.country-panel__flag img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.country-panel__flag-fallback { color: var(--color-text-secondary); font-size: .875rem; font-weight: 700; }
 
 .country-panel__region {
   margin-bottom: var(--space-1);
@@ -1361,15 +1391,18 @@ select:focus-visible {
 
 .media-card {
   position: relative;
-  min-height: 126px;
-  aspect-ratio: 16 / 9;
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
 }
-.media-card--primary { grid-column: 1 / -1; min-height: 190px; }
-.media-card--failed::before { content: 'Imagem indisponível'; display: grid; place-items: center; position: absolute; inset: 0; color: var(--color-text-secondary); font-size: .8rem; }
+.media-card--primary { grid-column: 1 / -1; }
+.media-card__visual { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--color-background-elevated); }
+.media-card__visual::before { content: 'Carregando imagem…'; display: grid; place-items: center; position: absolute; inset: 0; color: var(--color-text-secondary); font-size: .75rem; }
+.media-card--loaded .media-card__visual::before { content: none; }
+.media-card--failed .media-card__visual::before { content: 'Imagem indisponível'; display: grid; place-items: center; position: absolute; inset: 0; color: var(--color-text-secondary); font-size: .8rem; }
 
 .media-card__image {
   width: 100%;
@@ -1380,23 +1413,18 @@ select:focus-visible {
 }
 
 .media-card__city {
-  position: absolute;
-  right: var(--space-2);
-  bottom: var(--space-2);
-  left: var(--space-2);
-  padding: 6px 8px;
+  padding: 9px 10px 11px;
   overflow: hidden;
-  border-radius: var(--radius-xs);
-  background: var(--color-overlay-soft);
+  border-top: 1px solid var(--color-border-soft);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font-size: .75rem;
   font-weight: 700;
   display: grid;
   gap: 2px;
   line-height: 1.3;
-  backdrop-filter: blur(10px);
 }
-.media-card__city strong, .media-card__city span, .media-card__city a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-card__city strong, .media-card__city span, .media-card__city a { overflow-wrap: anywhere; }
 .media-card__city span { font-weight: 500; }
 .media-card__city a { color: var(--color-text-secondary); font-size: .62rem; text-decoration: underline; }
 .media-card__city a:focus-visible { outline: 2px solid var(--color-focus); }
@@ -1704,6 +1732,13 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.route-builder__destination-note {
+  margin: calc(var(--space-2) * -1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
 .route-builder__line {
   position: relative;
   color: var(--color-accent);
@@ -1837,6 +1872,22 @@ select:focus-visible {
   gap: var(--space-3);
 }
 
+.checklist__header {
+  display: grid;
+  gap: 9px;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: .75rem;
+}
+
+.checklist__header > div:first-child { display: flex; justify-content: space-between; gap: var(--space-2); }
+.checklist__header strong { color: var(--color-text); font-size: .875rem; }
+.checklist__meter { height: 4px; overflow: hidden; border-radius: 999px; background: var(--color-border-soft); }
+.checklist__meter span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--color-success); transition: width var(--motion-base); }
+.checklist__month { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0 0 var(--space-4); color: var(--color-text-secondary); font-size: .75rem; }
+.checklist__month[hidden] { display: none; }
+.checklist__month select { min-height: 34px; padding: 4px 9px; border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); background: var(--color-input); color: var(--color-text); }
+
 .checklist__group {
   padding: var(--space-3);
 }
@@ -1964,6 +2015,8 @@ select:focus-visible {
   :root { --panel-width: min(500px, 48vw); }
   .continent-nav { max-width: 520px; }
   .continent-nav__button { font-size: .75rem; }
+  .discover-button { width: var(--control-height); padding: 0; }
+  .discover-button__label { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -1980,13 +2033,16 @@ select:focus-visible {
 }
 
 @media (max-width: 600px) {
-  .app-header__brand { font-size: .8rem; letter-spacing: .12em; }
-  .search { width: min(170px, 46vw); }
+  .app-header { gap: 4px; padding-inline: 8px; }
+  .app-header__brand { padding: 4px; font-size: .8rem; letter-spacing: .12em; }
+  .app-header__actions { gap: 4px; }
+  .app-header .icon-button, .discover-button { width: 34px; height: 34px; }
+  .search { width: clamp(92px, calc(100vw - 230px), 170px); }
   .search__results { position: fixed; top: calc(var(--header-height) - 2px); right: 3vw; left: 3vw; width: auto; }
   .continent-nav { display: none; }
   .country-panel { width: 100vw; max-width: none; }
   .country-panel__identity { padding: var(--space-4); }
-  .country-panel__flag { font-size: 2.25rem; }
+  .country-panel__flag { flex-basis: 46px; width: 46px; height: 35px; }
   .visa-filter { display: none; }
   .country-tab { padding: var(--space-4); }
   .media-strip { margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4); padding: var(--space-3) var(--space-4); }
