@@ -52,6 +52,7 @@ const elements = {
   foods: document.getElementById('food-content'),
   etiquette: document.getElementById('etiquette-content'),
   vibe: document.getElementById('vibe-content'),
+  historyCopy: document.getElementById('country-history'),
   originInput: document.getElementById('origin-airport-input'),
   airportSuggestions: document.getElementById('airport-suggestions'),
   cabinSelect: document.getElementById('cabin-select'),
@@ -222,11 +223,17 @@ function switchTab(tabName) {
   state.tab = tabName;
   for (const button of elements.tabButtons) {
     const active = button.dataset.tab === tabName;
+    button.id = `country-tab-button-${button.dataset.tab}`;
+    button.setAttribute('aria-controls', `tab-${button.dataset.tab}`);
+    button.tabIndex = active ? 0 : -1;
     button.classList.toggle('country-tabs__button--active', active);
     button.setAttribute('aria-selected', String(active));
   }
   for (const panel of elements.tabPanels) {
-    panel.classList.toggle('country-tab--active', panel.dataset.tabPanel === tabName);
+    const active = panel.dataset.tabPanel === tabName;
+    panel.classList.toggle('country-tab--active', active);
+    panel.hidden = !active;
+    panel.setAttribute('aria-labelledby', `country-tab-button-${panel.dataset.tabPanel}`);
   }
   if (tabName === 'flights') {
     airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
@@ -238,13 +245,13 @@ function renderMedia(countryKey, country) {
   getCountryMedia(countryKey, country).then(media => {
     if (state.countryKey !== countryKey) return;
     if (!media.length) {
-      elements.media.innerHTML = '<div class="media-empty">Mídia em curadoria para este destino.</div>';
+      elements.media.innerHTML = '<div class="media-empty">Imagem ainda não verificada para este destino.</div>';
       return;
     }
-    elements.media.innerHTML = media.map(item => `
-      <figure class="media-card">
-        <img class="media-card__image" src="${escapeHtml(item.url)}" alt="${escapeHtml(item.city)}" loading="lazy" decoding="async">
-        <figcaption class="media-card__city">${escapeHtml(item.city)}</figcaption>
+    elements.media.innerHTML = media.map((item, index) => `
+      <figure class="media-card ${index === 0 ? 'media-card--primary' : ''}">
+        <img class="media-card__image" src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)} em ${escapeHtml(item.city)}" loading="lazy" decoding="async">
+        <figcaption class="media-card__city"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.city)}</span><a href="${escapeHtml(item.sourcePage)}" target="_blank" rel="noopener noreferrer" aria-label="Crédito da imagem de ${escapeHtml(item.name)}">${escapeHtml(item.author)} · ${escapeHtml(item.license)}</a></figcaption>
       </figure>
     `).join('');
   });
@@ -261,8 +268,8 @@ function renderBasics(country) {
   ];
   elements.basics.innerHTML = cards.map(([label, value]) => `
     <article class="info-card">
-      <div class="info-card__label">${escapeHtml(label)}</div>
       <div class="info-card__value">${escapeHtml(value)}</div>
+      <div class="info-card__label">${escapeHtml(label)}</div>
     </article>
   `).join('');
 }
@@ -359,6 +366,13 @@ function renderEntry(country) {
     ['Saúde e vacinas', country.vaccines || 'Confirmar requisitos sanitários']
   ];
   if (country.entryDeclaration) items.push(['Formulários', country.entryDeclaration]);
+  if (country.entryRequirements) {
+    const entry = country.entryRequirements;
+    items.push(['Permanência', entry.maxStay]);
+    items.push(['Documentos', entry.documents]);
+    items.push(['EES', `${entry.ees.status}: ${entry.ees.notes}`]);
+    items.push(['ETIAS', `${entry.etias.status}: ${entry.etias.notes}`]);
+  }
   if (country.conflict?.text) items.unshift(['Segurança', country.conflict.text]);
   const tone = entryTone(country);
   elements.entry.innerHTML = items.map(([label, value]) => `
@@ -366,7 +380,7 @@ function renderEntry(country) {
       <div class="detail-card__label">${escapeHtml(label)}</div>
       <div class="detail-card__value">${escapeHtml(value)}</div>
     </article>
-  `).join('');
+  `).join('') + (country.entryRequirements?.officialSource ? `<p class="entry-source">Regras consultadas em ${escapeHtml(country.entryRequirements.verifiedAt)} · <a href="${escapeHtml(country.entryRequirements.officialSource)}" target="_blank" rel="noopener noreferrer">Fonte de entrada</a>${country.entryRequirements.ees?.officialSource ? ` · <a href="${escapeHtml(country.entryRequirements.ees.officialSource)}" target="_blank" rel="noopener noreferrer">EES</a>` : ''}${country.entryRequirements.etias?.officialSource ? ` · <a href="${escapeHtml(country.entryRequirements.etias.officialSource)}" target="_blank" rel="noopener noreferrer">ETIAS</a>` : ''}</p>` : '') + (country.healthSource ? `<p class="entry-source"><a href="${escapeHtml(country.healthSource)}" target="_blank" rel="noopener noreferrer">Fonte oficial de saúde</a></p>` : '');
 }
 
 function renderCulture(country) {
@@ -459,6 +473,7 @@ function renderCountry(countryKey) {
   renderMonths(country);
   renderEntry(country);
   renderCulture(country);
+  elements.historyCopy.textContent = country.history || 'Panorama histórico ainda em curadoria para este país.';
   renderChecklist(countryKey, country);
   primeDestinationAirport(countryKey);
   elements.routeResult.innerHTML = '';
@@ -470,6 +485,7 @@ function renderCountry(countryKey) {
 function selectCountry(countryKey, { recordHistory = true } = {}) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
+  if (window.innerWidth < 1200 && elements.milesHub.classList.contains('miles-hub--open')) setMilesOpen(false);
   state.map?.selectCountry(countryKey);
   renderCountry(countryKey);
   if (recordHistory) addHistory({ type: 'country', key: countryKey, label: country.namePt });
@@ -650,6 +666,7 @@ function showTooltip(countryKey, clientX, clientY) {
 }
 
 function setMilesOpen(open, restoreFocus = false) {
+  if (open && window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
   elements.milesHub.classList.toggle('miles-hub--open', open);
   elements.milesHub.inert = !open;
   elements.milesLauncher.setAttribute('aria-expanded', String(open));
@@ -658,6 +675,9 @@ function setMilesOpen(open, restoreFocus = false) {
 }
 
 function bindUiEvents() {
+  window.matchMedia('(max-width: 1199px)').addEventListener('change', event => {
+    if (event.matches && elements.milesHub.classList.contains('miles-hub--open') && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
+  });
   elements.homeButton.addEventListener('click', home);
   elements.themeButton.addEventListener('click', () => {
     setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -731,6 +751,24 @@ function bindUiEvents() {
   elements.panelClose.addEventListener('click', closeCountryPanel);
   elements.visitButton.addEventListener('click', toggleVisited);
   for (const button of elements.tabButtons) button.addEventListener('click', () => switchTab(button.dataset.tab));
+  elements.panel.querySelector('.country-tabs').addEventListener('keydown', event => {
+    const current = elements.tabButtons.indexOf(event.target);
+    if (current < 0) return;
+    let next = current;
+    if (event.key === 'ArrowRight') next = (current + 1) % elements.tabButtons.length;
+    else if (event.key === 'ArrowLeft') next = (current - 1 + elements.tabButtons.length) % elements.tabButtons.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = elements.tabButtons.length - 1;
+    else return;
+    event.preventDefault();
+    switchTab(elements.tabButtons[next].dataset.tab);
+    elements.tabButtons[next].focus();
+  });
+  elements.media.addEventListener('error', event => {
+    if (event.target.tagName !== 'IMG') return;
+    event.target.closest('figure')?.classList.add('media-card--failed');
+    event.target.remove();
+  }, true);
 
   elements.checklist.addEventListener('click', event => {
     const button = event.target.closest('[data-checklist-key]');

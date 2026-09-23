@@ -1,5 +1,7 @@
 import { CENTRAL_AMERICA_ENRICHMENT } from './centralAmerica.dataset.js';
 import { SOUTH_AMERICA_ENRICHMENT } from './southAmerica.dataset.js';
+import { LANDMARK_MEDIA } from './landmarks.media.js';
+import { EUROPE_ENRICHMENT } from './europe.dataset.js';
 
 /**
  * Traveling country data.
@@ -4996,20 +4998,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇧🇷",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=400&q=70",
-        "caption": "Cristo Redentor"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1554188248-986adbb73be4?w=400&q=70",
-        "caption": "Amazônia"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1516306580123-e6e52b1b7b5f?w=400&q=70",
-        "caption": "Carnaval"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -2,
       1,
@@ -5029,7 +5018,7 @@ export const CURATED_COUNTRIES = Object.freeze({
       1,
       1
     ],
-    "bestTime": "Abril a setembro é a temporada seca no Sudeste — ideal para Rio e SP. Nordeste brilha de outubro a março com sol garantido. Carnaval (fev/mar) é a festa maior, mas preços triplicam.",
+    "bestTime": "A época ideal depende da região. No Sudeste, meses de outono e inverno costumam ser mais secos; no Nordeste, compare o período de chuvas do destino escolhido. Carnaval aumenta a procura por hospedagem e voos.",
     "currency": "Real Brasileiro (BRL)",
     "symbol": "R$",
     "currencyCode": "BRL",
@@ -5040,7 +5029,8 @@ export const CURATED_COUNTRIES = Object.freeze({
     "borderNote": "Fronteiras abertas.",
     "visa": "free",
     "visaText": "Destino <strong>doméstico</strong> — nenhum requisito de visto para brasileiros. RG válido.",
-    "vaccines": "Febre Amarela obrigatória para Amazônia e Centro-Oeste. Hepatite A/B recomendadas.",
+    "vaccines": "Para viagens nacionais, o Ministério da Saúde recomenda manter a vacinação contra febre amarela atualizada; planeje a dose ao menos 10 dias antes, se indicada. Não há exigência nacional geral de certificado para entrar nessas regiões.",
+    "healthSource": "https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/f/febre-amarela/viajantes",
     "passport": "RG ou Passaporte válidos.",
     "foods": [
       {
@@ -5171,20 +5161,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇦🇷",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1612294037637-ec328d0e075e?w=400&q=70",
-        "caption": "Buenos Aires"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1531590878845-12627191e687?w=400&q=70",
-        "caption": "Patagônia"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-        "caption": "Mendoza"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -2,
@@ -5338,20 +5315,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇨🇱",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1531590878845-12627191e687?w=400&q=70",
-        "caption": "Torres del Paine"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&q=70",
-        "caption": "Atacama"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-        "caption": "Santiago"
-      }
-    ],
+    "photos": [],
     "rotations": [
       0,
       -2,
@@ -5509,20 +5473,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇵🇪",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=400&q=70",
-        "caption": "Machu Picchu"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=400&q=70",
-        "caption": "Lima"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1545389336-cf090694435e?w=400&q=70",
-        "caption": "Lago Titicaca"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -1,
       2,
@@ -5684,20 +5635,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇨🇴",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1558618047-3c5dc9c7c5f1?w=400&q=70",
-        "caption": "Cartagena"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-        "caption": "Medellín - El Poblado"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1518638150340-f706e86654de?w=400&q=70",
-        "caption": "Eje Cafetero"
-      }
-    ],
+    "photos": [],
     "rotations": [
       2,
       -1,
@@ -5855,20 +5793,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇺🇾",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1582560475093-ba66accbc424?w=400&q=70",
-        "caption": "Montevidéu"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1504196606672-aef5c9cefc92?w=400&q=70",
-        "caption": "Punta del Este"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&q=70",
-        "caption": "Colônia del Sacramento"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -1,
       2,
@@ -6009,20 +5934,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇵🇾",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-        "caption": "Assunção"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=400&q=70",
-        "caption": "Missões Jesuítas"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=400&q=70",
-        "caption": "Pantanal paraguaio"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -1,
@@ -6153,20 +6065,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇧🇴",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1583244532610-2c49e76c87ca?w=400&q=70",
-        "caption": "Salar de Uyuni"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1540979388789-6cee28a1cdc9?w=400&q=70",
-        "caption": "La Paz"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-        "caption": "Lago Titicaca"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -2,
       1,
@@ -6318,20 +6217,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇪🇨",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1559494007-9f5847c49d94?w=400&q=70",
-        "caption": "Galápagos"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1547222526-3e2ab0c3e1e1?w=400&q=70",
-        "caption": "Quito"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1533240332313-0db49b459ad6?w=400&q=70",
-        "caption": "Cotapaxi"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -2,
@@ -6475,20 +6361,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇻🇪",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1517760444937-f6397edcbbcd?w=400&q=70",
-        "caption": "Angel Falls"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-        "caption": "Caracas"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1558618047-3c5dc9c7c5f1?w=400&q=70",
-        "caption": "Gran Sabana"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -1,
       0,
@@ -6613,20 +6486,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇬🇾",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-        "caption": "Georgetown"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-        "caption": "Kaieteur Falls"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-        "caption": "Amazônia Guianense"
-      }
-    ],
+    "photos": [],
     "rotations": [
       0,
       2,
@@ -6750,20 +6610,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇸🇷",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-        "caption": "Paramaribo"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-        "caption": "Amazônia Surinamesa"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-        "caption": "Rio Suriname"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -1,
@@ -6883,20 +6730,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇫🇷",
     "region": "Europa Ocidental",
     "cont": "EU",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&q=70",
-        "caption": "Torre Eiffel"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1555993539-1732b0258235?w=400&q=70",
-        "caption": "Versalhes"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&q=70",
-        "caption": "Provence"
-      }
-    ],
+    "photos": [],
     "rotations": [
       0,
       -2,
@@ -7036,20 +6870,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇯🇵",
     "region": "Ásia Oriental",
     "cont": "AS",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=400&q=70",
-        "caption": "Fushimi Inari"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?w=400&q=70",
-        "caption": "Monte Fuji"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&q=70",
-        "caption": "Shibuya"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -1,
       2,
@@ -7198,20 +7019,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇺🇸",
     "region": "América do Norte",
     "cont": "NA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1485738422979-f5c462d49f74?w=400&q=70",
-        "caption": "Nova York"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=400&q=70",
-        "caption": "Grand Canyon"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1526129318478-62ed807ebdf9?w=400&q=70",
-        "caption": "San Francisco"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -2,
@@ -7347,20 +7155,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇪🇬",
     "region": "Norte da África",
     "cont": "AF",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1539650116574-75e09e35e6c3?w=400&q=70",
-        "caption": "Pirâmides de Gizé"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=400&q=70",
-        "caption": "Luxor"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=400&q=70",
-        "caption": "Mar Vermelho"
-      }
-    ],
+    "photos": [],
     "rotations": [
       1,
       -1,
@@ -7509,20 +7304,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇹🇭",
     "region": "Sudeste Asiático",
     "cont": "AS",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1506665531195-3566af2b4dfa?w=400&q=70",
-        "caption": "Wat Pho"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=400&q=70",
-        "caption": "Ilhas do Sul"
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1538485399081-7191377e8241?w=400&q=70",
-        "caption": "Chiang Mai"
-      }
-    ],
+    "photos": [],
     "rotations": [
       -2,
       0,
@@ -7675,12 +7457,7 @@ export const CURATED_COUNTRIES = Object.freeze({
     "flag": "🇬🇫",
     "region": "América do Sul",
     "cont": "SA",
-    "photos": [
-      {
-        "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-        "caption": "Amazônia Guianense"
-      }
-    ],
+    "photos": [],
     "rotations": [
       0
     ],
@@ -7800,182 +7577,7 @@ export const CURATED_COUNTRIES = Object.freeze({
   }
 });
 
-export const SOUTH_AMERICA_MEDIA = Object.freeze({
-  "Brazil": [
-    {
-      "url": "https://images.unsplash.com/photo-1483729558449-99ef09a8c325?w=400&q=70",
-      "city": "Rio de Janeiro"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1554188248-986adbb73be4?w=400&q=70",
-      "city": "Manaus"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1516306580123-e6e52b1b7b5f?w=400&q=70",
-      "city": "Rio de Janeiro"
-    }
-  ],
-  "Argentina": [
-    {
-      "url": "https://images.unsplash.com/photo-1612294037637-ec328d0e075e?w=400&q=70",
-      "city": "Buenos Aires"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1531590878845-12627191e687?w=400&q=70",
-      "city": "El Calafate"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-      "city": "Mendoza"
-    }
-  ],
-  "Chile": [
-    {
-      "url": "https://images.unsplash.com/photo-1531590878845-12627191e687?w=400&q=70",
-      "city": "Puerto Natales"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&q=70",
-      "city": "San Pedro de Atacama"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-      "city": "Santiago"
-    }
-  ],
-  "Peru": [
-    {
-      "url": "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=400&q=70",
-      "city": "Cusco"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=400&q=70",
-      "city": "Lima"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1545389336-cf090694435e?w=400&q=70",
-      "city": "Puno"
-    }
-  ],
-  "Colombia": [
-    {
-      "url": "https://images.unsplash.com/photo-1558618047-3c5dc9c7c5f1?w=400&q=70",
-      "city": "Cartagena"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70",
-      "city": "Medellín"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1518638150340-f706e86654de?w=400&q=70",
-      "city": "Pereira"
-    }
-  ],
-  "Uruguay": [
-    {
-      "url": "https://images.unsplash.com/photo-1582560475093-ba66accbc424?w=400&q=70",
-      "city": "Montevidéu"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1504196606672-aef5c9cefc92?w=400&q=70",
-      "city": "Punta del Este"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&q=70",
-      "city": "Colonia del Sacramento"
-    }
-  ],
-  "Paraguay": [
-    {
-      "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-      "city": "Assunção"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=400&q=70",
-      "city": "Encarnación"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=400&q=70",
-      "city": "Fuerte Olimpo"
-    }
-  ],
-  "Bolivia": [
-    {
-      "url": "https://images.unsplash.com/photo-1583244532610-2c49e76c87ca?w=400&q=70",
-      "city": "Uyuni"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1540979388789-6cee28a1cdc9?w=400&q=70",
-      "city": "La Paz"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-      "city": "Copacabana"
-    }
-  ],
-  "Ecuador": [
-    {
-      "url": "https://images.unsplash.com/photo-1559494007-9f5847c49d94?w=400&q=70",
-      "city": "Puerto Ayora"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1547222526-3e2ab0c3e1e1?w=400&q=70",
-      "city": "Quito"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1533240332313-0db49b459ad6?w=400&q=70",
-      "city": "Latacunga"
-    }
-  ],
-  "Venezuela": [
-    {
-      "url": "https://images.unsplash.com/photo-1517760444937-f6397edcbbcd?w=400&q=70",
-      "city": "Canaima"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-      "city": "Caracas"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1558618047-3c5dc9c7c5f1?w=400&q=70",
-      "city": "Santa Elena de Uairén"
-    }
-  ],
-  "Guyana": [
-    {
-      "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-      "city": "Georgetown"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-      "city": "Mahdia"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-      "city": "Georgetown"
-    }
-  ],
-  "Suriname": [
-    {
-      "url": "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=400&q=70",
-      "city": "Paramaribo"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-      "city": "Paramaribo"
-    },
-    {
-      "url": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=70",
-      "city": "Paramaribo"
-    }
-  ],
-  "Fr. Guiana": [
-    {
-      "url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=70",
-      "city": "Cayenne"
-    }
-  ]
-});
+// Catálogo legado de URLs não verificadas removido; a mídia editorial vive em landmarks.media.js.
 
 export const BASE_CHECKLIST = Object.freeze([
   { group: 'Documentos', items: [
@@ -8147,31 +7749,33 @@ export const AMERICAS_ENRICHMENT = Object.freeze({
   ...SOUTH_AMERICA_ENRICHMENT
 });
 
-/**
- * Media candidates already present in the project. `verifiedInSession` is false
- * because this environment has no web access to verify the subject/source now.
- * The UI only overlays `city`; landmark/description metadata never appears over images.
- */
-export const LANDMARK_MEDIA = Object.freeze({
-  ...SOUTH_AMERICA_MEDIA,
-  // Deliberately excludes the old ambiguous Copacabana beach candidate.
-  // Copacabana, Bolivia is modeled above as the Lake Titicaca city/basilica landmark.
-  "Bolivia": [
-    { url: "https://images.unsplash.com/photo-1583244532610-2c49e76c87ca?w=400&q=70", city: "Uyuni", verifiedInSession: false },
-    { url: "https://images.unsplash.com/photo-1540979388789-6cee28a1cdc9?w=400&q=70", city: "La Paz", verifiedInSession: false }
-  ],
-  "United States of America": [
-    { url: "https://images.unsplash.com/photo-1485738422979-f5c462d49f74?w=400&q=70", city: "Nova York", verifiedInSession: false },
-    { url: "https://images.unsplash.com/photo-1526129318478-62ed807ebdf9?w=400&q=70", city: "San Francisco", verifiedInSession: false }
-  ]
-});
+// Mantém o export público; imagens não verificadas permanecem fora do render.
+export { LANDMARK_MEDIA };
+
+function curatedLandmarks(key, legacy = []) {
+  const output = [];
+  const names = new Set();
+  const aliases = { 'statue of liberty': 'estátua da liberdade' };
+  for (const item of LANDMARK_MEDIA[key] ?? []) {
+    output.push({ ...item, status: 'verified' });
+    names.add(item.name.toLocaleLowerCase('pt-BR'));
+  }
+  for (const { imageUrl, ...item } of legacy) {
+    const originalName = item.name?.toLocaleLowerCase('pt-BR');
+    const name = aliases[originalName] ?? originalName;
+    if (!name || names.has(name)) continue;
+    output.push({ ...item, status: 'needs-review' });
+    names.add(name);
+  }
+  return output;
+}
 
 export const COUNTRIES = Object.freeze(Object.fromEntries(
   Object.entries(COUNTRY_CATALOG).map(([key, meta]) => {
     const base = baseCountry(key, meta);
     const curated = CURATED_COUNTRIES[key] ?? null;
-    const regional = AMERICAS_ENRICHMENT[key] ?? null;
-    if (!curated && !regional) return [key, base];
+    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(EUROPE_ENRICHMENT[key] ?? {}) };
+    if (!curated && !Object.keys(regional).length) return [key, base];
     const merged = { ...base, ...(curated ?? {}), ...(regional ?? {}) };
     return [key, {
       ...merged,
@@ -8187,6 +7791,8 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
         detail: merged.visaText ?? 'Confirme o requisito de visto em fonte consular oficial antes da viagem.'
       },
       checklist: normalizeChecklist(merged.checklist),
+      photos: [],
+      landmarks: curatedLandmarks(key, merged.landmarks ?? []),
       dataLevel: curated || merged.dataLevel === 'curated' ? 'curated' : 'regional'
     }];
   })

@@ -43,7 +43,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Parque Nacional Tikal',
       city: 'Flores',
-      imageUrl: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   Belize: {
@@ -78,7 +77,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Great Blue Hole',
       city: 'Lighthouse Reef',
-      imageUrl: 'https://images.unsplash.com/photo-1544550285-f813152fb2fd?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   'El Salvador': {
@@ -113,7 +111,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Parque Nacional El Boquerón',
       city: 'Santa Tecla',
-      imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   Honduras: {
@@ -148,7 +145,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Sítio Arqueológico de Copán',
       city: 'Copán Ruinas',
-      imageUrl: 'https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   Nicaragua: {
@@ -183,7 +179,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Catedral de León',
       city: 'León',
-      imageUrl: 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   'Costa Rica': {
@@ -218,7 +213,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Parque Nacional Manuel Antonio',
       city: 'Quepos',
-      imageUrl: 'https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?auto=format&fit=crop&w=1200&q=82'
     }]
   },
   Panama: {
@@ -253,7 +247,6 @@ export const CENTRAL_AMERICA_DATA = Object.freeze({
     landmarks: [{
       name: 'Eclusas de Miraflores',
       city: 'Cidade do Panamá',
-      imageUrl: 'https://images.unsplash.com/photo-1530789253388-582c481c54b0?auto=format&fit=crop&w=1200&q=82'
     }]
   }
 });
@@ -327,7 +320,7 @@ export const CENTRAL_AMERICA_ENRICHMENT = Object.freeze(Object.fromEntries(
         items: data.countryChecklist.map((label, index) => ({ icon: ['📘', '🧾', '💉', '🔌', '🧳'][index] || '✓', label }))
       }],
       landmarks: data.landmarks.map(landmark => ({ ...landmark, country: data.name })),
-      photos: data.landmarks.map(landmark => ({ url: landmark.imageUrl, city: landmark.city })),
+      photos: [],
       airport: meta.airport,
       airportCity: meta.airportCity,
       majorAirports: [meta.airport],

@@ -44,15 +44,15 @@
   --color-overlay-soft: rgba(255, 255, 255, .80);
   --color-shadow: rgba(15, 23, 42, .12);
   --color-focus: #0284c7;
-  --color-ocean: #d4e0ec;
-  --color-ocean-emissive: #e4edf5;
-  --color-graticule: #0284c7;
+  --color-ocean: #c6dbea;
+  --color-ocean-emissive: #deecf5;
+  --color-graticule: #2d799e;
   --color-globe-atmosphere: #38bdf8;
   --color-globe-ambient: rgba(2, 132, 199, .10);
-  --color-land: #9aafc3;
-  --color-land-hover: #7894ae;
+  --color-land: #8fa7ba;
+  --color-land-hover: #648aa7;
   --color-land-dimmed: #d7e2ec;
-  --color-land-border: #71869d;
+  --color-land-border: #59788e;
   --color-land-selected: #0284c7;
   --color-border-selected: #0369a1;
   --color-land-visited: #10b981;
@@ -105,7 +105,7 @@
   --color-ocean-emissive: #091423;
   --color-graticule: #93c5fd;
   --color-globe-atmosphere: #38bdf8;
-  --color-globe-ambient: rgba(14, 116, 144, .12);
+  --color-globe-ambient: rgba(14, 116, 144, .075);
   --color-land: #263850;
   --color-land-hover: #3a526e;
   --color-land-dimmed: #142238;
@@ -570,7 +570,7 @@ select:focus-visible {
   isolation: isolate;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% 46%, var(--color-globe-ambient) 0%, transparent 47%),
+    radial-gradient(ellipse at 50% 46%, var(--color-globe-ambient) 0%, transparent 40%),
     linear-gradient(145deg, var(--color-background) 0%, var(--color-background-subtle) 100%);
 }
 
@@ -625,7 +625,6 @@ select:focus-visible {
 [data-theme='light'] .explorer-counter,
 [data-theme='light'] .visa-filter,
 [data-theme='light'] .icon-button,
-[data-theme='light'] .info-card,
 [data-theme='light'] .detail-card,
 [data-theme='light'] .route-result__card,
 [data-theme='light'] .checklist__group,
@@ -1124,6 +1123,21 @@ select:focus-visible {
 .miles-pending { color: var(--color-text-muted); }
 .miles-trust { display: block; margin-top: var(--space-4); color: var(--color-text-muted); font-size: .75rem; }
 .miles-trust a { color: var(--color-accent-strong); }
+.miles-card-record__intro { gap: 3px; }
+.miles-card-record__intro strong { font-size: .93rem; }
+.miles-card-record__intro small { color: var(--color-text-muted); font-size: .72rem; }
+.miles-card-record__intro span { color: var(--color-text-secondary); font-size: .78rem; line-height: 1.4; }
+.miles-card-record__intro em { color: var(--color-accent-strong); font-size: .72rem; font-style: normal; font-weight: 700; }
+.miles-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.miles-tags span { padding: 4px 7px; border-radius: var(--radius-xs); background: var(--color-accent-soft); color: var(--color-accent-strong); font-size: .7rem; font-weight: 700; }
+.miles-facts { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; }
+.miles-facts div { display: grid; grid-template-columns: minmax(80px, 25%) 1fr; gap: var(--space-2); padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border-soft); }
+.miles-facts dt { color: var(--color-text-muted); font-size: .75rem; }
+.miles-facts dd { margin: 0; color: var(--color-text); font-size: .8rem; line-height: 1.45; }
+.miles-airport__lounges { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-border-soft); font-size: .8rem; }
+.miles-airport__lounges p { line-height: 1.55; }
+.miles-airport__lounges a, .entry-source a { color: var(--color-accent-strong); }
+.entry-source { font-size: .75rem; color: var(--color-text-muted); }
 
 .miles-journey {
   display: grid;
@@ -1335,12 +1349,11 @@ select:focus-visible {
 
 .media-strip {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(150px, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-5);
   padding: var(--space-4) var(--space-5);
-  overflow-x: auto;
+  overflow: hidden;
   border-bottom: 1px solid var(--color-border-soft);
   background: var(--color-background-elevated);
   scrollbar-width: thin;
@@ -1348,17 +1361,20 @@ select:focus-visible {
 
 .media-card {
   position: relative;
-  min-height: 112px;
+  min-height: 126px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
 }
+.media-card--primary { grid-column: 1 / -1; min-height: 190px; }
+.media-card--failed::before { content: 'Imagem indisponível'; display: grid; place-items: center; position: absolute; inset: 0; color: var(--color-text-secondary); font-size: .8rem; }
 
 .media-card__image {
   width: 100%;
   height: 100%;
-  min-height: 112px;
+  min-height: 0;
   display: block;
   object-fit: cover;
 }
@@ -1375,10 +1391,15 @@ select:focus-visible {
   color: var(--color-text);
   font-size: .75rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: grid;
+  gap: 2px;
+  line-height: 1.3;
   backdrop-filter: blur(10px);
 }
+.media-card__city strong, .media-card__city span, .media-card__city a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-card__city span { font-weight: 500; }
+.media-card__city a { color: var(--color-text-secondary); font-size: .62rem; text-decoration: underline; }
+.media-card__city a:focus-visible { outline: 2px solid var(--color-focus); }
 
 .media-empty {
   grid-column: 1 / -1;
@@ -1391,8 +1412,6 @@ select:focus-visible {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
 }
-
-.info-card,
 .detail-card,
 .route-result__card,
 .checklist__group {
@@ -1402,18 +1421,12 @@ select:focus-visible {
   box-shadow: 0 1px 0 rgba(255, 255, 255, .025);
 }
 
-.info-card,
 .detail-card,
 .route-result__card,
 .checklist__group,
 .currency-converter-card,
 .route-builder__airports {
   transition: border-color var(--motion-fast), background-color var(--motion-fast);
-}
-
-.info-card {
-  min-height: 92px;
-  padding: var(--space-3);
 }
 
 .info-card__label,
@@ -1432,6 +1445,9 @@ select:focus-visible {
   font-size: .875rem;
   line-height: 1.5;
 }
+.info-grid .info-card { border: 0; border-bottom: 1px solid var(--color-border-soft); border-radius: 0; background: transparent; box-shadow: none; min-height: 66px; padding: var(--space-2) var(--space-1); }
+.info-grid .info-card__value { font-size: .94rem; font-weight: 700; }
+.info-grid .info-card__label { margin-top: 2px; margin-bottom: 0; font-size: .66rem; }
 
 .currency-converter-card {
   display: grid;
@@ -1974,10 +1990,10 @@ select:focus-visible {
   .visa-filter { display: none; }
   .country-tab { padding: var(--space-4); }
   .media-strip { margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4); padding: var(--space-3) var(--space-4); }
-  .info-grid,
+  .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-grid,
   .route-result__summary,
-  .route-result__programs,
+  .route-result__programs { grid-template-columns: 1fr; }
   .miles-launcher { top: auto; bottom: calc(var(--space-3) + env(safe-area-inset-bottom)); height: 44px; min-width: 104px; flex-direction: row; transform: none; border-left: 1px solid var(--color-border-strong); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
   .miles-launcher__label { writing-mode: horizontal-tb; transform: none; }
   .miles-hub,

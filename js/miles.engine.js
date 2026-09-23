@@ -38,7 +38,7 @@ function trustLine(item) {
   const [year, month] = item.verifiedAt.split('-').map(Number);
   const date = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
     .format(new Date(Date.UTC(year, month - 1, 1)));
-  return `<span class="miles-trust">Verificado em ${escapeHtml(date)} · <a href="${escapeHtml(officialUrl(item.officialSource))}" target="_blank" rel="noopener noreferrer">Fonte oficial</a></span>`;
+  return `<span class="miles-trust">Verificado em ${escapeHtml(date)} · <a href="${escapeHtml(officialUrl(item.officialSource))}" target="_blank" rel="noopener noreferrer">Fonte oficial</a>${item.uncertainFields?.length ? ` · A confirmar: ${escapeHtml(item.uncertainFields.join(', '))}` : ''}</span>`;
 }
 
 function normalize(value) {
@@ -72,25 +72,19 @@ function renderOverview() {
 }
 
 function renderCardRecord(card) {
-  const name = `${card.name || 'Cartão'} · ${card.issuer || 'Emissor a confirmar'}`;
-  if (!isVerified(card)) return detailRow(name, 'Informações pendentes de verificação', `<p>Benefícios e condições serão exibidos após conferência em fonte oficial.</p>${trustLine(card)}`);
   const facts = [
-    `Acúmulo: ${card.earning?.value ?? 'não informado'} ${card.earning?.unit ?? ''}. ${card.earning?.notes ?? ''}`,
-    `Programa: ${card.loyaltyProgram || 'não informado'}`,
-    `Salas VIP: ${card.loungeAccess?.networks?.join(', ') || 'não informado'}; visitas: ${card.loungeAccess?.visits || 'não informado'}; condições: ${card.loungeAccess?.conditions || 'consulte o emissor'}`,
-    `Anuidade: ${card.annualFee || 'não informada'}`,
-    `Benefícios de viagem: ${card.travelBenefits || 'não informados'}`,
-    `Perfil ideal: ${card.idealFor || 'não informado'}`
-  ];
-  return detailRow(name, card.idealFor || 'Veja os critérios', `${list(facts)}${trustLine(card)}`);
+    ['Bandeira', card.network], ['Programa', card.loyaltyProgram], ['Anuidade', card.annualFee],
+    ['Isenção', card.feeWaiver], ['Convidados', card.guests], ['Viagem', card.travelBenefits]
+  ].filter(([, value]) => value);
+  return `<details class="miles-detail miles-card-record"><summary><span class="miles-card-record__intro"><strong>${escapeHtml(card.name)}</strong><small>${escapeHtml(card.issuer)}</small><span>${escapeHtml(card.earning)}</span><span>${escapeHtml(card.loungeAccess)}</span><em>${escapeHtml(card.idealFor)}</em></span><span class="miles-detail__chevron" aria-hidden="true">+</span></summary><div class="miles-detail__body"><div class="miles-tags">${(card.tags || []).map(tag => `<span>${escapeHtml(tag)}</span>`).join('')}</div><dl class="miles-facts">${facts.map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${trustLine(card)}</div></details>`;
 }
 
 function renderCards() {
   return `${sectionHeading('Escolha pelo uso', 'Cartões em destaque por perfil', 'Não existe um cartão melhor para todas as pessoas. Compare seu gasto, renda, anuidade, banco, companhia preferida e frequência de viagem.')}
     <div class="miles-detail-list">${CARD_PROFILES.map(profile => {
       const cards = CARD_OFFERS.filter(card => card.profile === profile.id);
-      const body = `<p>${escapeHtml(profile.guidance)}</p>${cards.length ? cards.map(renderCardRecord).join('') : '<p class="miles-pending">Produtos e condições atuais aguardam verificação em fontes oficiais.</p>'}`;
-      return detailRow(profile.label, profile.guidance, body);
+      const body = cards.map(renderCardRecord).join('');
+      return detailRow(profile.label, `${cards.length} ${cards.length === 1 ? 'cartão pesquisado' : 'cartões pesquisados'}`, body);
     }).join('')}</div>
     <p class="miles-footnote">A pontuação anunciada sozinha não revela o custo real do cartão. Confira também regras para isenção e validade dos pontos.</p>`;
 }
@@ -99,7 +93,7 @@ function renderLounges() {
   return `${sectionHeading('Acesso sem surpresa', 'Como entrar em uma sala VIP?', 'O benefício só funciona quando as quatro partes da sua viagem são compatíveis.')}
     <ol class="miles-journey" aria-label="Caminho para acessar uma sala VIP"><li>Cartão elegível</li><li>Rede parceira</li><li>Aeroporto</li><li>Sala compatível</li></ol>
     <p class="miles-section-copy">A mesma rede pode oferecer regras diferentes conforme cartão e emissor. O logotipo não garante entrada gratuita ou ilimitada.</p>
-    <div class="miles-detail-list">${LOUNGE_TYPES.map(type => detailRow(type.name, 'Entenda como funciona', `<p>${escapeHtml(type.explanation)}</p>`)).join('')}</div>
+    <div class="miles-detail-list">${LOUNGE_TYPES.map(type => detailRow(type.name, 'Acesso, visitas e condições', `<p>${escapeHtml(type.explanation)}</p>${trustLine(type)}`)).join('')}</div>
     ${detailRow('Antes de sair de casa', 'Confira as condições do seu acesso', list([
       'Categoria do cartão, emissor e eventual gasto mínimo exigido.',
       'Quantidade de visitas, política de convidados e possíveis cobranças.',
@@ -112,7 +106,6 @@ function renderUpgradeExample(example) {
   const title = `${example.airline || 'Companhia'} · ${example.method || 'Método'}`;
   if (!isVerified(example)) return detailRow(title, 'Regra pendente de verificação', `<p>Confira as condições atuais com a companhia aérea.</p>${trustLine(example)}`);
   return detailRow(title, example.eligibleRouteCabin || 'Condições da companhia', `${list([
-    `Rota ou cabine: ${example.eligibleRouteCabin || 'consulte a companhia'}`,
     `Quando solicitar: ${example.timing || 'consulte a companhia'}`,
     `Pontos ou milhas: ${example.milesRequired || 'consulte a companhia'}`,
     `Restrições: ${example.restrictions || 'consulte a companhia'}`
@@ -132,18 +125,18 @@ function airportFacts(label, items) {
 
 function renderAirport(guide, airport) {
   const city = airport?.city || 'Cidade a confirmar';
-  const country = airport?.country ? new Intl.DisplayNames('pt-BR', { type: 'region' }).of(airport.country) : 'País a confirmar';
   const heading = `${guide.iata} · ${city}`;
-  let facts = '<p>Terminais, companhias, salas VIP, conexões e benefícios locais aguardam verificação em fonte oficial.</p>';
+  let facts = '<p>Dados operacionais a confirmar.</p>';
   if (isVerified(guide)) {
     const verifiedLounges = guide.lounges?.filter(isVerified) ?? [];
     facts = `${airportFacts('Terminais', guide.terminals)}${airportFacts('Companhias', guide.airlines)}
-      ${verifiedLounges.length ? `<p><strong>Salas VIP:</strong></p>${list(verifiedLounges.map(lounge => `${lounge.name} · ${lounge.terminal || 'terminal a confirmar'} · ${lounge.networks?.join(', ') || 'rede a confirmar'}`))}` : '<p>Salas VIP ainda não verificadas para este aeroporto.</p>'}
+      ${verifiedLounges.length ? `<div class="miles-airport__lounges"><strong>Salas verificadas</strong>${verifiedLounges.map(lounge => `<p><b>${escapeHtml(lounge.name)}</b> · ${escapeHtml(lounge.terminal)}<br><span>${escapeHtml(lounge.eligibility)}</span>${lounge.networks?.length ? `<br>Rede confirmada: ${escapeHtml(lounge.networks.join(', '))}` : ''}<br><a href="${escapeHtml(lounge.officialSource)}" target="_blank" rel="noopener noreferrer">Fonte da sala</a></p>`).join('')}</div>` : '<p>Salas VIP ainda não verificadas para este aeroporto.</p>'}
       ${guide.fastTrack ? `<p><strong>Fast Track:</strong> ${escapeHtml(guide.fastTrack)}</p>` : ''}
       ${guide.connectionNotes ? `<p><strong>Conexões:</strong> ${escapeHtml(guide.connectionNotes)}</p>` : ''}`;
   }
-  return `<details class="miles-airport"><summary><span class="miles-airport__code">${escapeHtml(guide.iata)}</span><span class="miles-airport__identity"><strong>${escapeHtml(city)}</strong><small>${escapeHtml(country)} · ${escapeHtml(airport?.name || 'Aeroporto')}</small></span><span class="miles-airport__more" aria-hidden="true">+</span></summary>
-    <div class="miles-airport__body"><h4>${escapeHtml(heading)}</h4>${facts}${trustLine(guide)}</div></details>`;
+  const networks = [...new Set(guide.lounges.filter(isVerified).flatMap(lounge => lounge.networks || []))];
+  return `<details class="miles-airport"><summary><span class="miles-airport__code">${escapeHtml(guide.iata)}</span><span class="miles-airport__identity"><strong>${escapeHtml(city)}</strong><small>${escapeHtml(guide.terminals.join(', '))} · ${guide.lounges.filter(isVerified).length} ${guide.lounges.filter(isVerified).length === 1 ? 'sala verificada' : 'salas verificadas'}${networks.length ? ` · ${escapeHtml(networks.join(', '))}` : ''}</small></span><span class="miles-airport__more" aria-hidden="true">+</span></summary>
+    <div class="miles-airport__body"><h4>${escapeHtml(airport?.name || heading)}</h4>${facts}${trustLine(guide)}</div></details>`;
 }
 
 function renderAirports() {
