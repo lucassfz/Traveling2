@@ -477,7 +477,7 @@ async function resolveDestinationAirport(countryKey) {
   if (country.flightUnavailable) return null;
   let airport = null;
   if (country.airport && country.airport !== '—') airport = await airportRepository.resolve(country.airport);
-  if (!airport && country.latlng) airport = await airportRepository.findNearest(country.latlng[0], country.latlng[1]);
+  if (!airport && !country.airport && country.latlng) airport = await airportRepository.findNearest(country.latlng[0], country.latlng[1]);
   destinationAirportCache.set(countryKey, airport);
   return airport;
 }
@@ -493,7 +493,7 @@ async function primeDestinationAirport(countryKey) {
     if (state.countryKey !== countryKey || !airport) return;
     state.destinationAirport = airport;
     elements.routeDestinationCode.textContent = airport.iata || airport.icao || '—';
-    elements.routeDestinationCity.textContent = airport.city || airport.name;
+    elements.routeDestinationCity.textContent = country.airportCity || airport.city || airport.name;
   } catch {
     if (state.countryKey === countryKey) elements.routeDestinationCode.textContent = country.airport || '—';
   }

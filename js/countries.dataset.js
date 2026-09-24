@@ -2,6 +2,7 @@ import { CENTRAL_AMERICA_ENRICHMENT } from './centralAmerica.dataset.js';
 import { SOUTH_AMERICA_ENRICHMENT } from './southAmerica.dataset.js';
 import { LANDMARK_MEDIA } from './landmarks.media.js';
 import { EUROPE_COMPLETE_ENRICHMENT } from './europe.complete.dataset.js';
+import { AFRICA_COMPLETE_ENRICHMENT } from './africa.complete.dataset.js';
 import { AMERICAS_PRIORITY_ENRICHMENT } from './americas.priority.dataset.js';
 import { flagFromAlpha2 } from './country.exploration.js';
 
@@ -7777,7 +7778,7 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
   Object.entries(COUNTRY_CATALOG).map(([key, meta]) => {
     const base = baseCountry(key, meta);
     const curated = CURATED_COUNTRIES[key] ?? null;
-    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}) };
+    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}), ...(AFRICA_COMPLETE_ENRICHMENT[key] ?? {}) };
     if (!curated && !Object.keys(regional).length) return [key, { ...base, landmarks: curatedLandmarks(key) }];
     const merged = { ...base, ...(curated ?? {}), ...(regional ?? {}) };
     return [key, {

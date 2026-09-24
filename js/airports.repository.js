@@ -38,6 +38,7 @@ const CORE_AIRPORTS = Object.freeze([
   ['FCO','LIRF','Leonardo da Vinci–Fiumicino','Roma','IT',41.8003,12.2389],
   ['AMS','EHAM','Amsterdam Schiphol','Amsterdã','NL',52.3105,4.7683],
   ['ZRH','LSZH','Zurich','Zurique','CH',47.4581,8.5555],
+  ['RMO','LUKK','Chișinău International','Chișinău','MD',46.9277,28.9309],
   ['ATH','LGAV','Athens International','Atenas','GR',37.9364,23.9445],
   ['IST','LTFM','Istanbul','Istambul','TR',41.2753,28.7519],
   ['DXB','OMDB','Dubai International','Dubai','AE',25.2532,55.3657],

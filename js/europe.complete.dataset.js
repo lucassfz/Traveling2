@@ -30,16 +30,22 @@ const SCHENGEN_ENTRY = entry(
   EU_BRAZIL,
   { passportValidity: 'Emitido nos últimos 10 anos e válido por pelo menos 3 meses após a saída prevista do espaço Schengen.', ees: EES, etias: ETIAS }
 );
+const ASSOCIATED_SCHENGEN_ENTRY = {
+  Iceland: entry('Brasileiros com passaporte comum visitam a Islândia sem visto para turismo curto, sob regras Schengen.', 'Até 90 dias em 180 no conjunto Schengen. A Islândia prevê possível extensão bilateral apenas no país, sob condições próprias.', 'https://island.is/en/entry-requirements-to-iceland/bilateral-agreements-on-extended-stay', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
+  Liechtenstein: entry('Brasileiros com passaporte comum fazem turismo curto sem visto em Liechtenstein, que integra Schengen; acesso usual via Suíça ou Áustria.', SCHENGEN_ENTRY.maxStay, 'https://www.llv.li/en/national-administration/migration-and-passport-office/visa', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
+  Norway: entry('Brasileiros com passaporte comum não precisam de visto para turismo curto na Noruega, integrante de Schengen.', SCHENGEN_ENTRY.maxStay, 'https://www.udi.no/en/want-to-apply/visit-and-holiday/visitors-visa-to-norway/?c=bra', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
+  Switzerland: entry('Brasileiros com passaporte comum fazem turismo curto sem visto na Suíça, integrante de Schengen.', SCHENGEN_ENTRY.maxStay, 'https://www.sem.admin.ch/sem/en/home/international-rueckkehr/ch-migrationsaussenpolitik/abkommen/visumbefreiung.html', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS })
+};
 const NATIONAL_ENTRY = {
   Albania: entry('Brasileiros não precisam de visto para turismo curto na Albânia; o país não integra Schengen.', 'Até 90 dias em 180 dias na Albânia, em contagem separada do Schengen.', 'https://punetejashtme.gov.al/en/regjimi-i-vizave-per-te-huajt/', { passportValidity: 'Emitido nos últimos 10 anos e válido por 3 meses após a saída da Albânia.' }),
   Andorra: entry('Andorra não exige visto próprio. O acesso terrestre passa por França ou Espanha, onde valem as regras de entrada Schengen.', 'Curta visita a Andorra; acompanhe também seus dias e eventuais reentradas no espaço Schengen.', 'https://www.govern.ad/en/ministries-and-secretaries-of-state/ministry-of-foreign-affairs/travel-to-andorra', { documents: 'Passaporte e comprovantes do roteiro; se você depender de visto Schengen, ele deve permitir reentrada após Andorra.', ees: { status: 'no trajeto', notes: 'Pode ocorrer na fronteira externa do espaço Schengen, não em um sistema andorrano.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando iniciar, poderá ser relevante para a passagem por França/Espanha; hoje não é exigido.' } }),
-  Belarus: entry('Acordo bilateral dispensa visto de turismo para passaporte brasileiro comum; atenção às rotas terrestres e conexões.', 'Até 90 dias; confirme o cálculo do período e regras da rota no acordo bilateral.', 'https://aplicacao.itamaraty.gov.br/ApiConcordia/Documento/download/16294', { status: 'needs-review', documents: 'Passagem de saída, hospedagem, seguro aceito localmente e documentos exigidos pela rota de entrada.', health: 'Seguro médico aceito na Bielorrússia pode ser exigido; confira cobertura e trânsito antes de embarcar.' }),
+  Belarus: entry('Acordo bilateral dispensa visto de turismo para passaporte brasileiro comum; atenção às rotas terrestres e conexões.', 'Até 90 dias por ano a contar da primeira entrada, conforme o acordo bilateral.', 'https://aplicacao.itamaraty.gov.br/ApiConcordia/Documento/download/16294', { status: 'needs-review', documents: 'Passagem de saída, hospedagem, seguro aceito localmente e documentos exigidos pela rota de entrada.', health: 'Seguro médico aceito na Bielorrússia pode ser exigido; confira cobertura e trânsito antes de embarcar.' }),
   'Bosnia and Herz.': entry('Brasileiros com passaporte comum estão dispensados de visto para turismo na Bósnia e Herzegovina.', 'Até 90 dias, sem exceder 180 dias no ano contados da primeira entrada, conforme acordo bilateral.', 'https://www.mvp.gov.ba/en/org_cmd57sdlc000nn43u2rk8pgsd_638883525257338153'),
   Cyprus: entry('Passaporte brasileiro comum: turismo sem visto na República de Chipre. Chipre é da UE, mas não integra Schengen.', 'Até 90 dias em 180 dias em Chipre; contagem separada da permanência Schengen.', 'https://www.gov.cy/information/visas/', { passportValidity: 'Passaporte válido por pelo menos 3 meses após a saída planejada de Chipre.', etias: { ...ETIAS, notes: 'Chipre está entre os países previstos; não há exigência de ETIAS em 2026-09.' } }),
   Ireland: entry('Brasileiros não precisam de visto irlandês prévio para visita curta; a admissão é decidida pela imigração da Irlanda, fora de Schengen.', 'Geralmente até 90 dias, conforme permissão concedida na chegada.', 'https://www.irishimmigration.ie/visa-non-visa-required-nationalities/', { documents: 'Tenha passagem de saída, hospedagem, recursos e motivo da visita; o agente pode solicitá-los.' }),
   Macedonia: entry('O acordo Brasil–Macedônia do Norte dispensa visto de turismo para passaporte comum.', 'Até 90 dias a partir da entrada, conforme acordo bilateral; não se soma ao limite Schengen.', 'https://aplicacao.itamaraty.gov.br/ApiConcordia/Documento/download/13494'),
   Moldova: entry('Brasileiros com passaporte comum têm isenção de visto para turismo na Moldávia.', 'Até 90 dias durante 6 meses desde a primeira entrada, conforme acordo bilateral.', 'https://www.planalto.gov.br/ccivil_03/_ato2019-2022/2022/decreto/d11128.htm'),
-  Monaco: entry('Mônaco não integra formalmente Schengen; o acesso usual é pela França e segue as exigências de entrada francesa para brasileiros.', 'Visita curta; os dias do roteiro na França contam para o limite Schengen.', 'https://service-public-particuliers.gouv.mc/Nationalite-et-residence/Residence/Installation/How-to-enter-Monaco', { ees: { status: 'no trajeto', notes: 'Aplica-se ao cruzar a fronteira externa francesa, não dentro de Mônaco.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando começar, poderá valer para entrar pela França; hoje não é exigido.' } }),
+  Monaco: entry('Mônaco não integra formalmente Schengen; o acesso usual é pela França e segue as exigências de entrada francesa para brasileiros.', 'Visita curta; os dias do roteiro na França contam para o limite Schengen.', 'https://ambassade-en-chine.gouv.mc/en/information-and-services/visiting-monaco', { ees: { status: 'no trajeto', notes: 'Aplica-se ao cruzar a fronteira externa francesa, não dentro de Mônaco.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando começar, poderá valer para entrar pela França; hoje não é exigido.' } }),
   Montenegro: entry('Brasileiros com passaporte válido entram sem visto para turismo em Montenegro.', 'Até 90 dias em 180 dias em Montenegro; contagem separada de Schengen.', 'https://www.gov.me/en/diplomatic-missions/embassies-and-consulates-of-montenegro/brazil', { documents: 'Passagem de saída, endereço de hospedagem e recursos; hospedagem deve providenciar o registro local da estadia.' }),
   Russia: entry('Acordo bilateral dispensa visto para turismo de curta duração com passaporte brasileiro comum; confirme rota e conexões antes de comprar.', 'Até 90 dias em cada período de 180 dias, conforme acordo Brasil–Rússia.', 'https://www.planalto.gov.br/ccivil_03/_ato2007-2010/2010/decreto/d7271.htm', { documents: 'Passagem de saída, hospedagem, seguro e documentos da conexão; a hospedagem normalmente cuida do registro migratório.', health: 'Seguro médico com cobertura efetiva na Rússia é prudente; avalie disponibilidade de atendimento e meios de pagamento.', status: 'needs-review' }),
   'San Marino': entry('San Marino não emite visto turístico próprio; a chegada é por território italiano, com a regra de entrada Schengen da Itália.', 'Visita curta; planeje os dias totais do roteiro italiano/Schengen.', 'https://visitsanmarino.com/pub1/VisitSM/contenuto/About-San-Marino/FORMALITA--DI-FRONTIERA.html', { ees: { status: 'no trajeto', notes: 'Pode ser registrado ao entrar no espaço Schengen pela Itália.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando iniciar, poderá ser necessário para entrar na Itália; hoje não é exigido.' } }),
@@ -58,7 +64,7 @@ const EXTRA = {
   Bulgaria: { capital: 'Sofia', currency: 'Euro (EUR)', code: 'EUR', symbol: '€', lang: 'búlgaro', zone: 'UTC+2/+3', volt: '230V · tipos C/F', airport: 'SOF', city: 'Sofia', airports: ['SOF', 'VAR', 'BOJ'], flight: 'Sofia (SOF) serve o interior; Varna (VAR) e Burgas (BOJ) atendem o Mar Negro, sobretudo no verão.', f: [['Banitsa', 'Massa folhada de queijo branco e ovos.'], ['Shopska salata', 'Salada de tomate, pepino, pimentão e queijo sirene.'], ['Kavarma', 'Ensopado de carne e legumes em panela de barro.']], e: ['Mosteiros exigem roupa discreta e respeito às áreas de oração.', 'Sinalizações podem estar em cirílico; confira o destino escrito antes de embarcar.'], tip: 'Gorjeta de 5–10% em restaurante é habitual se o serviço agradar; não é automática.', comm: 'Inglês aparece em hotéis e atrações; algumas palavras em búlgaro ajudam fora de Sofia.', note: 'O euro substituiu o lev em 2026; confira tarifas de ônibus e trem locais.' },
   Croatia: { capital: 'Zagreb', currency: 'Euro (EUR)', code: 'EUR', symbol: '€', lang: 'croata', zone: 'UTC+1/+2', volt: '230V · tipos C/F', airport: 'ZAG', city: 'Zagreb', airports: ['ZAG', 'SPU', 'DBV'], flight: 'Zagreb (ZAG) é hub anual; Split (SPU) e Dubrovnik (DBV) atendem a costa com forte sazonalidade.', f: [['Peka', 'Carne ou polvo assado lentamente sob tampa de ferro.'], ['Crni rižot', 'Arroz negro de tinta de lula, típico da costa.'], ['Štrukli', 'Massa recheada de queijo, comum no norte.']], e: ['Em Dubrovnik e outras cidades muradas, respeite moradores e regras para malas e ruído.', 'Ferries do Adriático variam conforme temporada e vento.'], tip: 'Serviço extra é opcional; arredondar ou deixar 5–10% por bom atendimento é comum.', comm: 'Inglês funciona em áreas turísticas; um hvala (obrigado) é bem recebido.', note: 'Reserve ferry e hospedagem cedo no verão do Adriático.' },
   Cyprus: { capital: 'Nicósia', currency: 'Euro (EUR)', code: 'EUR', symbol: '€', lang: 'grego e turco; inglês frequente no turismo', zone: 'UTC+2/+3', volt: '230V · tipo G', airport: 'LCA', city: 'Lárnaca', airports: ['LCA', 'PFO'], flight: 'Lárnaca (LCA) é a principal chegada da República de Chipre; Pafos (PFO) serve o oeste da ilha.', f: [['Halloumi', 'Queijo grelhado de textura firme.'], ['Kleftiko', 'Cordeiro assado lentamente.'], ['Meze', 'Sequência de pequenos pratos compartilhados.']], e: ['Mesas de meze são demoradas e compartilhadas; confirme o número de pessoas antes de pedir.', 'Ao cruzar a Linha Verde, leve o passaporte e observe regras dos pontos oficiais.'], tip: 'Serviço pode estar incluído; pequena gorjeta em restaurante é apreciada, mas não obrigatória.', comm: 'Grego predomina no sul; inglês é comum no turismo. Há sensibilidade política na divisão da ilha.', note: 'Dirige-se pela esquerda; confirme cobertura do aluguel de carro antes de cruzar áreas da ilha.' },
-  'Czech Rep.': { capital: 'Praga', currency: 'Coroa tcheca (CZK)', code: 'CZK', symbol: 'Kč', lang: 'tcheco', zone: 'UTC+1/+2', volt: '230V · tipos C/E', airport: 'PRG', city: 'Praga', airports: ['PRG', 'BRQ'], flight: 'Praga (PRG) concentra chegadas; Brno (BRQ) tem poucas rotas e pode exigir conexão terrestre.', f: [['Svíčková', 'Carne bovina com molho cremoso, pão knedlíky e geleia.'], ['Trdelník', 'Doce de massa assada popular em áreas turísticas; não é símbolo exclusivo tcheco.'], ['Koláče', 'Pãezinhos doces com frutas, papoula ou queijo.']], e: ['Valide bilhetes de transporte quando exigido; fiscalização é comum.', 'Use casas de câmbio identificadas e leia a taxa antes de trocar dinheiro.'], tip: 'Em restaurantes, arredondar ou deixar 5–10% por bom serviço é comum.', comm: 'Inglês ajuda em Praga; frases simples em tcheco facilitam visitas menores.', note: 'Pague em coroas tchecas e recuse conversão dinâmica para BRL no cartão.' },
+  'Czech Rep.': { capital: 'Praga', currency: 'Coroa tcheca (CZK)', code: 'CZK', symbol: 'Kč', lang: 'tcheco', zone: 'UTC+1/+2', volt: '230V · tipos C/E', airport: 'PRG', city: 'Praga', airports: ['PRG', 'BRQ'], flight: 'Praga (PRG) concentra chegadas; Brno (BRQ) tem poucas rotas e pode exigir conexão terrestre.', f: [['Svíčková', 'Carne bovina com molho cremoso, pão knedlíky e geleia.'], ['Vepřo knedlo zelo', 'Porco assado com bolinhos de pão e repolho, clássico da cozinha tcheca.'], ['Koláče', 'Pãezinhos doces com frutas, papoula ou queijo.']], e: ['Valide bilhetes de transporte quando exigido; fiscalização é comum.', 'Use casas de câmbio identificadas e leia a taxa antes de trocar dinheiro.'], tip: 'Em restaurantes, arredondar ou deixar 5–10% por bom serviço é comum.', comm: 'Inglês ajuda em Praga; frases simples em tcheco facilitam visitas menores.', note: 'Pague em coroas tchecas e recuse conversão dinâmica para BRL no cartão.' },
   Denmark: { capital: 'Copenhague', currency: 'Coroa dinamarquesa (DKK)', code: 'DKK', symbol: 'kr', lang: 'dinamarquês', zone: 'UTC+1/+2', volt: '230V · tipos C/E/F/K', airport: 'CPH', city: 'Copenhague', airports: ['CPH', 'BLL'], flight: 'Copenhague (CPH) é hub; Billund (BLL) atende a Jutlândia e Legoland.', f: [['Smørrebrød', 'Sanduíche aberto de pão de centeio com coberturas variadas.'], ['Frikadeller', 'Almôndegas achatadas de carne.'], ['Æbleskiver', 'Bolinho redondo doce, tradicional no inverno.']], e: ['Fique fora das ciclovias e sinalize ao atravessá-las.', 'Pontualidade e respeito ao espaço pessoal ajudam em encontros e transporte.'], tip: 'Serviço normalmente está incluído; gorjeta não é esperada.', comm: 'Inglês é amplamente utilizável em cidades, mas uma saudação em dinamarquês é cordial.', note: 'Cartão é aceito quase em todo lugar; trens e bicicletas facilitam o deslocamento.' },
   Estonia: { capital: 'Tallinn', currency: 'Euro (EUR)', code: 'EUR', symbol: '€', lang: 'estoniano', zone: 'UTC+2/+3', volt: '230V · tipos C/F', airport: 'TLL', city: 'Tallinn', airports: ['TLL'], flight: 'Tallinn (TLL) é a porta aérea; ferry conecta a Helsinque em cerca de duas horas.', f: [['Kiluvõileib', 'Pão aberto com espadilha e ovo.'], ['Verivorst', 'Morcela tradicional do inverno.'], ['Kama', 'Mistura de cereais torrados usada em sobremesas.']], e: ['Filas, silêncio e espaço pessoal são valorizados; evite falar alto no transporte.', 'A cidade velha tem pedras irregulares; use calçado estável.'], tip: 'Serviço costuma estar incluído; gorjeta pequena é opcional.', comm: 'Inglês é frequente em Tallinn; estoniano é o idioma oficial, e russo não deve ser presumido.', note: 'Bilhetes digitais e pagamento por cartão são práticos; confira validação local.' },
   Finland: { capital: 'Helsinque', currency: 'Euro (EUR)', code: 'EUR', symbol: '€', lang: 'finlandês e sueco', zone: 'UTC+2/+3', volt: '230V · tipos C/F', airport: 'HEL', city: 'Helsinque', airports: ['HEL', 'RVN'], flight: 'Helsinque (HEL) é hub; Rovaniemi (RVN) é acesso sazonal à Lapônia.', f: [['Karjalanpiirakka', 'Tortinha careliana de centeio com arroz.'], ['Lohikeitto', 'Sopa cremosa de salmão e batata.'], ['Korvapuusti', 'Pão doce de canela e cardamomo.']], e: ['Na sauna, siga as regras do local sobre banho, silêncio e roupas; não jogue água sem combinar.', 'Silêncio em público não significa falta de cordialidade.'], tip: 'Gorjeta não é esperada; preços incluem serviço.', comm: 'Inglês costuma funcionar em cidades; finlandês e sueco são oficiais.', note: 'Planeje trens e roupas técnicas para a Lapônia; cartão é amplamente aceito.' },
@@ -98,6 +104,53 @@ const PRIORITY_GUIDE = {
   Switzerland: ['Serviço está incluído; arredondamento é opcional.', 'Confirme o idioma do cantão: alemão, francês, italiano ou romanche.', 'CHF é a moeda; passes ferroviários e deslocamento alpino exigem orçamento.'],
   Austria: ['Arredondar a conta por bom serviço é prática comum.', 'Alemão é a língua local; inglês ajuda em Viena e destinos alpinos.', 'Confira reservas de trem e condições de montanha antes de trilhas.'],
   Ireland: ['Confira service charge; gorjeta em restaurante é comum, mas não obrigatória.', 'Inglês funciona amplamente; irlandês aparece em placas e nomes de lugares.', 'Estradas são pela esquerda e chuva é frequente; planeje trajeto fora de Dublin.']
+};
+
+const MONEY = {
+  Albania: 'Levar leks em espécie para mercados, praias menores e ônibus locais.',
+  Andorra: 'Pagar em euros; cartão é comum, mas dinheiro ajuda em pequenos serviços de montanha.',
+  Austria: 'Usar euros e manter algum dinheiro para cafés e estabelecimentos pequenos.',
+  Belarus: 'Providenciar rublos bielorrussos e confirmar se cartões estrangeiros funcionam na rota.',
+  Belgium: 'Usar euros; confirmar aceitação do cartão internacional em lojas pequenas.',
+  'Bosnia and Herz.': 'Levar marcos conversíveis para ônibus, cafés e cidades menores.',
+  Bulgaria: 'Usar euros desde 2026; ter algum dinheiro para mercados e transporte local.',
+  Croatia: 'Usar euros; dinheiro é útil em barcos, feiras e ilhas menores.',
+  Cyprus: 'Usar euros e manter dinheiro para vilarejos, praias e estacionamentos.',
+  'Czech Rep.': 'Pagar em coroas tchecas e recusar conversão dinâmica para reais no cartão.',
+  Denmark: 'Pagar em coroas dinamarquesas; cartão é amplamente aceito.',
+  Estonia: 'Usar euros; pagamentos eletrônicos são comuns até para valores pequenos.',
+  Finland: 'Usar euros; cartão é amplamente aceito, inclusive fora de Helsinque.',
+  France: 'Usar euros e manter pequena quantia para mercados e serviços locais.',
+  Germany: 'Usar euros e levar dinheiro para locais que não aceitam cartão.',
+  Greece: 'Usar euros; dinheiro ajuda em tavernas e ilhas menores.',
+  Hungary: 'Pagar em florins e recusar conversão dinâmica para reais no cartão.',
+  Iceland: 'Pagar em coroas islandesas; cartão é aceito em quase todos os serviços.',
+  Ireland: 'Usar euros; cartão é comum, mas leve pequena quantia para áreas rurais.',
+  Italy: 'Usar euros e manter dinheiro para cafés, feiras e pequenos serviços.',
+  Latvia: 'Usar euros; cartão é comum em Riga, menos em mercados rurais.',
+  Liechtenstein: 'Pagar em francos suíços; confira se o cartão faz conversão em CHF.',
+  Lithuania: 'Usar euros; cartão é comum nas cidades, dinheiro ajuda em feiras.',
+  Luxembourg: 'Usar euros; cartão é comum, mas dinheiro ajuda em mercados pequenos.',
+  Malta: 'Usar euros; levar dinheiro para quiosques e pequenos serviços em Gozo.',
+  Moldova: 'Levar lei moldávios para mercados, ônibus e regiões fora de Chișinău.',
+  Monaco: 'Usar euros e planejar orçamento maior que o das cidades francesas vizinhas.',
+  Montenegro: 'Usar euros; dinheiro ajuda em praias, estacionamento e vilas menores.',
+  Netherlands: 'Usar euros; confirmar aceitação do cartão internacional em lojas que priorizam débito.',
+  Macedonia: 'Levar dinares macedônios para mercados e transporte fora de Skopje.',
+  Norway: 'Pagar em coroas norueguesas; cartão é amplamente aceito.',
+  Poland: 'Pagar em złoty e recusar conversão dinâmica para reais no cartão.',
+  Portugal: 'Usar euros; cartão é comum, mas dinheiro ajuda em cafés e mercados pequenos.',
+  Romania: 'Pagar em lei romenos; dinheiro ajuda em vilarejos e transporte local.',
+  Russia: 'Confirmar antes da viagem meios legais de obter rublos; cartões estrangeiros podem falhar.',
+  'San Marino': 'Usar euros; dinheiro ajuda em pequenos cafés e lojas do centro histórico.',
+  Serbia: 'Levar dinares sérvios para ônibus, mercados e gastos pequenos.',
+  Slovakia: 'Usar euros; dinheiro ajuda em vilarejos e refúgios de montanha.',
+  Slovenia: 'Usar euros; manter dinheiro para áreas rurais e estacionamentos.',
+  Spain: 'Usar euros; cartão é comum, mas dinheiro ajuda em bares e mercados menores.',
+  Sweden: 'Pagar em coroas suecas; muitos locais preferem cartão e não aceitam dinheiro.',
+  Switzerland: 'Pagar em francos suíços; euros nem sempre são aceitos e podem ter câmbio ruim.',
+  Ukraine: 'Confirmar disponibilidade de saques e pagamentos na rota; serviços podem ser interrompidos.',
+  'United Kingdom': 'Pagar em libras; cartão por aproximação é comum, inclusive no transporte urbano.'
 };
 
 // Pontuações 0/1/2 (fraco/bom/ótimo) de janeiro a dezembro, alinhadas ao texto.
@@ -149,17 +202,33 @@ const SEASON = {
   'United Kingdom': ['Maio–setembro oferece dias mais longos; chuva é possível todo o ano e inverno tem dias curtos.', '001122221100', 'Levar impermeável leve mesmo no verão.', 'Levar casaco quente e calçado resistente à chuva.']
 };
 
-const simpleChecklist = (key, regime, note) => [
+const simpleChecklist = regime => [
   { group: 'Documentos', items: [
     { id: 'passport', icon: '📘', label: 'Passaporte conforme a regra de entrada' },
     { id: 'exit', icon: '🧾', label: 'Comprovantes de saída, hospedagem e recursos' },
     { id: 'insurance', icon: '🛡️', label: 'Seguro de viagem adequado ao roteiro' },
     { id: 'regime', icon: '🛂', label: regime }
-  ] },
-  { group: 'No destino', items: [{ id: 'local', icon: '📍', label: note }] }
+  ] }
 ];
+const ENTRY_CHECKLIST_NOTES = {
+  Albania: 'Contar até 90 dias em 180 na Albânia, fora do limite Schengen.',
+  Andorra: 'Conferir entrada e reentrada pela França ou Espanha.',
+  Belarus: 'Confirmar rota de entrada, seguro aceito e limite bilateral de 90 dias por ano.',
+  'Bosnia and Herz.': 'Contar o limite bilateral bósnio de 90 dias, separado do Schengen.',
+  Cyprus: 'Separar os dias em Chipre dos dias do espaço Schengen; ETIAS ainda não é exigido.',
+  Ireland: 'Preparar comprovantes para a imigração irlandesa, independente do Schengen.',
+  Macedonia: 'Conferir o limite bilateral de 90 dias na Macedônia do Norte.',
+  Moldova: 'Conferir 90 dias em seis meses na Moldávia e a rota por países vizinhos.',
+  Monaco: 'Conferir entrada na França e dias usados no espaço Schengen.',
+  Montenegro: 'Confirmar com a hospedagem o registro local da estadia.',
+  Russia: 'Confirmar rota, meios de pagamento e viabilidade consular antes de viajar.',
+  'San Marino': 'Conferir a entrada pela Itália e dias usados em Schengen.',
+  Serbia: 'Contar 90 dias em seis meses na Sérvia, separadamente de Schengen.',
+  Ukraine: 'Consultar alerta consular e confirmar transporte terrestre e plano de saída.',
+  'United Kingdom': 'Obter ETA britânica vinculada ao passaporte antes do embarque, salvo exceção.'
+};
 const tip = (id, label, icon) => ({ id, label, icon });
-const sourceEntry = key => SCHENGEN_KEYS.has(key) ? SCHENGEN_ENTRY : NATIONAL_ENTRY[key];
+const sourceEntry = key => ASSOCIATED_SCHENGEN_ENTRY[key] || (SCHENGEN_KEYS.has(key) ? SCHENGEN_ENTRY : NATIONAL_ENTRY[key]);
 
 export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
   Object.entries(SEASON).map(([key, [bestTime, scoreText, summer, winter]]) => {
@@ -168,7 +237,8 @@ export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
     const detail = EXTRA[key] || {};
     const guide = PRIORITY_GUIDE[key];
     const border = sourceEntry(key);
-    const moneyNote = detail.note || guide?.[2];
+    const moneyNote = MONEY[key];
+    const localNote = detail.note || guide?.[2];
     const foods = detail.f?.map(([name, desc]) => ({ e: '🍽️', name, desc })) || priority.foods;
     const etiquette = [
       ...(detail.e?.map(t => ({ e: 'ℹ️', t })) || priority.etiquette || []),
@@ -178,11 +248,8 @@ export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
     const airport = detail.airport !== undefined ? detail.airport : (priority.airport || legacy.airport);
     const majorAirports = detail.airports || priority.majorAirports || legacy.majorAirports;
     const entryNote = SCHENGEN_KEYS.has(key)
-      ? 'Conferir dias usados no espaço Schengen; EES registra a fronteira externa e ETIAS ainda não é exigido.'
-      : key === 'United Kingdom' ? 'Solicitar ETA britânica antes do embarque, salvo exceção.'
-        : key === 'Ireland' ? 'Preparar documentos para a imigração irlandesa, independente do Schengen.'
-          : ['Andorra', 'Monaco', 'San Marino'].includes(key) ? 'Verificar também a entrada e eventual reentrada pelo país vizinho Schengen.'
-            : 'Conferir a regra nacional de entrada, separada do limite Schengen.';
+      ? 'Contar dias usados no espaço Schengen; EES registra a fronteira externa e ETIAS ainda não é exigido.'
+      : ENTRY_CHECKLIST_NOTES[key];
     const patch = {
       ...legacy, ...priority,
       ...(detail.capital ? { capital: detail.capital } : {}),
@@ -200,10 +267,10 @@ export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
       visa: 'free', visaText: border.visaPolicyBR, passport: border.passportValidity, vaccines: border.health,
       borderStatus: detail.safety ? 'warn' : 'open',
       borderNote: detail.safety || (SCHENGEN_KEYS.has(key) ? 'Turismo sem visto no espaço Schengen para passaporte brasileiro.' : 'Turismo sob regime nacional próprio para passaporte brasileiro.'),
-      checklist: priority.checklist || simpleChecklist(key, entryNote, moneyNote),
+      checklist: priority.checklist || simpleChecklist(entryNote),
       travelProfile: {
         moneyTips: [tip('money', moneyNote, '💶')],
-        transportTips: [tip('gateway', detail.flight || priority.flightNote, '✈️')],
+        transportTips: [tip('gateway', detail.flight || priority.flightNote, '✈️'), tip('local', localNote, '🚆')],
         packingTips: [tip('electricity', `Adaptador para ${detail.volt || legacy.voltage}.`, '🔌')],
         seasonalTips: [
           { id: 'warm', months: [5, 6, 7, 8, 9], group: 'Bagagem e clima', items: [tip('warm', summer, '☀️')] },
