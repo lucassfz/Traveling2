@@ -1279,6 +1279,7 @@ select:focus-visible {
 }
 
 .country-panel__flag img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.country-panel__flag--nepal img { width: 78%; height: 88%; object-fit: contain; }
 .country-panel__flag-fallback { color: var(--color-text-secondary); font-size: .875rem; font-weight: 700; }
 
 .country-panel__region {
@@ -1624,6 +1625,39 @@ select:focus-visible {
 
 .body-copy {
   margin: var(--space-3) 0 0;
+}
+
+.history-list {
+  display: grid;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.history-item:last-child {
+  border-bottom: 0;
+}
+
+.history-item__icon {
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.history-item__title {
+  margin: 0;
+  font-size: .9rem;
+}
+
+.history-item__text {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: .875rem;
+  line-height: 1.6;
 }
 
 .notice-card {

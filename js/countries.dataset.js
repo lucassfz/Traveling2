@@ -3,7 +3,14 @@ import { SOUTH_AMERICA_ENRICHMENT } from './southAmerica.dataset.js';
 import { LANDMARK_MEDIA } from './landmarks.media.js';
 import { EUROPE_COMPLETE_ENRICHMENT } from './europe.complete.dataset.js';
 import { AFRICA_COMPLETE_ENRICHMENT } from './africa.complete.dataset.js';
+import { ASIA_OCEANIA_COMPLETE_ENRICHMENT } from './asia-oceania.complete.dataset.js';
+import { GEOGRAPHIC_COMPLETION_ENRICHMENT } from './geographic-completion.dataset.js';
+import { AMERICAS_SEASONAL_ENRICHMENT } from './americas.seasonal.dataset.js';
 import { AMERICAS_PRIORITY_ENRICHMENT } from './americas.priority.dataset.js';
+import { HISTORY_ENRICHMENT } from './history.americas-europe.dataset.js';
+import { AFRICA_HISTORY } from './history.africa.dataset.js';
+import { ASIA_HISTORY } from './history.asia.dataset.js';
+import { OCEANIA_HISTORY } from './history.oceania.dataset.js';
 import { flagFromAlpha2 } from './country.exploration.js';
 
 /**
@@ -55,6 +62,7 @@ export const WORLD_ID_TO_NAME = Object.freeze({
   "76": "Brazil",
   "100": "Bulgaria",
   "108": "Burundi",
+  "112": "Belarus",
   "116": "Cambodia",
   "120": "Cameroon",
   "124": "Canada",
@@ -106,6 +114,7 @@ export const WORLD_ID_TO_NAME = Object.freeze({
   "376": "Israel",
   "380": "Italy",
   "388": "Jamaica",
+  "392": "Japan",
   "398": "Kazakhstan",
   "400": "Jordan",
   "404": "Kenya",
@@ -134,6 +143,7 @@ export const WORLD_ID_TO_NAME = Object.freeze({
   "516": "Namibia",
   "524": "Nepal",
   "528": "Netherlands",
+  "548": "Vanuatu",
   "554": "New Zealand",
   "558": "Nicaragua",
   "562": "Niger",
@@ -162,11 +172,12 @@ export const WORLD_ID_TO_NAME = Object.freeze({
   "710": "South Africa",
   "716": "Zimbabwe",
   "724": "Spain",
-  "729": "S. Sudan",
-  "736": "Sudan",
+  "728": "S. Sudan",
+  "729": "Sudan",
   "740": "Suriname",
   "748": "Swaziland",
   "752": "Sweden",
+  "158": "Taiwan",
   "756": "Switzerland",
   "760": "Syria",
   "762": "Tajikistan",
@@ -2662,6 +2673,19 @@ export const COUNTRY_CATALOG = Object.freeze({
       68
     ]
   },
+  "Kosovo": {
+    "alpha2": "XK",
+    "namePt": "Kosovo",
+    "capital": "Pristina",
+    "currencyCode": "EUR",
+    "currencyName": "Euro",
+    "symbol": "€",
+    "languages": ["albanês", "sérvio"],
+    "timezones": ["UTC+01:00", "UTC+02:00 no verão"],
+    "cont": "EU",
+    "region": "Europa",
+    "latlng": [42.6, 21]
+  },
   "Kenya": {
     "alpha2": "KE",
     "namePt": "Quênia",
@@ -4440,6 +4464,19 @@ export const COUNTRY_CATALOG = Object.freeze({
       35,
       38
     ]
+  },
+  "Taiwan": {
+    "alpha2": "TW",
+    "namePt": "Taiwan",
+    "capital": "Taipé",
+    "currencyCode": "TWD",
+    "currencyName": "Novo dólar taiwanês",
+    "symbol": "NT$",
+    "languages": ["mandarim", "taiwanês (hokkien)", "hakka"],
+    "timezones": ["UTC+08:00"],
+    "cont": "AS",
+    "region": "Ásia",
+    "latlng": [23.7, 121]
   },
   "Tajikistan": {
     "alpha2": "TJ",
@@ -7778,7 +7815,12 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
   Object.entries(COUNTRY_CATALOG).map(([key, meta]) => {
     const base = baseCountry(key, meta);
     const curated = CURATED_COUNTRIES[key] ?? null;
-    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}), ...(AFRICA_COMPLETE_ENRICHMENT[key] ?? {}) };
+    const history = HISTORY_ENRICHMENT[key] ?? AFRICA_HISTORY[key] ?? ASIA_HISTORY[key] ?? OCEANIA_HISTORY[key];
+    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}), ...(AFRICA_COMPLETE_ENRICHMENT[key] ?? {}), ...(ASIA_OCEANIA_COMPLETE_ENRICHMENT[key] ?? {}), ...(GEOGRAPHIC_COMPLETION_ENRICHMENT[key] ?? {}), ...(history ? { history } : {}) };
+    if (AMERICAS_SEASONAL_ENRICHMENT[key]) regional.travelProfile = {
+      ...(curated?.travelProfile ?? {}), ...(regional.travelProfile ?? {}),
+      seasonalTips: AMERICAS_SEASONAL_ENRICHMENT[key]
+    };
     if (!curated && !Object.keys(regional).length) return [key, { ...base, landmarks: curatedLandmarks(key) }];
     const merged = { ...base, ...(curated ?? {}), ...(regional ?? {}) };
     return [key, {

@@ -11,10 +11,9 @@ import {
 } from './geospatial.js';
 import {
   COUNTRIES,
-  CONTINENT_LABELS,
-  WORLD_ID_TO_NAME,
-  WORLD_KEY_MAP
+  CONTINENT_LABELS
 } from './countries.dataset.js';
+import { atlasFeatureParts } from './map.topology.js';
 
 const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const GLOBE_RADIUS = 1;
@@ -82,12 +81,6 @@ function cssToken(name) {
 
 function colorToken(name) {
   return new THREE.Color(cssToken(name));
-}
-
-function normalizeCountryName(rawName) {
-  if (!rawName || rawName === 'Antarctica') return null;
-  const mapped = WORLD_KEY_MAP[rawName] ?? rawName;
-  return COUNTRIES[mapped] ? mapped : null;
 }
 
 function ringCenterLongitude(ring) {
@@ -195,7 +188,7 @@ function decodeTopologyArc(topology, index) {
   });
 }
 
-function subdivideTriangle(a, b, c, output, depth = 0) {
+function subdivideTriangle(a, b, c, output, depth = 0, maxDepth = 6) {
   const edges = [
     { pair: 'ab', distance: planarDistance(a, b) },
     { pair: 'bc', distance: planarDistance(b, c) },
@@ -205,27 +198,27 @@ function subdivideTriangle(a, b, c, output, depth = 0) {
   // Small spherical triangles stay outside the ocean/graticule surface after
   // projection. Larger planar triangles sag into the globe and expose a
   // straight grid segment through a country.
-  if (edges[0].distance < 4 || depth >= 6) {
+  if (edges[0].distance < 4 || depth >= maxDepth) {
     output.push([a, b, c]);
     return;
   }
 
   if (edges[0].pair === 'ab') {
     const midpoint = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    subdivideTriangle(a, midpoint, c, output, depth + 1);
-    subdivideTriangle(midpoint, b, c, output, depth + 1);
+    subdivideTriangle(a, midpoint, c, output, depth + 1, maxDepth);
+    subdivideTriangle(midpoint, b, c, output, depth + 1, maxDepth);
   } else if (edges[0].pair === 'bc') {
     const midpoint = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2];
-    subdivideTriangle(a, b, midpoint, output, depth + 1);
-    subdivideTriangle(a, midpoint, c, output, depth + 1);
+    subdivideTriangle(a, b, midpoint, output, depth + 1, maxDepth);
+    subdivideTriangle(a, midpoint, c, output, depth + 1, maxDepth);
   } else {
     const midpoint = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2];
-    subdivideTriangle(a, b, midpoint, output, depth + 1);
-    subdivideTriangle(midpoint, b, c, output, depth + 1);
+    subdivideTriangle(a, b, midpoint, output, depth + 1, maxDepth);
+    subdivideTriangle(midpoint, b, c, output, depth + 1, maxDepth);
   }
 }
 
-function sphericalGeometryFromShape(shape) {
+function sphericalGeometryFromShape(shape, maxDepth = 6) {
   const planarGeometry = new THREE.ShapeGeometry(shape, 1);
   const positions = planarGeometry.getAttribute('position');
   const index = planarGeometry.index;
@@ -237,7 +230,7 @@ function sphericalGeometryFromShape(shape) {
     const a = read(index ? index.getX(cursor) : cursor);
     const b = read(index ? index.getX(cursor + 1) : cursor + 1);
     const c = read(index ? index.getX(cursor + 2) : cursor + 2);
-    subdivideTriangle(a, b, c, triangles);
+    subdivideTriangle(a, b, c, triangles, 0, maxDepth);
   }
   planarGeometry.dispose();
 
@@ -295,7 +288,9 @@ function polygonToMesh(polygon, material, countryKey, continent) {
     shape.holes.push(path);
   }
 
-  const geometry = sphericalGeometryFromShape(shape);
+  // The broad Russian mainland needs two extra splits to keep long planar
+  // triangulation diagonals above the spherical ocean surface.
+  const geometry = sphericalGeometryFromShape(shape, countryKey === 'Russia' ? 8 : 6);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.countryKey = countryKey;
   mesh.userData.continent = continent;
@@ -523,11 +518,25 @@ export class MapEngine {
   }
 
   async #buildWorld(features) {
-    for (let index = 0; index < features.length; index += 1) {
-      const feature = features[index];
-      const rawName = WORLD_ID_TO_NAME[String(Number(feature.id))] ?? null;
-      const countryKey = normalizeCountryName(rawName);
-      if (!countryKey) continue;
+    const parts = features.flatMap(feature => Number(feature.id) === 10 || feature.properties?.name === 'Antarctica'
+      ? [] : atlasFeatureParts(feature));
+    for (let index = 0; index < parts.length; index += 1) {
+      const { key: countryKey, geometry } = parts[index];
+      const polygons = geometryToPolygons(geometry).map(sanitizePolygon).filter(Boolean);
+      if (!countryKey) {
+        // Draw territories absent from the travel catalog as neutral land,
+        // including Western Sahara, without assigning contested sovereignty.
+        if (!this.neutralLandMaterial) this.neutralLandMaterial = new THREE.MeshStandardMaterial({
+          color: colorToken('--color-land'), roughness: 0.82, metalness: 0,
+          side: THREE.DoubleSide, clippingPlanes: [this.horizonClipPlane],
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+        });
+        for (const polygon of polygons) {
+          const mesh = polygonToMesh(polygon, this.neutralLandMaterial, null, null);
+          if (mesh) this.worldGroup.add(mesh);
+        }
+        continue;
+      }
       const country = COUNTRIES[countryKey];
       const continent = country.continent;
       const existing = this.countryRecords.get(countryKey);
@@ -556,9 +565,6 @@ export class MapEngine {
       });
       const group = existing?.group ?? new THREE.Group();
       const borderContainer = existing?.borderContainer ?? new THREE.Group();
-      const polygons = geometryToPolygons(feature.geometry)
-        .map(sanitizePolygon)
-        .filter(Boolean);
       const childCountBefore = group.children.length;
 
       for (const polygon of polygons) {
@@ -591,11 +597,11 @@ export class MapEngine {
       }
 
       const prepared = this.preparedGeometries.get(countryKey) ?? [];
-      prepared.push(...prepareGeometry(feature.geometry));
+      prepared.push(...prepareGeometry(geometry));
       this.preparedGeometries.set(countryKey, prepared);
 
       if (index % 16 === 0) {
-        this.callbacks.onProgress?.(`Construindo mapa… ${Math.round((index / Math.max(1, features.length - 1)) * 100)}%`);
+        this.callbacks.onProgress?.(`Construindo mapa… ${Math.round((index / Math.max(1, parts.length - 1)) * 100)}%`);
         await new Promise(resolve => requestAnimationFrame(resolve));
       }
     }
@@ -954,6 +960,7 @@ export class MapEngine {
     this.graticuleMaterial.color.copy(colorToken('--color-graticule'));
     this.graticuleMaterial.opacity = dark ? 0.055 : 0.05;
     this.globalBorderMaterial?.color.copy(colorToken('--color-land-border'));
+    this.neutralLandMaterial?.color.copy(colorToken('--color-land'));
 
     this.ambientLight.color.copy(colorToken('--color-light-ambient'));
     this.hemisphereLight.color.copy(colorToken('--color-light-sky'));
@@ -1000,6 +1007,10 @@ export class MapEngine {
       record.landMaterial.dispose();
       record.borderMaterial.dispose();
     }
+    this.worldGroup.traverse(object => {
+      if (object.isMesh && object.material === this.neutralLandMaterial) object.geometry?.dispose?.();
+    });
+    this.neutralLandMaterial?.dispose();
     this.ocean.geometry.dispose();
     this.oceanMaterial.dispose();
     this.atmosphere.geometry.dispose();

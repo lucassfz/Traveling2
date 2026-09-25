@@ -51,11 +51,11 @@
     </button>
 
     <div class="app-header__actions">
-      <div class="explorer-counter" aria-label="Países marcados como visitados">
+      <div class="explorer-counter" aria-label="Destinos marcados como visitados">
         <span aria-hidden="true">🌍</span>
         <span class="explorer-counter__label">Visitados</span>
         <strong class="explorer-counter__value" id="visited-count">0</strong>
-        <span class="explorer-counter__total">/ 193</span>
+        <span class="explorer-counter__total" id="visited-total">/ 0</span>
       </div>
 
       <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
@@ -234,7 +234,7 @@
         </div>
       </section>
       <section class="country-tab" id="tab-history" data-tab-panel="history" role="tabpanel">
-        <div class="content-section"><div class="section-heading">Panorama histórico</div><p class="body-copy" id="country-history"></p></div>
+        <div class="content-section"><div class="section-heading">Panorama histórico</div><div class="history-list" id="country-history"></div></div>
       </section>
     </div>
   </aside>

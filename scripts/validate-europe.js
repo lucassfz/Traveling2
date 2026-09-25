@@ -1,5 +1,6 @@
 import { COUNTRIES } from '../js/countries.dataset.js';
 import { EUROPE_COMPLETE_ENRICHMENT } from '../js/europe.complete.dataset.js';
+import { GEOGRAPHIC_COMPLETION_ENRICHMENT } from '../js/geographic-completion.dataset.js';
 import { checklistGroups } from '../js/checklist.engine.js';
 
 const european = Object.entries(COUNTRIES).filter(([, country]) => country.continent === 'EU');
@@ -45,7 +46,7 @@ for (const [key, country] of european) {
     if (complete) counts[section] += 1;
     else errors.push(`${key}: ${section} incompleto`);
   }
-  if (!EUROPE_COMPLETE_ENRICHMENT[key] || country.dataLevel !== 'curated') errors.push(`${key}: enriquecimento europeu não resolvido`);
+  if (!(EUROPE_COMPLETE_ENRICHMENT[key] || GEOGRAPHIC_COMPLETION_ENRICHMENT[key]) || country.dataLevel !== 'curated') errors.push(`${key}: enriquecimento europeu não resolvido`);
   if (seenIso.has(country.alpha2)) errors.push(`${key}: ISO ${country.alpha2} duplicado`);
   seenIso.add(country.alpha2);
   if (entry?.status === 'needs-review') review.push(`${key}: entrada/viabilidade requer revisão operacional`);

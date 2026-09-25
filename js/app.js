@@ -28,6 +28,7 @@ const elements = {
   themeButton: document.getElementById('theme-button'),
   discoverButton: document.getElementById('discover-button'),
   visitedCount: document.getElementById('visited-count'),
+  visitedTotal: document.getElementById('visited-total'),
   visaFreeFilter: document.getElementById('visa-free-filter'),
   visaFreeCount: document.getElementById('visa-free-count'),
   search: document.getElementById('country-search'),
@@ -150,6 +151,7 @@ function initializeTheme() {
 
 function renderVisitedCount() {
   elements.visitedCount.textContent = String(state.visited.size);
+  elements.visitedTotal.textContent = `/ ${Object.keys(COUNTRIES).length}`;
   state.map?.setVisitedCountries?.(state.visited);
 }
 
@@ -440,6 +442,25 @@ function renderCulture(country) {
   elements.vibe.innerHTML = (country.vibe ?? []).map(value => `<span class="tag">${escapeHtml(value)}</span>`).join('');
 }
 
+function renderCountryHistory(country) {
+  if (Array.isArray(country.history) && country.history.length) {
+    elements.historyCopy.innerHTML = country.history.map(item => `
+      <article class="history-item">
+        <span class="history-item__icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
+        <div>
+          <h3 class="history-item__title">${escapeHtml(item.title)}</h3>
+          <p class="history-item__text">${escapeHtml(item.text)}</p>
+        </div>
+      </article>
+    `).join('');
+    return;
+  }
+  const legacy = typeof country.history === 'string' && country.history.trim()
+    ? country.history
+    : 'Panorama histórico ainda em curadoria para este país.';
+  elements.historyCopy.innerHTML = `<p class="body-copy">${escapeHtml(legacy)}</p>`;
+}
+
 function renderChecklist(countryKey, country) {
   const groups = checklistGroups(countryKey, country, Number(elements.monthSelect.value));
   state.visibleChecklistGroups = groups;
@@ -505,6 +526,7 @@ function renderCountry(countryKey) {
   state.countryKey = countryKey;
   state.continent = country.continent;
   const flagUrl = flagImageUrl(country.alpha2);
+  elements.countryFlag.classList.toggle('country-panel__flag--nepal', country.alpha2 === 'NP');
   elements.countryFlag.setAttribute('aria-label', `${flagUrl ? 'Bandeira de' : 'Bandeira não disponível para'} ${country.namePt}`);
   elements.countryFlag.innerHTML = flagUrl
     ? `<img src="${flagUrl}" alt="" width="56" height="42" decoding="async">`
@@ -523,7 +545,7 @@ function renderCountry(countryKey) {
   renderMonths(country);
   renderEntry(country);
   renderCulture(country);
-  elements.historyCopy.textContent = country.history || 'Panorama histórico ainda em curadoria para este país.';
+  renderCountryHistory(country);
   renderChecklist(countryKey, country);
   primeDestinationAirport(countryKey);
   elements.routeResult.innerHTML = '';
