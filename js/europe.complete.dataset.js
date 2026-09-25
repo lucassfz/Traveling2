@@ -237,6 +237,7 @@ export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
     const detail = EXTRA[key] || {};
     const guide = PRIORITY_GUIDE[key];
     const border = sourceEntry(key);
+    const requiresEta = key === 'United Kingdom';
     const moneyNote = MONEY[key];
     const localNote = detail.note || guide?.[2];
     const foods = detail.f?.map(([name, desc]) => ({ e: '🍽️', name, desc })) || priority.foods;
@@ -262,9 +263,9 @@ export const EUROPE_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
       majorAirports, flightNote: detail.flight || priority.flightNote,
       ...(key === 'Ukraine' ? { flightUnavailable: true } : {}),
       bestTime, months: [...scoreText].map(Number), foods, etiquette,
-      entryRequirements: border,
-      visaPolicyBR: { eligibility: 'visa-free', detail: border.visaPolicyBR, verifiedOn: '2026-09', source: border.officialSource },
-      visa: 'free', visaText: border.visaPolicyBR, passport: border.passportValidity, vaccines: border.health,
+      entryRequirements: requiresEta ? { ...border, modality: 'eta' } : border,
+      visaPolicyBR: { eligibility: requiresEta ? 'authorization' : 'visa-free', detail: border.visaPolicyBR, verifiedOn: '2026-09', source: border.officialSource },
+      visa: requiresEta ? 'cond' : 'free', visaText: border.visaPolicyBR, passport: border.passportValidity, vaccines: border.health,
       borderStatus: detail.safety ? 'warn' : 'open',
       borderNote: detail.safety || (SCHENGEN_KEYS.has(key) ? 'Turismo sem visto no espaço Schengen para passaporte brasileiro.' : 'Turismo sob regime nacional próprio para passaporte brasileiro.'),
       checklist: priority.checklist || simpleChecklist(entryNote),

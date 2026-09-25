@@ -49,6 +49,7 @@ const CORE_AIRPORTS = Object.freeze([
   ['NBO','HKJK','Jomo Kenyatta','Nairóbi','KE',-1.3192,36.9278],
   ['HND','RJTT','Tokyo Haneda','Tóquio','JP',35.5494,139.7798],
   ['NRT','RJAA','Narita International','Tóquio','JP',35.7720,140.3929],
+  ['MLE','VRMM','Velana International','Malé','MV',4.1917,73.5292],
   ['ICN','RKSI','Incheon International','Seul','KR',37.4602,126.4407],
   ['PEK','ZBAA','Beijing Capital','Pequim','CN',40.0799,116.6031],
   ['PVG','ZSPD','Shanghai Pudong','Xangai','CN',31.1443,121.8083],
@@ -107,7 +108,9 @@ function parseAirportCsv(csvText) {
     if (!iata && !icao) continue;
     const coordinates = String(cells[index.coordinates] ?? '').split(',').map(Number);
     if (coordinates.length !== 2 || coordinates.some(value => !Number.isFinite(value))) continue;
-    const [lng, lat] = coordinates;
+    // The airport-codes CSV stores coordinates as latitude, longitude.
+    const [lat, lng] = coordinates;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
     airports.push({
       iata,
       icao,
@@ -136,14 +139,17 @@ export class AirportRepository {
   #all = null;
   #loadPromise = null;
   #lookup = new Map();
+  #coreCodes = new Set(CORE_AIRPORTS.flatMap(airport => [airport.iata, airport.icao]).filter(Boolean));
 
   constructor() {
     for (const airport of CORE_AIRPORTS) this.#indexAirport(airport);
   }
 
-  #indexAirport(airport) {
-    if (airport.iata) this.#lookup.set(normalizeCode(airport.iata), airport);
-    if (airport.icao) this.#lookup.set(normalizeCode(airport.icao), airport);
+  #indexAirport(airport, remote = false) {
+    // Preserve the hand-checked core gateways when the larger remote catalog
+    // is loaded for search and less common destinations.
+    if (airport.iata && (!remote || !this.#coreCodes.has(normalizeCode(airport.iata)))) this.#lookup.set(normalizeCode(airport.iata), airport);
+    if (airport.icao && (!remote || !this.#coreCodes.has(normalizeCode(airport.icao)))) this.#lookup.set(normalizeCode(airport.icao), airport);
   }
 
   get coreAirports() {
@@ -158,7 +164,7 @@ export class AirportRepository {
       if (!response.ok) throw new Error(`Falha ao carregar base global de aeroportos (${response.status}).`);
       const parsed = parseAirportCsv(await response.text());
       this.#all = parsed;
-      for (const airport of parsed) this.#indexAirport(airport);
+      for (const airport of parsed) this.#indexAirport(airport, true);
       return parsed;
     })();
     try {

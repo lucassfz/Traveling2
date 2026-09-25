@@ -14,6 +14,8 @@ import {
   CONTINENT_LABELS
 } from './countries.dataset.js';
 import { atlasFeatureParts } from './map.topology.js';
+import { routePoint } from './flight.route.js';
+import { FlightVisualization } from './flight.visualization.js';
 
 const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const GLOBE_RADIUS = 1;
@@ -363,6 +365,10 @@ export class MapEngine {
     this.visaFreeFilterActive = false;
     this.visaFreeCountries = new Set();
     this.cameraFlight = null;
+    this.routePreview = null;
+    this.ready = false;
+    this.hotspotRecords = new Map();
+    this.hotspotHitMeshes = [];
     this.disposed = false;
     // Equivalent to an orthographic clipAngle(89.9): anything on the rear
     // hemisphere is clipped before land/border fragments reach the framebuffer.
@@ -378,6 +384,7 @@ export class MapEngine {
     this.#createAtmosphere();
     this.#createGraticule();
     this.#createLights();
+    this.flightVisualization = new FlightVisualization(this.scene, this.horizonClipPlane);
     this.#bindPointerEvents();
     this.#bindResize();
     this.setTheme();
@@ -512,6 +519,8 @@ export class MapEngine {
     this.callbacks.onProgress?.('Construindo países em 3D…');
     this.#buildGlobalBorders(topojson, topology);
     await this.#buildWorld(features);
+    this.#buildSmallDestinationHotspots();
+    this.ready = true;
     this.setTheme();
     this.resize();
     this.callbacks.onReady?.();
@@ -610,6 +619,37 @@ export class MapEngine {
     this.#refreshCountryMaterials();
   }
 
+  #buildSmallDestinationHotspots() {
+    // The 110m atlas omits small islands/microstates. They get honest points,
+    // never invented country polygons; the invisible hit area is larger.
+    this.hotspotGeometry = new THREE.SphereGeometry(0.0038, 10, 8);
+    this.hotspotHitGeometry = new THREE.SphereGeometry(0.012, 10, 8);
+    this.hotspotHitMaterial = new THREE.MeshBasicMaterial({
+      colorWrite: false, depthWrite: false, transparent: true, opacity: 0
+    });
+    this.hotspotGroup = new THREE.Group();
+    this.scene.add(this.hotspotGroup);
+    for (const [countryKey, country] of Object.entries(COUNTRIES)) {
+      if (this.countryRecords.has(countryKey) || !country.latlng) continue;
+      const [latitude, longitude] = country.latlng;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      const position = latLngToCartesian(latitude, longitude, 1.022, GLOBE_YAW, GLOBE_ORIGIN);
+      const material = new THREE.MeshBasicMaterial({
+        color: colorToken('--color-land-border'),
+        depthTest: true, depthWrite: false, clippingPlanes: [this.horizonClipPlane]
+      });
+      const marker = new THREE.Mesh(this.hotspotGeometry, material);
+      marker.position.copy(position);
+      const hit = new THREE.Mesh(this.hotspotHitGeometry, this.hotspotHitMaterial);
+      hit.position.copy(position);
+      hit.userData.countryKey = countryKey;
+      this.hotspotGroup.add(marker, hit);
+      this.hotspotHitMeshes.push(hit);
+      this.hotspotRecords.set(countryKey, { marker, material });
+    }
+    this.#refreshCountryMaterials();
+  }
+
   #buildGlobalBorders(_topojson, topology) {
     if (this.globalBorderMaterial || !topology?.arcs) return;
     this.globalBorderMaterial = new THREE.LineBasicMaterial({
@@ -649,7 +689,7 @@ export class MapEngine {
 
   #bindPointerEvents() {
     this.onPointerMove = createRafThrottle((clientX, clientY) => {
-      if (this.cameraFlight) return;
+      if (this.cameraFlight || this.routePreview) return;
       const countryKey = this.pickCountry(clientX, clientY);
       this.#setHovered(countryKey);
       if (countryKey) {
@@ -674,7 +714,7 @@ export class MapEngine {
     });
 
     this.renderer.domElement.addEventListener('pointerdown', event => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || this.routePreview) return;
       this.pointerDown = {
         id: event.pointerId,
         x: event.clientX,
@@ -685,6 +725,7 @@ export class MapEngine {
     });
 
     this.renderer.domElement.addEventListener('pointerup', event => {
+      if (this.routePreview) return;
       if (!this.pointerDown || event.pointerId !== this.pointerDown.id || event.button !== 0) return;
       this.renderer.domElement.releasePointerCapture?.(event.pointerId);
       const travel = Math.hypot(event.clientX - this.pointerDown.x, event.clientY - this.pointerDown.y);
@@ -747,6 +788,10 @@ export class MapEngine {
     if (!sphereHit) return null;
     const frontSurfaceLimit = sphereHit.distance + PICK_SURFACE_TOLERANCE;
 
+    for (const hit of this.raycaster.intersectObjects(this.hotspotHitMeshes, false)) {
+      if (hit.distance <= frontSurfaceLimit + 0.025) return hit.object.userData.countryKey;
+    }
+
     const landHits = this.raycaster.intersectObjects(this.raycastMeshes, false);
     for (const hit of landHits) {
       if (hit.distance > frontSurfaceLimit) continue;
@@ -771,20 +816,25 @@ export class MapEngine {
   #countryState(countryKey) {
     if (countryKey === this.selectedCountry) return 'selected';
     if (this.visaFreeFilterActive) {
+      const continent = this.countryRecords.get(countryKey)?.continent ?? COUNTRIES[countryKey]?.continent;
+      if (this.activeContinent && continent !== this.activeContinent) return 'visa-dimmed';
       if (!this.visaFreeCountries.has(countryKey)) return 'visa-dimmed';
       if (countryKey === this.hoveredCountry) return 'visa-free-hover';
       return 'visa-free';
     }
     if (countryKey === this.hoveredCountry) return 'hover';
     if (this.visitedCountries.has(countryKey)) return 'visited';
-    const record = this.countryRecords.get(countryKey);
-    if (this.activeContinent && record?.continent !== this.activeContinent) return 'dimmed';
+    const continent = this.countryRecords.get(countryKey)?.continent ?? COUNTRIES[countryKey]?.continent;
+    if (this.activeContinent && continent !== this.activeContinent) return 'dimmed';
     return 'base';
   }
 
   #updateCountryMaterial(countryKey) {
     const record = this.countryRecords.get(countryKey);
-    if (!record) return;
+    if (!record) {
+      this.#updateHotspotMaterial(countryKey);
+      return;
+    }
     const state = this.#countryState(countryKey);
     const visitedColorName = CONTINENT_COLOR_TOKENS[record.continent] ?? '--color-land-visited';
     const colorName = state === 'selected'
@@ -842,6 +892,22 @@ export class MapEngine {
 
   #refreshCountryMaterials() {
     for (const countryKey of this.countryRecords.keys()) this.#updateCountryMaterial(countryKey);
+    for (const countryKey of this.hotspotRecords.keys()) this.#updateHotspotMaterial(countryKey);
+  }
+
+  #updateHotspotMaterial(countryKey) {
+    const record = this.hotspotRecords.get(countryKey);
+    if (!record) return;
+    const state = this.#countryState(countryKey);
+    const colorName = state === 'selected' ? '--color-land-selected'
+      : state === 'visa-free' || state === 'visa-free-hover' ? '--color-land-visa-free'
+        : state === 'hover' ? '--color-land-hover'
+          : state === 'visited' ? CONTINENT_COLOR_TOKENS[COUNTRIES[countryKey]?.continent] ?? '--color-land-visited'
+            : '--color-land-border';
+    record.material.color.copy(colorToken(colorName));
+    record.material.opacity = state === 'visa-dimmed' || state === 'dimmed' ? 0.25 : 0.9;
+    record.material.transparent = record.material.opacity < 1;
+    record.marker.scale.setScalar(state === 'selected' || state === 'hover' || state === 'visa-free-hover' ? 1.45 : 1);
   }
 
   selectCountry(countryKey, { fly = true } = {}) {
@@ -882,6 +948,7 @@ export class MapEngine {
   }
 
   home() {
+    this.stopRoutePreview(false);
     this.activeContinent = null;
     this.clearSelection();
     this.#refreshCountryMaterials();
@@ -935,7 +1002,7 @@ export class MapEngine {
     this.camera.updateMatrixWorld(true);
     if (linear >= 1) {
       this.cameraFlight = null;
-      this.controls.enabled = true;
+      this.controls.enabled = !this.routePreview;
       this.controls.target.copy(GLOBE_ORIGIN);
       this.controls.update();
     }
@@ -972,7 +1039,44 @@ export class MapEngine {
     this.keyLight.intensity = dark ? 2.5 : 1.72;
     this.fillLight.intensity = dark ? 0.76 : 0.46;
     this.renderer.toneMappingExposure = dark ? 1.08 : 1;
+    this.flightVisualization.setTheme(colorToken('--color-accent'), colorToken('--color-text'));
     this.#refreshCountryMaterials();
+  }
+
+  startRoutePreview(route) {
+    if (!this.ready || this.disposed) return false;
+    this.stopRoutePreview(false);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const savedCamera = this.camera.position.clone();
+    const longRoute = route.angle > 1.75;
+    // Begin at GRU so departure is understandable before the camera follows
+    // the moving aircraft on long routes.
+    const focus = routePoint(route, longRoute && !reducedMotion ? 0 : 0.5);
+    const { latitude, longitude } = cartesianToLatLng(
+      new THREE.Vector3(focus.x, focus.y, focus.z), GLOBE_YAW, GLOBE_ORIGIN
+    );
+    const distance = longRoute ? 3.35 : 2.9;
+    const preflightMs = reducedMotion ? 0 : 950;
+    const startedAt = performance.now() + preflightMs;
+    this.routePreview = { route, savedCamera, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1 };
+    this.#setHovered(null);
+    this.callbacks.onHover?.(null);
+    this.flightVisualization.start(route, startedAt, reducedMotion);
+    this.flyTo(latitude, longitude, distance, preflightMs);
+    this.controls.enabled = false;
+    return true;
+  }
+
+  stopRoutePreview(restoreCamera = true) {
+    if (!this.routePreview) return;
+    const savedCamera = this.routePreview.savedCamera;
+    this.routePreview = null;
+    this.flightVisualization.clear();
+    this.controls.enabled = true;
+    if (restoreCamera) {
+      const { latitude, longitude } = cartesianToLatLng(savedCamera, GLOBE_YAW, GLOBE_ORIGIN);
+      this.flyTo(latitude, longitude, savedCamera.length(), 780);
+    } else this.cameraFlight = null;
   }
 
   resize() {
@@ -988,7 +1092,16 @@ export class MapEngine {
     if (this.disposed) return;
     requestAnimationFrame(nextTimestamp => this.#render(nextTimestamp));
     this.#updateCameraFlight(timestamp);
-    if (!this.cameraFlight) this.controls.update();
+    if (this.routePreview) {
+      const progress = this.flightVisualization.update(timestamp);
+      const preview = this.routePreview;
+      if (preview.longRoute && timestamp >= preview.startedAt && progress !== preview.lastProgress) {
+        const focus = routePoint(preview.route, progress * 0.97);
+        this.camera.position.set(focus.x, focus.y, focus.z).normalize().multiplyScalar(preview.distance);
+        this.camera.lookAt(GLOBE_ORIGIN);
+        preview.lastProgress = progress;
+      }
+    } else if (!this.cameraFlight) this.controls.update();
     this.#updateHorizonClip();
     this.renderer.render(this.scene, this.camera);
   }
@@ -1000,6 +1113,12 @@ export class MapEngine {
     this.resizeObserver?.disconnect();
     cancelAnimationFrame(this.resizeFrame);
     this.controls.dispose();
+    this.flightVisualization.dispose();
+    this.hotspotGroup?.parent?.remove(this.hotspotGroup);
+    this.hotspotGeometry?.dispose();
+    this.hotspotHitGeometry?.dispose();
+    this.hotspotHitMaterial?.dispose();
+    for (const record of this.hotspotRecords.values()) record.material.dispose();
 
     for (const record of this.countryRecords.values()) {
       record.group.traverse(object => object.geometry?.dispose?.());

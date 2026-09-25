@@ -10,6 +10,8 @@ import { chooseDiscoveryKey, discoveryCountryKeys, flagImageUrl } from './countr
 import { checklistGroups, checklistProgress, hasSeasonalChecklist } from './checklist.engine.js';
 import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
+import { brasiliaTimezoneNote } from './timezone.br.js';
+import { buildFlightRoute, estimatedTravelMinutes } from './flight.route.js';
 import {
   estimateFlightPricing,
   formatDistance,
@@ -66,6 +68,13 @@ const elements = {
   routeDestinationCode: document.getElementById('route-destination-code'),
   routeDestinationCity: document.getElementById('route-destination-city'),
   routeDestinationNote: document.getElementById('route-destination-note'),
+  flightPreviewButton: document.getElementById('flight-preview-button'),
+  flightPreviewStatus: document.getElementById('flight-preview-status'),
+  flightPreviewPanel: document.getElementById('flight-preview-panel'),
+  flightPreviewClose: document.getElementById('flight-preview-close'),
+  flightPreviewTitle: document.getElementById('flight-preview-title'),
+  flightPreviewCodes: document.getElementById('flight-preview-codes'),
+  flightPreviewDetails: document.getElementById('flight-preview-details'),
   routeButton: document.getElementById('calculate-route-button'),
   routeResult: document.getElementById('route-result'),
   checklist: document.getElementById('checklist-content'),
@@ -106,6 +115,8 @@ const state = {
   starfield: null,
   milesEngine: null,
   destinationAirport: null,
+  routePreviewActive: false,
+  routeObscured: null,
   mediaObserver: null,
   visibleChecklistGroups: [],
   previousDiscoveryKey: null
@@ -170,11 +181,14 @@ function renderVisaFreeFilter() {
   elements.visaFreeCount.textContent = String(eligibleCountries.length);
   elements.visaFreeFilter.classList.toggle('visa-filter--active', state.isVisaFreeBRFilterActive);
   elements.visaFreeFilter.setAttribute('aria-pressed', String(state.isVisaFreeBRFilterActive));
+  elements.visaFreeFilter.title = state.isVisaFreeBRFilterActive
+    ? 'Desativar filtro de destinos sem visto prévio nem autorização eletrônica'
+    : 'Mostrar destinos sem visto prévio nem autorização eletrônica';
   elements.visaFreeFilter.setAttribute(
     'aria-label',
     state.isVisaFreeBRFilterActive
-      ? `Ocultar filtro de ${eligibleCountries.length} destinos isentos de visto para brasileiros`
-      : `Mostrar ${eligibleCountries.length} destinos isentos de visto para brasileiros`
+      ? `Desativar filtro de ${eligibleCountries.length} destinos sem visto prévio nem autorização eletrônica para brasileiros`
+      : `Mostrar ${eligibleCountries.length} destinos sem visto prévio nem autorização eletrônica para brasileiros`
   );
   state.map?.setVisaFreeFilter(state.isVisaFreeBRFilterActive, eligibleCountries);
 }
@@ -300,13 +314,14 @@ function renderBasics(country) {
     ['Capital', country.capital || '—'],
     ['Moeda', country.currency || '—'],
     ['Idioma', country.lang || '—'],
-    ['Fuso', country.timezoneLabel || '—'],
+    ['Fuso', country.timezoneLabel || '—', brasiliaTimezoneNote(country)],
     ['Voltagem', country.voltage || 'Confirmar'],
     ['Código', country.alpha2 || '—']
   ];
-  elements.basics.innerHTML = cards.map(([label, value]) => `
+  elements.basics.innerHTML = cards.map(([label, value, note]) => `
     <article class="info-card">
       <div class="info-card__value">${escapeHtml(value)}</div>
+      ${note ? `<div class="info-card__note">${escapeHtml(note)}</div>` : ''}
       <div class="info-card__label">${escapeHtml(label)}</div>
     </article>
   `).join('');
@@ -509,14 +524,74 @@ async function primeDestinationAirport(countryKey) {
   elements.routeDestinationCity.textContent = country.airportCity || country.capital || country.namePt;
   elements.routeDestinationNote.textContent = country.flightNote || (country.majorAirports?.length > 1 ? `Outros aeroportos no país: ${country.majorAirports.filter(code => code !== country.airport).join(', ')}.` : '');
   state.destinationAirport = null;
+  updateFlightPreviewAvailability();
   try {
     const airport = await resolveDestinationAirport(countryKey);
     if (state.countryKey !== countryKey || !airport) return;
     state.destinationAirport = airport;
     elements.routeDestinationCode.textContent = airport.iata || airport.icao || '—';
     elements.routeDestinationCity.textContent = country.airportCity || airport.city || airport.name;
+    updateFlightPreviewAvailability();
   } catch {
     if (state.countryKey === countryKey) elements.routeDestinationCode.textContent = country.airport || '—';
+    updateFlightPreviewAvailability();
+  }
+}
+
+function updateFlightPreviewAvailability() {
+  const ready = Boolean(state.map?.ready && state.destinationAirport && state.countryKey && !state.routePreviewActive);
+  elements.flightPreviewButton.disabled = !ready;
+  elements.flightPreviewStatus.textContent = !state.map?.ready
+    ? 'Aguarde o carregamento do globo 3D.'
+    : !state.destinationAirport ? 'Aeroporto de destino indisponível para esta visualização.'
+      : state.destinationAirport.iata === 'GRU' ? 'Selecione outro destino para sair de GRU.'
+        : 'Parte de São Paulo/Guarulhos (GRU).';
+  if (state.destinationAirport?.iata === 'GRU') elements.flightPreviewButton.disabled = true;
+}
+
+function closeFlightPreview(restoreCamera = true, restoreFocus = false) {
+  if (!state.routePreviewActive) return;
+  state.routePreviewActive = false;
+  state.map?.stopRoutePreview(restoreCamera);
+  document.body.classList.remove('route-mode');
+  elements.flightPreviewPanel.hidden = true;
+  elements.flightPreviewPanel.inert = true;
+  for (const [element, wasInert] of state.routeObscured || []) element.inert = wasInert;
+  state.routeObscured = null;
+  updateFlightPreviewAvailability();
+  if (restoreFocus) elements.flightPreviewButton.focus({ preventScroll: true });
+}
+
+async function openFlightPreview() {
+  if (!state.map?.ready || !state.countryKey || !state.destinationAirport || state.routePreviewActive) return;
+  const selectedKey = state.countryKey;
+  elements.flightPreviewButton.disabled = true;
+  elements.flightPreviewStatus.textContent = 'Preparando rota no globo…';
+  try {
+    const origin = await airportRepository.resolve('GRU');
+    if (state.countryKey !== selectedKey || !origin) return;
+    const destination = state.destinationAirport;
+    const route = buildFlightRoute(origin, destination);
+    if (!state.map.startRoutePreview(route)) throw new Error('O globo 3D está indisponível.');
+    const minutes = estimatedTravelMinutes(route.distanceKm);
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    const destinationCity = COUNTRIES[selectedKey].airportCity || destination.city || COUNTRIES[selectedKey].capital || COUNTRIES[selectedKey].namePt;
+    elements.flightPreviewTitle.textContent = `São Paulo → ${destinationCity}`;
+    elements.flightPreviewCodes.textContent = `GRU → ${destination.iata || destination.icao || selectedKey}`;
+    elements.flightPreviewDetails.textContent = `${Math.round(route.distanceKm).toLocaleString('pt-BR')} km · Tempo de viagem estimado: cerca de ${hours} h${remaining ? ` ${remaining} min` : ''}`;
+    state.routePreviewActive = true;
+    state.routeObscured = [...document.querySelectorAll('.country-panel, .miles-hub, .miles-launcher, .app-header, .continent-nav, .navigation-trail')]
+      .map(element => [element, element.inert]);
+    for (const [element] of state.routeObscured) element.inert = true;
+    document.body.classList.add('route-mode');
+    elements.flightPreviewPanel.hidden = false;
+    elements.flightPreviewPanel.inert = false;
+    elements.flightPreviewClose.focus({ preventScroll: true });
+  } catch (error) {
+    elements.flightPreviewStatus.textContent = error.message || 'Não foi possível visualizar esta rota.';
+  } finally {
+    elements.flightPreviewButton.disabled = state.routePreviewActive || !state.map?.ready || !state.destinationAirport;
   }
 }
 
@@ -557,6 +632,7 @@ function renderCountry(countryKey) {
 function selectCountry(countryKey, { recordHistory = true } = {}) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
+  closeFlightPreview(false);
   if (window.innerWidth < 1200 && elements.milesHub.classList.contains('miles-hub--open')) setMilesOpen(false);
   state.map?.selectCountry(countryKey);
   renderCountry(countryKey);
@@ -572,6 +648,7 @@ function discoverDestination() {
 }
 
 function closeCountryPanel() {
+  closeFlightPreview(false);
   elements.panel.classList.remove('country-panel--open');
   clearMedia();
   state.map?.clearSelection();
@@ -579,6 +656,7 @@ function closeCountryPanel() {
 }
 
 function selectContinent(continent, { recordHistory = true } = {}) {
+  closeFlightPreview(false);
   state.continent = continent;
   state.countryKey = null;
   elements.panel.classList.remove('country-panel--open');
@@ -590,12 +668,17 @@ function selectContinent(continent, { recordHistory = true } = {}) {
 }
 
 function home() {
+  closeFlightPreview(false);
   state.countryKey = null;
   state.continent = null;
   state.history = [];
   elements.panel.classList.remove('country-panel--open');
   clearMedia();
   state.map?.home();
+  if (state.isVisaFreeBRFilterActive) {
+    state.isVisaFreeBRFilterActive = false;
+    renderVisaFreeFilter();
+  }
   renderContinentState();
   renderHistory();
 }
@@ -894,6 +977,8 @@ function bindUiEvents() {
     airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
   });
   elements.routeButton.addEventListener('click', calculateRoute);
+  elements.flightPreviewButton.addEventListener('click', openFlightPreview);
+  elements.flightPreviewClose.addEventListener('click', () => closeFlightPreview(true, true));
 
   elements.milesLauncher.addEventListener('click', () => {
     const open = !elements.milesHub.classList.contains('miles-hub--open');
@@ -903,6 +988,10 @@ function bindUiEvents() {
 
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
+    if (state.routePreviewActive) {
+      closeFlightPreview(true, true);
+      return;
+    }
     if (elements.milesHub.classList.contains('miles-hub--open')) {
       setMilesOpen(false, true);
     } else if (elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
@@ -916,7 +1005,10 @@ async function initializeMap() {
       onHover: showTooltip,
       onSelect: countryKey => selectCountry(countryKey),
       onProgress: message => { elements.globeStatus.lastElementChild.textContent = message; },
-      onReady: () => elements.globeStatus.classList.add('globe__status--hidden')
+      onReady: () => {
+        elements.globeStatus.classList.add('globe__status--hidden');
+        updateFlightPreviewAvailability();
+      }
     });
     state.map.setVisitedCountries?.(state.visited);
     renderVisaFreeFilter();

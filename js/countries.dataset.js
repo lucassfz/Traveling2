@@ -3731,7 +3731,7 @@ export const COUNTRY_CATALOG = Object.freeze({
       "guarani"
     ],
     "timezones": [
-      "UTC−04:00"
+      "UTC−03:00"
     ],
     "cont": "SA",
     "region": "América do Sul",
@@ -4915,7 +4915,7 @@ export const COUNTRY_CATALOG = Object.freeze({
       "espanhol"
     ],
     "timezones": [
-      "UTC−04:30"
+      "UTC−04:00"
     ],
     "cont": "SA",
     "region": "América do Sul",
@@ -7655,6 +7655,28 @@ function normalizeChecklist(source) {
   }));
 }
 
+// Preserve the Entry modality in the filter category: arrival visas, eVisas
+// and ETAs are not the same as unrestricted visa-free travel.
+const VISA_CATEGORY_BY_MODALITY = Object.freeze({
+  free: 'visa-free',
+  eta: 'authorization',
+  arrival: 'visa-on-arrival',
+  evisa: 'evisa',
+  visa: 'visa-required',
+  unknown: 'unknown'
+});
+
+function normalizedVisaPolicy(key, country, entryRequirements) {
+  const existing = country.visaPolicyBR ?? {
+    eligibility: country.visa === 'free' ? 'visa-free' : 'unknown',
+    detail: country.visaText ?? 'Confirme o requisito de visto em fonte consular oficial antes da viagem.'
+  };
+  const eligibility = key === 'Brazil'
+    ? 'domestic'
+    : VISA_CATEGORY_BY_MODALITY[entryRequirements?.modality] ?? existing.eligibility;
+  return { ...existing, eligibility };
+}
+
 function baseCountry(key, meta) {
   const timezones = meta.timezones ?? [];
   return {
@@ -7833,10 +7855,7 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
       flag: flagFromAlpha2(merged.alpha2 ?? base.alpha2),
       namePt: merged.namePt ?? base.namePt,
       timezoneLabel: merged.timezoneLabel ?? base.timezoneLabel,
-      visaPolicyBR: merged.visaPolicyBR ?? {
-        eligibility: merged.visa === 'free' ? 'visa-free' : 'unknown',
-        detail: merged.visaText ?? 'Confirme o requisito de visto em fonte consular oficial antes da viagem.'
-      },
+      visaPolicyBR: normalizedVisaPolicy(key, merged, merged.entryRequirements),
       checklist: normalizeChecklist(merged.checklist),
       photos: [],
       landmarks: curatedLandmarks(key, merged.landmarks ?? []),
