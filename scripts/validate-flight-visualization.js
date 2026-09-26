@@ -15,7 +15,7 @@ const airports = new AirportRepository();
 const origin = await airports.resolve('GRU');
 const scene = new THREE.Scene();
 const view = new FlightVisualization(scene, new THREE.Plane(new THREE.Vector3(0, 0, 1), 2));
-for (const code of ['JFK', 'NRT', 'MLE', 'SYD']) {
+for (const code of ['FCO', 'JFK', 'NRT', 'JNB', 'SYD', 'MLE']) {
   const route = buildFlightRoute(origin, await airports.resolve(code));
   view.start(route, 1000);
   const geometry = view.line.geometry;
@@ -44,4 +44,4 @@ for (const code of ['JFK', 'NRT', 'MLE', 'SYD']) {
 }
 view.dispose();
 assert.equal(scene.children.length, 0);
-console.log('Mesh, quaternion, reused geometry, 4 routes, one pulse, reduced motion and cleanup: OK');
+console.log('Mesh, quaternion, reused geometry, 6 routes, one pulse, reduced motion and cleanup: OK');

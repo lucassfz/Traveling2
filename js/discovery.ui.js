@@ -1,5 +1,5 @@
 import { BUDGETS, CLIMATES, DISCOVERY_MONTHS, INTERESTS, TRIP_REFERENCE } from './destination.profiles.js';
-import { formatTripRange, nextDiscoveryIndex, rankDestinations } from './destination.discovery.js';
+import { formatTripRange, nextDiscoveryIndex, noMatchAdvice, rankDestinations } from './destination.discovery.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
@@ -66,11 +66,12 @@ export class DiscoveryUI {
     else if (this.step === 'loading') body = '<p role="status" class="discovery-loading">✦ Encontrando boas combinações…</p>';
     else if (!this.matches.length) {
       title = 'Vamos ajustar a viagem?';
-      body = '<p role="status">Não encontramos uma combinação forte com todos esses filtros.</p><p>Tente aumentar o orçamento, escolher “Tanto faz” no clima ou mudar o mês.</p><small>A busca considera apenas os roteiros com perfil editorial disponível, não todos os países do mundo.</small><button class="primary-button" data-action="edit">Editar preferências</button>';
+      body = `<p role="status">Não encontramos uma combinação forte com todos esses filtros.</p><p>${escape(noMatchAdvice(this.countries, this.preferences))}</p><small>A busca considera apenas os roteiros com perfil editorial disponível, não todos os países do mundo.</small><button class="primary-button" data-action="edit">Editar preferências</button>`;
     } else {
       const match = this.matches[this.index];
       title = `${match.country.flag} ${match.country.namePt}`;
       body = `<p class="discovery-region">${escape(match.profile.region)} · ${DISCOVERY_MONTHS[this.preferences.month]}</p>
+        <small>${escape(match.matchSummary)}</small>
         <strong class="discovery-price">${formatTripRange(match.range)} <small>/ pessoa · 7 dias</small></strong>
         <small>Faixa de planejamento, não cotação. Saída de GRU; conexões podem ser necessárias.</small>
         <ul class="discovery-reasons">${match.reasons.slice(0, 2).map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>

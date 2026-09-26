@@ -1,7 +1,11 @@
+import { COUNTRIES } from './countries.dataset.js';
+import { ACCESS_GATEWAYS, COST_PROFILES, EXPERIENCES, EXPANSION_SEEDS, PROFILE_COMPLEMENTS, REFINED_NOTES, SEASON_REFINEMENTS } from './destination.expansion.js';
+
 // Editorial regional refinements of bestTime/travelProfile, NOT nationwide weather.
 // Monthly strings run Jan–Dec: H=calor, M=ameno, C=frio; season 0=exclude,
-// 1=usable with caveats, 2=favorable. See DISCOVERY.md for scope and assumptions.
-export const DISCOVERY_REVIEWED_ON = '2026-09-25';
+// Original compact rows use 0=poor, 1=usable, 2=favorable; the factory normalizes
+// to the shared 0=poor, 1=acceptable, 2=good, 3=ideal scale. See DISCOVERY.md.
+export const DISCOVERY_REVIEWED_ON = '2026-09-26';
 export const TRIP_REFERENCE = '1 pessoa · 7 dias/7 noites · ida e volta econômica de GRU · hospedagem simples em quarto privativo, refeições, transporte local e passeios básicos. Sem compras, luxo ou grandes expedições. Faixas editoriais, não cotações; confirme passagens, seguro e documentação.';
 export const INTERESTS = Object.freeze({
   praia: '🌊 Praia', cultura: '🏛️ Cultura', natureza: '🌿 Natureza',
@@ -22,20 +26,22 @@ function profile(id, countryKey, region, airport, interests, climate, season, ai
   return Object.freeze({
     id, countryKey, region, airport, interests: Object.freeze(interests),
     monthlyClimate: Object.freeze([...climate].map(value => ({ H: 'calor', M: 'ameno', C: 'frio' })[value])),
-    seasonSuitability: Object.freeze([...season].map(Number)),
+    seasonSuitability: Object.freeze([...season].map(value => options.fourSeasons ? Number(value) : [0, 2, 3][Number(value)])),
     airfareBRL: Object.freeze(airfare), localWeekBRL: Object.freeze(local),
     estimatedTripRangeBRL: Object.freeze({ min: airfare[0] + local[0], max: airfare[1] + local[1] }),
     note, peakMonths: Object.freeze(options.peakMonths || [1, 7, 12]),
     seasonBasis: options.seasonBasis || 'Refinamento regional de bestTime e travelProfile.seasonalTips do catálogo.',
     sources: Object.freeze(options.sources || []), confidence: 'editorial-conservative',
-    reviewedOn: DISCOVERY_REVIEWED_ON
+    reviewedOn: DISCOVERY_REVIEWED_ON,
+    airportCountry: ACCESS_GATEWAYS[`${countryKey}:${airport}`] || ACCESS_GATEWAYS[countryKey] || COUNTRIES[countryKey]?.alpha2,
+    interestMonths: options.interestMonths || null
   });
 }
 
 // Strength 3 = defining experience; 2 = meaningful complementary experience.
 // Costs include the actual regional gateway, connections/transfers and local week;
 // cheap daily living never cancels an expensive long-haul flight.
-export const DESTINATION_PROFILES = Object.freeze([
+const ORIGINAL_PROFILES = [
   profile('br-salvador', 'Brazil', 'Salvador e litoral próximo', 'SSA', { praia: 3, cultura: 3, gastronomia: 2 },
     'HHHHHHHHHHHH', '222100112222', [1000, 2500], [3000, 5000],
     'Praias e patrimônio de Salvador; chuvas mais fortes limitam abril–julho. Carnaval e Réveillon podem ultrapassar a faixa.', { peakMonths: [1, 2, 12] }),
@@ -102,4 +108,36 @@ export const DESTINATION_PROFILES = Object.freeze([
   profile('nz-queenstown', 'New Zealand', 'Queenstown: lagos e montanhas', 'ZQN', { natureza: 3, aventura: 3 },
     'MMMMCCCCMMMM', '222111221122', [8500, 13000], [6500, 11000],
     'Verão para trilhas; inverno para paisagens e atividades de neve guiadas, não trilhas alpinas de verão. Esqui intensivo à parte.', { peakMonths: [1, 7, 8, 12], sources: ['https://www.queenstownnz.co.nz/stories/post/winter-in-queenstown/'], seasonBasis: 'Alternância verão/trilhas e inverno/neve já citada no catálogo; recorte alpino explícito.' })
+];
+
+// Only the compact regional facts are added. Never copy visa, History, media or
+// whole country records here. Season null means reuse the catalog's month curve,
+// mapping "not preferred" to acceptable for the named cultural/city itinerary.
+const BEACH_MONTHS = {
+  Uruguay: [12, 1, 2, 3], Croatia: [5, 6, 7, 8, 9], Cyprus: [4, 5, 6, 7, 8, 9, 10, 11],
+  Greece: [5, 6, 7, 8, 9, 10], Malta: [5, 6, 7, 8, 9, 10], Montenegro: [5, 6, 7, 8, 9]
+};
+const expanded = EXPANSION_SEEDS.map(([key, region, gateway, experience, climate, season, cost, note]) => {
+  const country = COUNTRIES[key];
+  if (!country) throw new Error(`Unknown discovery country: ${key}`);
+  const airport = gateway || country.airport;
+  const [airfare, local] = COST_PROFILES[cost];
+  return profile(`regional-${country.alpha2}-${airport}`, key, region, airport, EXPERIENCES[experience], climate,
+    season || country.months.map(value => [1, 2, 3][value]).join(''), airfare, local, note, {
+      fourSeasons: true,
+      seasonBasis: season ? 'Janela regional explícita, refinando bestTime e checklist do catálogo.' : `Derivada de months + bestTime para roteiro cultural/regional; inverno não ideal continua aceitável. ${country.bestTime}`,
+      interestMonths: BEACH_MONTHS[key] ? { praia: BEACH_MONTHS[key] } : null
+    });
+});
+
+export const DESTINATION_PROFILES = Object.freeze([
+  ...ORIGINAL_PROFILES.map(original => Object.freeze({
+    ...original,
+    note: REFINED_NOTES[original.id] || original.note,
+    seasonBasis: SEASON_REFINEMENTS[original.id] ? 'Refinamento regional: distingue época ideal, boa, aceitável com ressalvas e ruim. Consulta bestTime, checklist sazonal e as fontes registradas.' : original.seasonBasis,
+    interests: Object.freeze({ ...original.interests, ...PROFILE_COMPLEMENTS[original.id] }),
+    seasonSuitability: SEASON_REFINEMENTS[original.id]
+      ? Object.freeze([...SEASON_REFINEMENTS[original.id]].map(Number)) : original.seasonSuitability
+  })),
+  ...expanded
 ]);
