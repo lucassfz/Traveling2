@@ -78,6 +78,72 @@
   --color-danger: #dc2626;
 }
 
+/* Compact discovery flow; shares theme tokens and leaves the globe visible. */
+.discovery-panel {
+  position: fixed;
+  z-index: 180;
+  top: calc(var(--header-height) + 16px);
+  right: 16px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100dvh - var(--header-height) - 100px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-overlay);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text);
+  animation: discovery-appear 180ms ease-out;
+}
+.discovery-panel[hidden] { display: none; }
+.discovery-header, .discovery-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.discovery-panel h2 { margin: 0; font-size: 21px; line-height: 1.3; }
+.discovery-panel p, .discovery-panel ul { margin: 0; font-size: 12px; line-height: 1.65; color: var(--color-text-secondary); }
+.discovery-panel small { font-size: 10px; line-height: 1.6; color: var(--color-text-muted); }
+.discovery-panel details { font-size: 12px; line-height: 1.6; }
+.discovery-panel summary { cursor: pointer; color: var(--color-accent-strong); }
+.discovery-panel details p { margin-top: 10px; }
+.discovery-panel ul { padding-left: 18px; margin-top: 10px; }
+.discovery-panel li + li { margin-top: 6px; }
+.discovery-options, .discovery-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.discovery-months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.discovery-options button, .discovery-months button {
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+.discovery-options button[aria-pressed='true'], .discovery-months button[aria-pressed='true'] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+.discovery-panel button:disabled { opacity: .45; cursor: default; }
+.discovery-check { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.5; }
+.discovery-check input { accent-color: var(--color-accent); }
+.discovery-nav > * { flex: 1; }
+.discovery-result-actions { display: flex; flex-direction: column; gap: 8px; }
+.discovery-price { font-size: 16px; }
+.discovery-price small { display: block; font-weight: normal; }
+.discovery-text-button { border: 0; background: none; color: var(--color-accent-strong); cursor: pointer; min-height: 36px; font: inherit; font-size: 11px; }
+.discovery-feedback:empty { display: none; }
+.discovery-loading { padding: 28px 0; }
+body.route-mode .discovery-panel { visibility: hidden; pointer-events: none; }
+@keyframes discovery-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 600px) {
+  .discovery-panel { top: auto; bottom: 12px; right: 12px; width: calc(100vw - 24px); max-height: 65dvh; padding: 16px; gap: 12px; }
+}
+
 [data-theme='dark'] {
   /* Tema escuro — profundidade fria e cartográfica, com acentos discretos. */
   --color-background: #060912;

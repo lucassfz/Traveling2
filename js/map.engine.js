@@ -1058,7 +1058,11 @@ export class MapEngine {
     const distance = longRoute ? 3.35 : 2.9;
     const preflightMs = reducedMotion ? 0 : 950;
     const startedAt = performance.now() + preflightMs;
-    this.routePreview = { route, savedCamera, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1 };
+    const savedSelection = this.selectedCountry;
+    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1 };
+    // Keep the thin cyan route legible over the destination's selected fill.
+    // Restore selection on exit; neither visited state nor filters are changed.
+    this.clearSelection();
     this.#setHovered(null);
     this.callbacks.onHover?.(null);
     this.flightVisualization.start(route, startedAt, reducedMotion);
@@ -1070,8 +1074,10 @@ export class MapEngine {
   stopRoutePreview(restoreCamera = true) {
     if (!this.routePreview) return;
     const savedCamera = this.routePreview.savedCamera;
+    const savedSelection = this.routePreview.savedSelection;
     this.routePreview = null;
     this.flightVisualization.clear();
+    this.selectCountry(savedSelection, { fly: false });
     this.controls.enabled = true;
     if (restoreCamera) {
       const { latitude, longitude } = cartesianToLatLng(savedCamera, GLOBE_YAW, GLOBE_ORIGIN);

@@ -1,4 +1,8 @@
 // Identidade visual e seleção editorial sem dependência do globo ou do DOM.
+export function isVisaFreeForBrazil(country) {
+  return country?.visaPolicyBR?.eligibility === 'visa-free';
+}
+
 export function flagFromAlpha2(alpha2) {
   const code = String(alpha2 ?? '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(code)) return '🌍';

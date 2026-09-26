@@ -29,6 +29,7 @@ function createAirplane(material) {
   const fin = new THREE.Mesh(new THREE.BoxGeometry(0.0016, 0.006, 0.006), material);
   fin.position.set(0, 0.0035, -0.012);
   airplane.add(fin);
+  airplane.scale.setScalar(1.3);
   return airplane;
 }
 
@@ -37,7 +38,7 @@ export class FlightVisualization {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x68d8f4, transparent: true, opacity: 0.8,
+      color: 0x68d8f4, transparent: true, opacity: 0.96,
       depthTest: true, depthWrite: false, clippingPlanes: [horizonClipPlane]
     });
     this.airplaneMaterial = new THREE.MeshStandardMaterial({
@@ -52,7 +53,8 @@ export class FlightVisualization {
     this.group.add(this.airplane);
     const markerGeometry = new THREE.SphereGeometry(0.006, 10, 8);
     this.originMarker = new THREE.Mesh(markerGeometry, this.markerMaterial);
-    this.destinationMarker = new THREE.Mesh(markerGeometry, this.markerMaterial);
+    // Solid origin / open destination ring; both attached to the same sphere.
+    this.destinationMarker = new THREE.Mesh(new THREE.TorusGeometry(0.009, 0.0017, 4, 24), this.markerMaterial);
     this.group.add(this.originMarker, this.destinationMarker);
     this.group.visible = false;
     this.forward = new THREE.Vector3();
@@ -82,8 +84,11 @@ export class FlightVisualization {
     this.group.add(this.line);
     this.originMarker.position.copy(points[0]);
     this.destinationMarker.position.copy(points.at(-1));
+    this.destinationMarker.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), points.at(-1).clone().normalize());
+    this.destinationMarker.scale.setScalar(1);
+    this.arrivedAt = null;
     this.group.visible = true;
-    this.#placeAirplane(reducedMotion ? 0.5 : 0);
+    this.#placeAirplane(reducedMotion ? 1 : 0);
   }
 
   #placeAirplane(progress) {
@@ -102,14 +107,21 @@ export class FlightVisualization {
   update(timestamp) {
     if (!this.route) return 0;
     if (this.reducedMotion) return 1;
-    if (this.completed) return 1;
+    if (this.completed) {
+      const pulse = THREE.MathUtils.clamp((timestamp - this.arrivedAt) / 700, 0, 1);
+      this.destinationMarker.scale.setScalar(1 + Math.sin(pulse * Math.PI) * 0.45);
+      return 1;
+    }
     const linear = THREE.MathUtils.clamp((timestamp - this.startedAt) / FLIGHT_DURATION_MS, 0, 1);
     if (linear <= 0) return 0;
     const eased = linear * linear * (3 - 2 * linear);
     const visiblePoints = Math.max(2, Math.ceil(eased * (this.route.samples.length - 1)) + 1);
     this.line.geometry.setDrawRange(0, visiblePoints);
     this.#placeAirplane(eased);
-    if (linear >= 1) this.completed = true;
+    if (linear >= 1) {
+      this.completed = true;
+      this.arrivedAt = timestamp;
+    }
     return eased;
   }
 
