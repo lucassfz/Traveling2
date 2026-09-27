@@ -122,7 +122,7 @@
       <div>
         <span class="eyebrow">Guia de viagem</span>
         <h2 class="miles-hub__title">Milhas &amp; Aeroportos</h2>
-        <p class="miles-hub__subtitle">Entenda pontos, cartões e benefícios para viajar melhor.</p>
+        <p class="miles-hub__subtitle">Compare resgates, cartões, salas e aeroportos da sua viagem.</p>
       </div>
       <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar Milhas e Aeroportos">✕</button>
     </header>
@@ -190,7 +190,7 @@
       <section class="country-tab" id="tab-flights" data-tab-panel="flights" role="tabpanel">
         <div class="route-builder">
           <div class="route-builder__airports">
-            <div><span class="eyebrow">Origem</span><strong id="route-origin-code">—</strong><small id="route-origin-city">Selecione um aeroporto</small></div>
+            <div><span class="eyebrow">Origem</span><strong id="route-origin-code">GRU</strong><small id="route-origin-city">São Paulo</small><button class="route-builder__change" id="change-origin-button" type="button">Alterar origem</button></div>
             <div class="route-builder__line" aria-hidden="true"><span>✈</span></div>
             <div><span class="eyebrow">Destino</span><strong id="route-destination-code">—</strong><small id="route-destination-city">—</small></div>
           </div>
@@ -202,8 +202,8 @@
 
           <div class="form-grid">
             <label class="form-field form-field--wide">
-              <span class="form-field__label">Aeroporto de origem — IATA ou ICAO</span>
-              <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off">
+              <span class="form-field__label">Aeroporto de origem — código IATA (3 letras) ou ICAO (4 letras)</span>
+              <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" value="GRU" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off" aria-describedby="flight-preview-status">
               <datalist id="airport-suggestions"></datalist>
             </label>
             <label class="form-field">
@@ -222,6 +222,7 @@
 
           <button class="primary-button" id="calculate-route-button" type="button">Calcular rota</button>
           <div class="route-result" id="route-result" aria-live="polite"></div>
+          <div class="route-airport-actions" id="route-airport-actions" hidden></div>
         </div>
       </section>
 
@@ -254,9 +255,10 @@
     </div>
     <strong id="flight-preview-title"></strong>
     <span id="flight-preview-codes"></span>
-    <small>● Origem GRU · ○ Destino</small>
+    <small>● Origem · ○ Destino</small>
     <p id="flight-preview-details"></p>
     <small>Distância em linha geodésica. Tempo de viagem estimado, não um voo direto ou horário de companhia aérea.</small>
+    <button class="route-preview-airports" id="flight-preview-airports" type="button">Ver benefícios dos aeroportos</button>
   </section>
 
   <script>

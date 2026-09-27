@@ -1258,11 +1258,60 @@ select:focus-visible {
 .miles-connection { margin: 0 0 var(--space-6); color: var(--color-text-secondary); font-size: .77rem; line-height: 1.7; }
 .miles-connection span { color: var(--color-accent-strong); }
 .miles-search-label { display: block; margin-bottom: var(--space-2); font-size: .8rem; font-weight: 700; }
+.miles-search-label[hidden], .miles-search[hidden] { display: none; }
 .miles-search { width: 100%; min-height: 44px; margin-bottom: var(--space-5); padding: 0 var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-input); color: var(--color-text); }
 .miles-airport__code { flex: 0 0 auto; min-width: 3.2rem; color: var(--color-accent-strong); font-weight: 800; }
 .miles-airport__identity small { overflow-wrap: anywhere; }
 .miles-airport__body h4 { margin: var(--space-4) 0 0; font-size: .9rem; }
 .miles-empty { color: var(--color-text-secondary); font-size: .875rem; }
+
+.miles-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-5); }
+.miles-actions button, .miles-choice-row button, .miles-airport-choices button, .miles-route-context button, .route-airport-actions button, .route-preview-airports {
+  min-height: 44px; padding: 9px var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm);
+  background: var(--color-surface); color: var(--color-text); font: inherit; font-size: .82rem; text-align: left; cursor: pointer;
+}
+.miles-actions button:hover, .miles-choice-row button:hover, .miles-airport-choices button:hover, .miles-route-context button:hover, .route-airport-actions button:hover, .route-preview-airports:hover,
+.miles-choice-row button[aria-pressed='true'] { border-color: var(--color-accent); color: var(--color-accent-strong); }
+.miles-actions button:focus-visible, .miles-choice-row button:focus-visible, .miles-airport-choices button:focus-visible, .miles-route-context button:focus-visible, .route-airport-actions button:focus-visible, .route-preview-airports:focus-visible,
+.miles-tool-form input:focus-visible, .miles-tool-form select:focus-visible, .miles-compare-controls select:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.miles-tool-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.miles-tool-form label, .miles-compare-controls label { display: grid; gap: var(--space-1); min-width: 0; color: var(--color-text-secondary); font-size: .78rem; font-weight: 700; }
+.miles-tool-form input, .miles-tool-form select, .miles-compare-controls select { width: 100%; min-width: 0; min-height: 44px; padding: 8px var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-input); color: var(--color-text); font: inherit; font-size: .86rem; }
+.miles-tool-form > button { min-height: 44px; align-self: end; }
+.miles-tool-result { color: var(--color-text-secondary); font-size: .85rem; line-height: 1.55; }
+.miles-tool-result:not(:empty) { padding: var(--space-4); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); background: var(--color-surface); }
+.miles-tool-result p { margin: 0 0 var(--space-2); }
+.miles-tool-result small { color: var(--color-text-muted); }
+.miles-tool-result strong { color: var(--color-text); }
+.miles-error { color: var(--color-text); }
+.miles-tool-help { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); font-size: .83rem; line-height: 1.5; }
+.miles-tool-help summary { color: var(--color-accent-strong); font-weight: 700; cursor: pointer; }
+.miles-tool-help p { margin-bottom: 0; }
+.miles-tool-help .miles-detail-list { margin-top: var(--space-4); }
+.miles-result-card { min-width: 0; padding: var(--space-4) 0; border-top: 1px solid var(--color-border-soft); }
+.miles-result-card h4 { margin: var(--space-1) 0 var(--space-3); font-size: .98rem; }
+.miles-result-card .miles-copy-list { margin: var(--space-2) 0 var(--space-4); }
+.miles-result-card .miles-trust { margin-top: var(--space-3); }
+.miles-compare-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.miles-compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.miles-compare-grid .miles-facts div { grid-template-columns: 1fr; gap: 0; }
+.miles-airport-choices { display: grid; gap: var(--space-2); margin: calc(var(--space-4) * -1) 0 var(--space-4); }
+.miles-airport-results > h4 { margin: 0 0 var(--space-3); }
+.miles-choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.miles-choice-row button { flex: 1 1 120px; text-align: center; }
+.miles-route-context { margin: 0 0 var(--space-4); padding: var(--space-3); border-left: 2px solid var(--color-accent); background: var(--color-accent-soft); font-size: .82rem; }
+.miles-route-context[hidden] { display: none; }
+.miles-route-context > div { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.miles-route-context button { min-height: 38px; }
+.route-builder__change { display: block; margin-top: var(--space-2); padding: 3px 0; border: 0; background: none; color: var(--color-accent-strong); font-size: .75rem; font-weight: 700; cursor: pointer; }
+.route-airport-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.route-airport-actions[hidden] { display: none; }
+.route-preview-airports { width: 100%; margin-top: var(--space-2); text-align: center; }
+
+@media (max-width: 500px) {
+  .miles-actions, .miles-tool-form, .miles-compare-controls, .miles-compare-grid { grid-template-columns: minmax(0, 1fr); }
+  .miles-choice-row button { flex-basis: calc(50% - var(--space-2)); }
+}
 
 .country-panel {
   position: fixed;

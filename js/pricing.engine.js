@@ -91,7 +91,7 @@ export function estimateFlightPricing({
     },
     awards,
     benchmarkValueBrlPerMile: centsPerMileBrl,
-    disclaimer: 'Estimativa algorítmica, não cotação. Tarifas e resgates variam por disponibilidade, taxas, antecedência e companhia.'
+    disclaimer: 'Valores de referência para planejar, não preços ao vivo nem oferta de voo direto. Preço, milhas e taxas reais variam conforme a data, a companhia e a disponibilidade.'
   };
 }
 

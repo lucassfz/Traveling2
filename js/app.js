@@ -62,6 +62,7 @@ const elements = {
   vibe: document.getElementById('vibe-content'),
   historyCopy: document.getElementById('country-history'),
   originInput: document.getElementById('origin-airport-input'),
+  changeOriginButton: document.getElementById('change-origin-button'),
   airportSuggestions: document.getElementById('airport-suggestions'),
   cabinSelect: document.getElementById('cabin-select'),
   monthSelect: document.getElementById('travel-month-select'),
@@ -79,6 +80,8 @@ const elements = {
   flightPreviewDetails: document.getElementById('flight-preview-details'),
   routeButton: document.getElementById('calculate-route-button'),
   routeResult: document.getElementById('route-result'),
+  routeAirportActions: document.getElementById('route-airport-actions'),
+  flightPreviewAirports: document.getElementById('flight-preview-airports'),
   checklist: document.getElementById('checklist-content'),
   checklistProgressText: document.getElementById('checklist-progress-text'),
   checklistProgressMeter: document.getElementById('checklist-progress-meter'),
@@ -117,6 +120,8 @@ const state = {
   starfield: null,
   milesEngine: null,
   destinationAirport: null,
+  originAirport: null,
+  originRequestId: 0,
   routePreviewActive: false,
   routeObscured: null,
   routeRequestId: 0,
@@ -524,11 +529,13 @@ async function primeDestinationAirport(countryKey) {
   elements.routeDestinationCity.textContent = country.airportCity || country.capital || country.namePt;
   elements.routeDestinationNote.textContent = country.flightNote || (country.majorAirports?.length > 1 ? `Outros aeroportos no país: ${country.majorAirports.filter(code => code !== country.airport).join(', ')}.` : '');
   state.destinationAirport = null;
+  state.milesEngine?.setRouteContext(null, null);
   updateFlightPreviewAvailability();
   try {
     const airport = await resolveDestinationAirport(countryKey);
     if (state.countryKey !== countryKey || !airport) return;
     state.destinationAirport = airport;
+    state.milesEngine?.setRouteContext(state.originAirport, airport);
     elements.routeDestinationCode.textContent = airport.iata || airport.icao || '—';
     elements.routeDestinationCity.textContent = country.airportCity || airport.city || airport.name;
     updateFlightPreviewAvailability();
@@ -538,15 +545,37 @@ async function primeDestinationAirport(countryKey) {
   }
 }
 
+async function primeOriginAirport() {
+  const code = elements.originInput.value.trim().toUpperCase();
+  const requestId = ++state.originRequestId;
+  state.originAirport = null;
+  state.milesEngine?.setRouteContext(null, null);
+  elements.routeOriginCode.textContent = code || '—';
+  elements.routeOriginCity.textContent = code ? 'Conferindo aeroporto…' : 'Informe uma origem';
+  elements.routeResult.innerHTML = '';
+  elements.routeAirportActions.hidden = true;
+  updateFlightPreviewAvailability();
+  if (!code || code.length < 3) return;
+  const airport = await airportRepository.resolve(code);
+  if (requestId !== state.originRequestId || elements.originInput.value.trim().toUpperCase() !== code) return;
+  state.originAirport = airport;
+  elements.routeOriginCode.textContent = airport?.iata || airport?.icao || code;
+  elements.routeOriginCity.textContent = airport?.city || (airport ? airport.name : 'Código não encontrado');
+  state.milesEngine?.setRouteContext(airport, state.destinationAirport);
+  updateFlightPreviewAvailability();
+}
+
 function updateFlightPreviewAvailability() {
-  const ready = Boolean(state.map?.ready && state.destinationAirport && state.countryKey && !state.routePreviewActive);
+  const sameAirport = state.originAirport && state.destinationAirport &&
+    (state.originAirport.iata || state.originAirport.icao) === (state.destinationAirport.iata || state.destinationAirport.icao);
+  const ready = Boolean(state.map?.ready && state.originAirport && state.destinationAirport && state.countryKey && !state.routePreviewActive && !sameAirport);
   elements.flightPreviewButton.disabled = !ready;
   elements.flightPreviewStatus.textContent = !state.map?.ready
     ? 'Aguarde o carregamento do globo 3D.'
+    : !state.originAirport ? 'Escolha um aeroporto de origem válido.'
     : !state.destinationAirport ? 'Aeroporto de destino indisponível para esta visualização.'
-      : state.destinationAirport.iata === 'GRU' ? 'Selecione outro destino para sair de GRU.'
-        : 'Parte de São Paulo/Guarulhos (GRU).';
-  if (state.destinationAirport?.iata === 'GRU') elements.flightPreviewButton.disabled = true;
+      : sameAirport ? 'Origem e destino precisam ser aeroportos diferentes.'
+        : `Parte de ${state.originAirport.city || state.originAirport.name} (${state.originAirport.iata || state.originAirport.icao}).`;
 }
 
 function closeFlightPreview(restoreCamera = true, restoreFocus = false) {
@@ -570,9 +599,10 @@ async function openFlightPreview({ countryKey = state.countryKey, airportCode, r
   const requestId = ++state.routeRequestId;
   elements.flightPreviewButton.disabled = true;
   elements.flightPreviewStatus.textContent = 'Preparando rota no globo…';
+  let failureMessage = null;
   try {
     const [origin, destination] = await Promise.all([
-      airportRepository.resolve('GRU'),
+      airportCode ? airportRepository.resolve('GRU') : airportRepository.resolve(elements.originInput.value.trim()),
       airportCode ? airportRepository.resolve(airportCode) : resolveDestinationAirport(selectedKey)
     ]);
     if (requestId !== state.routeRequestId || !isCurrent()) return false;
@@ -583,10 +613,15 @@ async function openFlightPreview({ countryKey = state.countryKey, airportCode, r
     const hours = Math.floor(minutes / 60);
     const remaining = minutes % 60;
     const destinationCity = (airportCode ? destination.city : COUNTRIES[selectedKey].airportCity) || destination.city || COUNTRIES[selectedKey].capital || COUNTRIES[selectedKey].namePt;
-    elements.flightPreviewTitle.textContent = `São Paulo → ${destinationCity}`;
-    elements.flightPreviewCodes.textContent = `GRU → ${destination.iata || destination.icao || selectedKey}`;
+    elements.flightPreviewTitle.textContent = `${origin.city || origin.name} → ${destinationCity}`;
+    elements.flightPreviewCodes.textContent = `${origin.iata || origin.icao} → ${destination.iata || destination.icao || selectedKey}`;
     elements.flightPreviewDetails.textContent = `${Math.round(route.distanceKm).toLocaleString('pt-BR')} km · Tempo de viagem estimado: cerca de ${hours} h${remaining ? ` ${remaining} min` : ''}`;
     state.routePreviewActive = true;
+    state.milesEngine?.setRouteContext(origin, destination);
+    const guideAirport = [origin, destination].find(airport => state.milesEngine?.hasAirportGuide(airport.iata));
+    elements.flightPreviewAirports.hidden = !guideAirport;
+    elements.flightPreviewAirports.dataset.airportCode = guideAirport?.iata || '';
+    if (guideAirport) elements.flightPreviewAirports.textContent = `Ver guia do aeroporto · ${guideAirport.iata}`;
     state.routeReturnFocus = returnFocus || elements.flightPreviewButton;
     state.routeObscured = [...document.querySelectorAll('.country-panel, .discovery-panel, .miles-hub, .miles-launcher, .app-header, .continent-nav, .navigation-trail')]
       .map(element => [element, element.inert]);
@@ -598,10 +633,11 @@ async function openFlightPreview({ countryKey = state.countryKey, airportCode, r
     return true;
   } catch (error) {
     if (airportCode) throw error;
-    elements.flightPreviewStatus.textContent = error.message || 'Não foi possível visualizar esta rota.';
+    failureMessage = error.message || 'Não foi possível visualizar esta rota.';
     return false;
   } finally {
-    elements.flightPreviewButton.disabled = state.routePreviewActive || !state.map?.ready || !state.destinationAirport;
+    updateFlightPreviewAvailability();
+    if (failureMessage) elements.flightPreviewStatus.textContent = failureMessage;
   }
 }
 
@@ -634,6 +670,7 @@ function renderCountry(countryKey) {
   renderChecklist(countryKey, country);
   primeDestinationAirport(countryKey);
   elements.routeResult.innerHTML = '';
+  elements.routeAirportActions.hidden = true;
   elements.panel.classList.add('country-panel--open');
   switchTab('overview');
   renderContinentState();
@@ -761,8 +798,11 @@ async function calculateRoute() {
     if (!origin) throw new Error('Aeroporto não encontrado. Verifique o código IATA/ICAO ou sua conexão para carregar a base global.');
     const destination = state.destinationAirport || await resolveDestinationAirport(state.countryKey);
     if (!destination) throw new Error('Não foi possível determinar um aeroporto de destino para este país.');
+    if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) throw new Error('Origem e destino precisam ser aeroportos diferentes.');
 
     state.destinationAirport = destination;
+    state.originAirport = origin;
+    state.milesEngine?.setRouteContext(origin, destination);
     elements.routeOriginCode.textContent = origin.iata || origin.icao;
     elements.routeOriginCity.textContent = origin.city || origin.name;
     elements.routeDestinationCode.textContent = destination.iata || destination.icao;
@@ -779,11 +819,11 @@ async function calculateRoute() {
     elements.routeResult.innerHTML = `
       <div class="route-result__summary">
         <article class="route-result__card">
-          <div class="route-result__label">Distância</div>
+          <div class="route-result__label">Distância aproximada</div>
           <div class="route-result__value">${escapeHtml(formatDistance(estimate.distanceKm))}</div>
         </article>
         <article class="route-result__card">
-          <div class="route-result__label">Tarifa estimada</div>
+          <div class="route-result__label">Passagem · faixa estimada</div>
           <div class="route-result__value">${escapeHtml(formatMoney(estimate.cash.brl.low))}–${escapeHtml(formatMoney(estimate.cash.brl.high))}</div>
         </article>
         <article class="route-result__card">
@@ -794,19 +834,31 @@ async function calculateRoute() {
       <div class="route-result__programs">
         ${Object.entries(estimate.awards).map(([program, range]) => `
           <article class="route-result__card">
-            <div class="route-result__label">${escapeHtml(program)}</div>
+            <div class="route-result__label">${escapeHtml(program)} · milhas estimadas</div>
             <div class="route-result__value">${escapeHtml(formatMiles(range.low))}–${escapeHtml(formatMiles(range.high))}</div>
           </article>
         `).join('')}
       </div>
       <p class="route-result__disclaimer">${escapeHtml(estimate.disclaimer)}</p>
     `;
+    const guideActions = [origin, destination].map((airport, index) => state.milesEngine?.hasAirportGuide(airport.iata)
+      ? `<button type="button" data-route-airport="${escapeHtml(airport.iata)}">Guia ${index ? 'do destino' : 'da origem'} · ${escapeHtml(airport.iata)}</button>` : '').join('');
+    elements.routeAirportActions.hidden = false;
+    elements.routeAirportActions.innerHTML = `${guideActions}<button type="button" data-route-redemption="true">Comparar com preço real</button>`;
+    updateFlightPreviewAvailability();
   } catch (error) {
     elements.routeResult.innerHTML = `<div class="route-error">${escapeHtml(error.message)}</div>`;
   } finally {
     elements.routeButton.disabled = false;
     elements.routeButton.textContent = 'Calcular rota';
   }
+}
+
+function openMilesForRoute(airportCode = null) {
+  if (state.routePreviewActive) closeFlightPreview(true);
+  setMilesOpen(true);
+  if (airportCode) state.milesEngine?.showAirport(airportCode);
+  else state.milesEngine?.selectTab('overview');
 }
 
 async function fetchExchangeRate() {
@@ -984,6 +1036,12 @@ function bindUiEvents() {
   });
 
   elements.originInput.addEventListener('input', () => updateAirportSuggestions(elements.originInput.value));
+  elements.originInput.addEventListener('input', primeOriginAirport);
+  elements.changeOriginButton.addEventListener('click', () => {
+    switchTab('flights');
+    elements.originInput.focus();
+    elements.originInput.select();
+  });
   elements.originInput.addEventListener('focus', () => {
     updateAirportSuggestions(elements.originInput.value);
     airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
@@ -991,6 +1049,12 @@ function bindUiEvents() {
   elements.routeButton.addEventListener('click', calculateRoute);
   elements.flightPreviewButton.addEventListener('click', openFlightPreview);
   elements.flightPreviewClose.addEventListener('click', () => closeFlightPreview(true, true));
+  elements.flightPreviewAirports.addEventListener('click', () => openMilesForRoute(elements.flightPreviewAirports.dataset.airportCode));
+  elements.routeAirportActions.addEventListener('click', event => {
+    const airport = event.target.closest('[data-route-airport]');
+    if (airport) openMilesForRoute(airport.dataset.routeAirport);
+    else if (event.target.closest('[data-route-redemption]')) openMilesForRoute();
+  });
 
   elements.milesLauncher.addEventListener('click', () => {
     const open = !elements.milesHub.classList.contains('miles-hub--open');
@@ -1079,6 +1143,7 @@ function initialize() {
   renderVisaFreeFilter();
   renderVisitedCount();
   populateMonthSelect();
+  state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   updateAirportSuggestions();
   bindUiEvents();
   state.milesEngine = new MilesEngine({
