@@ -7,6 +7,7 @@ import {
 import { MilesEngine } from './miles.engine.js';
 import { getCountryMedia } from './media.service.js';
 import { flagImageUrl, isVisaFreeForBrazil } from './country.exploration.js';
+import { entryPresentation } from './entry.presentation.js';
 import { discoveryCoverage } from './destination.discovery.js';
 import { DiscoveryUI } from './discovery.ui.js';
 import { checklistGroups, checklistProgress, hasSeasonalChecklist } from './checklist.engine.js';
@@ -48,7 +49,6 @@ const elements = {
   countryFlag: document.getElementById('country-flag'),
   countryRegion: document.getElementById('country-region'),
   countryName: document.getElementById('country-name'),
-  dataBadge: document.getElementById('country-data-badge'),
   tabButtons: [...document.querySelectorAll('.country-tabs__button')],
   tabPanels: [...document.querySelectorAll('[data-tab-panel]')],
   media: document.getElementById('country-media'),
@@ -142,12 +142,6 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
-}
-
-function stripHtml(value) {
-  const holder = document.createElement('div');
-  holder.innerHTML = String(value ?? '');
-  return holder.textContent ?? '';
 }
 
 function savePersistentState() {
@@ -286,7 +280,7 @@ function renderMedia(countryKey, country) {
   getCountryMedia(countryKey, country).then(media => {
     if (state.countryKey !== countryKey) return;
     if (!media.length) {
-      elements.media.innerHTML = '<div class="media-empty">Imagem ainda não verificada para este destino.</div>';
+      elements.media.innerHTML = '<div class="media-empty">Imagem ainda não disponível para este destino.</div>';
       return;
     }
     elements.media.innerHTML = media.map((item, index) => `
@@ -409,36 +403,26 @@ function renderMonths(country) {
   elements.bestTime.textContent = country.bestTime || 'Consulte clima e sazonalidade antes da reserva.';
 }
 
-function entryTone(country) {
-  if (country.borderStatus === 'closed') return 'detail-card--danger';
-  if (country.borderStatus === 'warn' || country.visa === 'req') return 'detail-card--warning';
-  if (country.borderStatus === 'open' && country.visa === 'free') return 'detail-card--success';
-  return '';
-}
-
 function renderEntry(country) {
-  const entry = country.entryRequirements;
-  const items = [
-    ['Status de entrada', country.borderNote],
-    ['Passaporte', entry?.passportValidity || country.passport],
-    ['Visto / autorização', entry?.visaPolicyBR || stripHtml(country.visaText)],
-    ['Permanência', entry?.maxStay],
-    ['Saúde e vacinas', entry?.health || country.vaccines],
-    ['Documentos', entry?.documents]
-  ].filter(([, value]) => String(value ?? '').trim());
-  if (country.entryDeclaration) items.push(['Formulários', country.entryDeclaration]);
-  if (entry) {
-    if (entry.ees) items.push(['EES', `${entry.ees.status}: ${entry.ees.notes}`]);
-    if (entry.etias) items.push(['ETIAS', `${entry.etias.status}: ${entry.etias.notes}`]);
-  }
-  if (country.conflict?.text) items.unshift(['Segurança', country.conflict.text]);
-  const tone = entryTone(country);
-  elements.entry.innerHTML = items.map(([label, value], index) => `
-    <article class="detail-card ${index === 0 ? tone : ''}">
-      <div class="detail-card__label">${escapeHtml(label)}</div>
-      <div class="detail-card__value">${escapeHtml(value)}</div>
+  const view = entryPresentation(country);
+  const preparation = view.preparation.length
+    ? `<ul class="entry-list">${view.preparation.map(([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`).join('')}</ul>`
+    : '<div class="detail-card__value">Confirme os documentos exigidos para seu roteiro antes da viagem.</div>';
+  const notes = view.notes.length
+    ? `<article class="detail-card"><div class="detail-card__label">Atenção</div><ul class="entry-list">${view.notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul></article>`
+    : '';
+  const verified = /^\d{4}-\d{2}$/.test(view.verifiedAt || '') ? `${view.verifiedAt.slice(5)}/${view.verifiedAt.slice(0, 4)}` : null;
+  const sources = view.sources.map(([label, url]) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`).join(' · ');
+  elements.entry.innerHTML = `
+    <article class="detail-card detail-card--${view.status.tone}">
+      <div class="detail-card__label">Status de entrada</div>
+      <div class="detail-card__value"><strong class="entry-status__title">${escapeHtml(view.status.title)}</strong><span>${escapeHtml(view.status.detail)}</span></div>
     </article>
-  `).join('') + (country.entryRequirements?.officialSource ? `<p class="entry-source">Regras consultadas em ${escapeHtml(country.entryRequirements.verifiedAt)} · <a href="${escapeHtml(country.entryRequirements.officialSource)}" target="_blank" rel="noopener noreferrer">Fonte de entrada</a>${country.entryRequirements.ees?.officialSource ? ` · <a href="${escapeHtml(country.entryRequirements.ees.officialSource)}" target="_blank" rel="noopener noreferrer">EES</a>` : ''}${country.entryRequirements.etias?.officialSource ? ` · <a href="${escapeHtml(country.entryRequirements.etias.officialSource)}" target="_blank" rel="noopener noreferrer">ETIAS</a>` : ''}</p>` : '') + (country.healthSource ? `<p class="entry-source"><a href="${escapeHtml(country.healthSource)}" target="_blank" rel="noopener noreferrer">Fonte oficial de saúde</a></p>` : '');
+    <article class="detail-card"><div class="detail-card__label">Permanência</div><div class="detail-card__value">${escapeHtml(view.stay)}</div></article>
+    <article class="detail-card"><div class="detail-card__label">Antes de viajar</div>${preparation}</article>
+    ${notes}
+    ${verified || sources ? `<p class="entry-source">${verified ? `Verificado em ${escapeHtml(verified)}` : ''}${verified && sources ? ' · ' : ''}${sources}</p>` : ''}
+  `;
 }
 
 function renderCulture(country) {
@@ -655,8 +639,6 @@ function renderCountry(countryKey) {
   elements.countryRegion.textContent = country.region || CONTINENT_LABELS[country.continent];
   elements.countryName.textContent = country.namePt;
   elements.path.textContent = `Mundo › ${country.region || CONTINENT_LABELS[country.continent]} › ${country.namePt}`;
-  elements.dataBadge.textContent = country.dataLevel === 'curated' ? 'Conteúdo curado' : country.dataLevel === 'regional' ? 'Cobertura regional' : 'Dados essenciais';
-  elements.dataBadge.classList.toggle('data-badge--curated', country.dataLevel === 'curated');
   elements.visitButton.classList.toggle('visit-button--active', state.visited.has(countryKey));
   elements.visitButton.textContent = state.visited.has(countryKey) ? '✓ Visitado' : 'Marcar visitado';
 
@@ -823,7 +805,7 @@ async function calculateRoute() {
           <div class="route-result__value">${escapeHtml(formatDistance(estimate.distanceKm))}</div>
         </article>
         <article class="route-result__card">
-          <div class="route-result__label">Passagem · faixa estimada</div>
+          <div class="route-result__label">Passagem · faixa estimada por trecho</div>
           <div class="route-result__value">${escapeHtml(formatMoney(estimate.cash.brl.low))}–${escapeHtml(formatMoney(estimate.cash.brl.high))}</div>
         </article>
         <article class="route-result__card">
@@ -834,7 +816,7 @@ async function calculateRoute() {
       <div class="route-result__programs">
         ${Object.entries(estimate.awards).map(([program, range]) => `
           <article class="route-result__card">
-            <div class="route-result__label">${escapeHtml(program)} · milhas estimadas</div>
+            <div class="route-result__label">${escapeHtml(program)} · milhas estimadas por trecho</div>
             <div class="route-result__value">${escapeHtml(formatMiles(range.low))}–${escapeHtml(formatMiles(range.high))}</div>
           </article>
         `).join('')}

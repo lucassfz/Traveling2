@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --font-sans: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Playfair Display', Georgia, serif;
   --header-height: 64px;
@@ -22,50 +23,51 @@
   --breakpoint-md: 900px;
   --breakpoint-lg: 1200px;
 
-  /* Tema claro — interface arejada, com azul usado apenas como ação e foco. */
-  --color-background: #f1f5f9;
-  --color-background-subtle: #e8eef5;
-  --color-background-elevated: rgba(255, 255, 255, .85);
-  --color-surface: rgba(255, 255, 255, .82);
-  --color-surface-raised: #eef4f9;
-  --color-surface-hover: rgba(255, 255, 255, .96);
-  --color-surface-active: #e0f2fe;
+  /* Tema claro: camadas opacas e distintas mantêm o mapa como plano de fundo. */
+  --color-background: #e8f0f5;
+  --color-background-subtle: #dce8f0;
+  --color-background-elevated: #f4f8fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #edf4f8;
+  --color-surface-hover: #e8f2f8;
+  --color-surface-active: #dceef8;
   --color-text: #0f172a;
-  --color-text-secondary: #334155;
-  --color-text-muted: #52637a;
-  --color-accent: #0284c7;
-  --color-accent-strong: #0369a1;
-  --color-accent-soft: rgba(2, 132, 199, .10);
-  --color-border: #e2e8f0;
-  --color-border-soft: #e2e8f0;
-  --color-border-strong: #cbd5e1;
-  --color-input: rgba(255, 255, 255, .78);
-  --color-overlay: rgba(255, 255, 255, .85);
-  --color-overlay-soft: rgba(255, 255, 255, .80);
-  --color-shadow: rgba(15, 23, 42, .12);
-  --color-focus: #0284c7;
-  --color-ocean: #c6dbea;
-  --color-ocean-emissive: #deecf5;
-  --color-graticule: #2d799e;
-  --color-globe-atmosphere: #38bdf8;
-  --color-globe-ambient: rgba(2, 132, 199, .10);
-  --color-land: #8fa7ba;
-  --color-land-hover: #648aa7;
-  --color-land-dimmed: #d7e2ec;
-  --color-land-border: #59788e;
-  --color-land-selected: #0284c7;
-  --color-border-selected: #0369a1;
+  --color-text-secondary: #30465a;
+  --color-text-muted: #52697d;
+  --color-accent: #0279b3;
+  --color-accent-strong: #075c89;
+  --color-accent-soft: rgba(2, 121, 179, .11);
+  --color-on-accent: #ffffff;
+  --color-border: #bfd0dc;
+  --color-border-soft: #d5e1e9;
+  --color-border-strong: #a8bdcb;
+  --color-input: #ffffff;
+  --color-overlay: #f5f9fc;
+  --color-overlay-soft: rgba(250, 252, 254, .96);
+  --color-shadow: rgba(22, 47, 69, .15);
+  --color-focus: #0279b3;
+  --color-ocean: #9abed0;
+  --color-ocean-emissive: #b8d2de;
+  --color-graticule: #397a9b;
+  --color-globe-atmosphere: #569abb;
+  --color-globe-ambient: rgba(38, 111, 151, .14);
+  --color-land: #668ba3;
+  --color-land-hover: #497794;
+  --color-land-dimmed: #c4d6e1;
+  --color-land-border: #3f6580;
+  --color-land-selected: #0279b3;
+  --color-border-selected: #075c89;
   --color-land-visited: #10b981;
   --color-land-visa-free: #10b981;
   --color-land-visa-free-border: #047857;
   --color-light-ambient: #ffffff;
-  --color-light-sky: #dcecfb;
-  --color-light-ground: #cbd5e1;
-  --color-light-key: #f8fafc;
-  --color-light-fill: #b8d8ed;
-  --shadow-header: 0 10px 25px -5px rgba(15, 23, 42, .08);
-  --shadow-panel: -24px 0 68px rgba(15, 23, 42, .12);
-  --shadow-card: 0 10px 25px -5px rgba(15, 23, 42, .08);
+  --color-light-sky: #d4e9f4;
+  --color-light-ground: #9fb6c7;
+  --color-light-key: #f7fbfd;
+  --color-light-fill: #9bc5db;
+  --shadow-header: 0 7px 22px -10px rgba(25, 53, 74, .22);
+  --shadow-panel: -18px 0 48px rgba(25, 53, 74, .16);
+  --shadow-card: 0 5px 18px -9px rgba(25, 53, 74, .20);
 
   --color-continent-europe: #8b5cf6;
   --color-continent-north-america: #0284c7;
@@ -98,12 +100,14 @@
   box-shadow: var(--shadow-card);
   color: var(--color-text);
   animation: discovery-appear 180ms ease-out;
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
 }
 .discovery-panel[hidden] { display: none; }
 .discovery-header, .discovery-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .discovery-panel h2 { margin: 0; font-size: 21px; line-height: 1.3; }
-.discovery-panel p, .discovery-panel ul { margin: 0; font-size: 12px; line-height: 1.65; color: var(--color-text-secondary); }
-.discovery-panel small { font-size: 10px; line-height: 1.6; color: var(--color-text-muted); }
+.discovery-panel p, .discovery-panel ul { margin: 0; font-size: .8rem; line-height: 1.6; color: var(--color-text-secondary); }
+.discovery-panel small { font-size: .7rem; line-height: 1.55; color: var(--color-text-muted); }
 .discovery-panel details { font-size: 12px; line-height: 1.6; }
 .discovery-panel summary { cursor: pointer; color: var(--color-accent-strong); }
 .discovery-panel details p { margin-top: 10px; }
@@ -112,14 +116,14 @@
 .discovery-options, .discovery-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .discovery-months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .discovery-options button, .discovery-months button {
-  min-height: 40px;
+  min-height: 42px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 8px 6px;
   background: var(--color-surface);
   color: var(--color-text-secondary);
   font: inherit;
-  font-size: 11px;
+  font-size: .75rem;
   cursor: pointer;
   transition: background var(--motion-fast), border-color var(--motion-fast);
 }
@@ -128,7 +132,19 @@
   border-color: var(--color-accent);
   color: var(--color-text);
 }
-.discovery-panel button:disabled { opacity: .45; cursor: default; }
+.discovery-options button:not([aria-pressed='true']):not(:disabled):hover,
+.discovery-months button:not([aria-pressed='true']):not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.discovery-panel button:disabled { opacity: .62; cursor: default; }
+.discovery-panel .primary-button:disabled {
+  opacity: 1;
+  border-color: var(--color-border-soft);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
 .discovery-check { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.5; }
 .discovery-check input { accent-color: var(--color-accent); }
 .discovery-nav > * { flex: 1; }
@@ -145,6 +161,7 @@ body.route-mode .discovery-panel { visibility: hidden; pointer-events: none; }
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   /* Tema escuro — profundidade fria e cartográfica, com acentos discretos. */
   --color-background: #060912;
   --color-background-subtle: #0a1120;
@@ -159,6 +176,7 @@ body.route-mode .discovery-panel { visibility: hidden; pointer-events: none; }
   --color-accent: #38bdf8;
   --color-accent-strong: #7dd3fc;
   --color-accent-soft: rgba(56, 189, 248, .12);
+  --color-on-accent: #060912;
   --color-border: #40546c;
   --color-border-soft: rgba(148, 163, 184, .18);
   --color-border-strong: rgba(148, 163, 184, .42);
@@ -518,13 +536,19 @@ select:focus-visible {
 }
 
 .icon-button:hover,
-.discover-button:hover,
 .visit-button:hover,
 .secondary-button:hover,
-.miles-launcher:hover,
 .continent-nav__button:hover,
 .country-tabs__button:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.discover-button:hover,
+.miles-launcher:hover {
   border-color: var(--color-accent);
+  background: var(--color-accent-soft);
   color: var(--color-accent-strong);
 }
 
@@ -590,6 +614,13 @@ select:focus-visible {
   background: var(--color-surface-hover);
 }
 
+.search__input:focus-visible,
+.form-field__control:focus-visible,
+.currency-converter-card__input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .search__icon {
   position: absolute;
   top: 50%;
@@ -614,6 +645,8 @@ select:focus-visible {
   background: var(--color-overlay);
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(22px);
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 .search__results--open {
@@ -666,8 +699,8 @@ select:focus-visible {
 
 [data-theme='light'] .globe {
   background:
-    radial-gradient(circle at 52% 42%, rgba(255, 255, 255, .82), transparent 38%),
-    linear-gradient(145deg, #f1f5f9 0%, #e2e8f0 100%);
+    radial-gradient(circle at 52% 42%, rgba(249, 252, 254, .64), transparent 40%),
+    linear-gradient(145deg, var(--color-background) 0%, var(--color-background-subtle) 100%);
 }
 
 .starfield {
@@ -701,31 +734,15 @@ select:focus-visible {
   outline: none;
 }
 
+/* O tema claro usa superfícies opacas: não há blur nem sombra em cada cartão. */
 [data-theme='light'] .app-header,
 [data-theme='light'] .search__results,
 [data-theme='light'] .continent-nav,
 [data-theme='light'] .country-panel,
-[data-theme='light'] .miles-hub {
-  background: rgba(255, 255, 255, .85);
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, .08);
-  backdrop-filter: blur(12px);
-}
-
-[data-theme='light'] .search__input,
-[data-theme='light'] .explorer-counter,
-[data-theme='light'] .visa-filter,
-[data-theme='light'] .icon-button,
-[data-theme='light'] .detail-card,
-[data-theme='light'] .route-result__card,
-[data-theme='light'] .checklist__group,
-[data-theme='light'] .miles-path,
-[data-theme='light'] .miles-detail,
-[data-theme='light'] .miles-airport,
-[data-theme='light'] .currency-converter-card {
-  border-color: #e2e8f0;
-  background: rgba(255, 255, 255, .78);
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, .05);
-  backdrop-filter: blur(12px);
+[data-theme='light'] .miles-hub,
+[data-theme='light'] .country-tooltip,
+[data-theme='light'] .flight-preview-panel {
+  backdrop-filter: none;
 }
 
 .globe__stage--interactive .globe__canvas {
@@ -979,6 +996,8 @@ select:focus-visible {
   transform: translateX(-104%);
   transition: transform var(--motion-slow);
   pointer-events: none;
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 .miles-hub--open {
@@ -1019,7 +1038,6 @@ select:focus-visible {
   line-height: 1.5;
 }
 
-.notice-card,
 .body-copy {
   color: var(--color-text-secondary);
   font-size: .875rem;
@@ -1061,6 +1079,12 @@ select:focus-visible {
 .miles-tab--active {
   border-bottom-color: var(--color-accent);
   color: var(--color-accent-strong);
+}
+
+.miles-tab:not(.miles-tab--active):hover {
+  border-bottom-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .miles-hub__content,
@@ -1270,8 +1294,10 @@ select:focus-visible {
   min-height: 44px; padding: 9px var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm);
   background: var(--color-surface); color: var(--color-text); font: inherit; font-size: .82rem; text-align: left; cursor: pointer;
 }
-.miles-actions button:hover, .miles-choice-row button:hover, .miles-airport-choices button:hover, .miles-route-context button:hover, .route-airport-actions button:hover, .route-preview-airports:hover,
-.miles-choice-row button[aria-pressed='true'] { border-color: var(--color-accent); color: var(--color-accent-strong); }
+.miles-actions button:hover, .miles-choice-row button:hover, .miles-airport-choices button:hover, .miles-route-context button:hover, .route-airport-actions button:hover, .route-preview-airports:hover {
+  border-color: var(--color-border-strong); background: var(--color-surface-hover); color: var(--color-text);
+}
+.miles-choice-row button[aria-pressed='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-strong); }
 .miles-actions button:focus-visible, .miles-choice-row button:focus-visible, .miles-airport-choices button:focus-visible, .miles-route-context button:focus-visible, .route-airport-actions button:focus-visible, .route-preview-airports:focus-visible,
 .miles-tool-form input:focus-visible, .miles-tool-form select:focus-visible, .miles-compare-controls select:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .miles-tool-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
@@ -1386,6 +1412,8 @@ select:focus-visible {
   border-bottom: 1px solid var(--color-border-soft);
 }
 
+.country-panel__identity > div { flex: 1; min-width: 0; }
+
 .country-panel__flag {
   flex: 0 0 56px;
   width: 56px;
@@ -1398,8 +1426,8 @@ select:focus-visible {
   background: var(--color-surface);
 }
 
-.country-panel__flag img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.country-panel__flag--nepal img { width: 78%; height: 88%; object-fit: contain; }
+.country-panel__flag img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.country-panel__flag--nepal img { width: 88%; height: 92%; }
 .country-panel__flag-fallback { color: var(--color-text-secondary); font-size: .875rem; font-weight: 700; }
 
 .country-panel__region {
@@ -1416,23 +1444,7 @@ select:focus-visible {
   font-family: var(--font-display);
   font-size: clamp(1.65rem, 2.3vw, 2.25rem);
   line-height: 1.05;
-}
-
-.data-badge {
-  width: fit-content;
-  margin-top: var(--space-2);
-  padding: 4px 8px;
-  border: 1px solid var(--color-border-soft);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-raised) 76%, transparent);
-  color: var(--color-text-secondary);
-  font-size: .75rem;
-}
-
-.data-badge--curated {
-  border-color: color-mix(in srgb, var(--color-success) 55%, transparent);
-  background: color-mix(in srgb, var(--color-success) 10%, transparent);
-  color: var(--color-success);
+  overflow-wrap: break-word;
 }
 
 .country-tabs {
@@ -1466,6 +1478,10 @@ select:focus-visible {
   color: var(--color-accent-strong);
 }
 
+.country-tabs__button:not(.country-tabs__button--active):hover {
+  background: var(--color-surface-hover);
+}
+
 .country-panel__content {
   flex: 1;
   overflow-y: auto;
@@ -1477,6 +1493,21 @@ select:focus-visible {
 }
 
 .country-panel__content::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  background-clip: padding-box;
+}
+
+.miles-hub::-webkit-scrollbar,
+.discovery-panel::-webkit-scrollbar,
+.search__results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.miles-hub::-webkit-scrollbar-thumb,
+.discovery-panel::-webkit-scrollbar-thumb,
+.search__results::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: var(--color-border-strong);
@@ -1604,9 +1635,9 @@ select:focus-visible {
   gap: var(--space-3);
   margin-top: var(--space-4);
   padding: var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border-soft));
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface));
+  background: var(--color-surface);
 }
 
 .currency-converter-card__header {
@@ -1708,7 +1739,7 @@ select:focus-visible {
 
 .section-heading {
   margin-bottom: var(--space-3);
-  color: var(--color-accent);
+  color: var(--color-text-secondary);
 }
 
 .month-chart {
@@ -1781,20 +1812,6 @@ select:focus-visible {
   line-height: 1.6;
 }
 
-.notice-card {
-  display: grid;
-  gap: var(--space-1);
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border-soft));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
-}
-
-.notice-card strong {
-  color: var(--color-warning);
-}
-
 .stack {
   display: grid;
   gap: var(--space-2);
@@ -1807,6 +1824,11 @@ select:focus-visible {
 .detail-card--success { border-color: color-mix(in srgb, var(--color-success) 48%, var(--color-border-soft)); }
 .detail-card--warning { border-color: color-mix(in srgb, var(--color-warning) 48%, var(--color-border-soft)); }
 .detail-card--danger { border-color: color-mix(in srgb, var(--color-danger) 48%, var(--color-border-soft)); }
+
+.entry-status__title { display: block; margin-bottom: 2px; font-size: 1rem; }
+.entry-list { margin: 0; padding-left: 1.15rem; color: var(--color-text); font-size: .875rem; line-height: 1.5; }
+.entry-list li + li { margin-top: var(--space-2); }
+.entry-reminder { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: .75rem; line-height: 1.5; }
 
 .culture-row {
   display: grid;
@@ -1955,7 +1977,7 @@ select:focus-visible {
 .primary-button {
   border-color: var(--color-accent);
   background: var(--color-accent);
-  color: var(--color-background);
+  color: var(--color-on-accent);
 }
 
 .primary-button:hover {
@@ -2049,7 +2071,7 @@ select:focus-visible {
 
 .checklist__title {
   margin: 0 0 var(--space-2);
-  color: var(--color-accent);
+  color: var(--color-text-secondary);
   font-size: .75rem;
   text-transform: uppercase;
   letter-spacing: .06em;

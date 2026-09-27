@@ -91,7 +91,7 @@ export function estimateFlightPricing({
     },
     awards,
     benchmarkValueBrlPerMile: centsPerMileBrl,
-    disclaimer: 'Valores de referência para planejar, não preços ao vivo nem oferta de voo direto. Preço, milhas e taxas reais variam conforme a data, a companhia e a disponibilidade.'
+    disclaimer: 'Estimativas por trecho para planejar, não preços ao vivo nem oferta de voo direto. Ida e volta, conexões e taxas reais podem alterar o total; confirme data, companhia e disponibilidade.'
   };
 }
 

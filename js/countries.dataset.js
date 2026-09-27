@@ -6,7 +6,7 @@ import { AFRICA_COMPLETE_ENRICHMENT } from './africa.complete.dataset.js';
 import { ASIA_OCEANIA_COMPLETE_ENRICHMENT } from './asia-oceania.complete.dataset.js';
 import { GEOGRAPHIC_COMPLETION_ENRICHMENT } from './geographic-completion.dataset.js';
 import { AMERICAS_SEASONAL_ENRICHMENT } from './americas.seasonal.dataset.js';
-import { AMERICAS_PRIORITY_ENRICHMENT } from './americas.priority.dataset.js';
+import { AMERICAS_PRIORITY_ENRICHMENT, AMERICAS_ENTRY_CORRECTIONS } from './americas.priority.dataset.js';
 import { HISTORY_ENRICHMENT } from './history.americas-europe.dataset.js';
 import { AFRICA_HISTORY } from './history.africa.dataset.js';
 import { ASIA_HISTORY } from './history.asia.dataset.js';
@@ -7659,6 +7659,7 @@ function normalizeChecklist(source) {
 // and ETAs are not the same as unrestricted visa-free travel.
 const VISA_CATEGORY_BY_MODALITY = Object.freeze({
   free: 'visa-free',
+  'visa-free': 'visa-free',
   eta: 'authorization',
   arrival: 'visa-on-arrival',
   evisa: 'evisa',
@@ -7838,7 +7839,7 @@ export const COUNTRIES = Object.freeze(Object.fromEntries(
     const base = baseCountry(key, meta);
     const curated = CURATED_COUNTRIES[key] ?? null;
     const history = HISTORY_ENRICHMENT[key] ?? AFRICA_HISTORY[key] ?? ASIA_HISTORY[key] ?? OCEANIA_HISTORY[key];
-    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}), ...(AFRICA_COMPLETE_ENRICHMENT[key] ?? {}), ...(ASIA_OCEANIA_COMPLETE_ENRICHMENT[key] ?? {}), ...(GEOGRAPHIC_COMPLETION_ENRICHMENT[key] ?? {}), ...(history ? { history } : {}) };
+    const regional = { ...(AMERICAS_ENRICHMENT[key] ?? {}), ...(AMERICAS_PRIORITY_ENRICHMENT[key] ?? {}), ...(EUROPE_COMPLETE_ENRICHMENT[key] ?? {}), ...(AFRICA_COMPLETE_ENRICHMENT[key] ?? {}), ...(ASIA_OCEANIA_COMPLETE_ENRICHMENT[key] ?? {}), ...(GEOGRAPHIC_COMPLETION_ENRICHMENT[key] ?? {}), ...(AMERICAS_ENTRY_CORRECTIONS[key] ?? {}), ...(history ? { history } : {}) };
     if (AMERICAS_SEASONAL_ENRICHMENT[key]) regional.travelProfile = {
       ...(curated?.travelProfile ?? {}), ...(regional.travelProfile ?? {}),
       seasonalTips: AMERICAS_SEASONAL_ENRICHMENT[key]

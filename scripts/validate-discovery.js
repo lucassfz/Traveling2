@@ -6,8 +6,10 @@ import { isVisaFreeForBrazil } from '../js/country.exploration.js';
 import { AirportRepository } from '../js/airports.repository.js';
 
 const coverage = discoveryCoverage(COUNTRIES);
-assert.equal(coverage.profiles.length, 133);
-assert.equal(coverage.countryKeys.length, 114);
+assert.equal(coverage.profiles.length, 135);
+assert.equal(coverage.countryKeys.length, 115);
+assert.equal(DESTINATION_PROFILES.filter(profile => profile.countryKey === 'Canada').length, 2);
+assert(coverage.countryKeys.includes('Canada'));
 assert.equal(new Set(DESTINATION_PROFILES.map(profile => profile.id)).size, DESTINATION_PROFILES.length);
 for (const profile of DESTINATION_PROFILES) assert.equal(profileExclusion(profile, COUNTRIES[profile.countryKey]), null, profile.id);
 const rank = patch => rankDestinations(COUNTRIES, { interests: ['praia'], climate: 'any', month: 0, budget: 'any', visaFree: false, ...patch });

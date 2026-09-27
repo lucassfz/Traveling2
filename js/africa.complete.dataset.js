@@ -275,6 +275,7 @@ export const AFRICA_COMPLETE_ENRICHMENT = Object.freeze(Object.fromEntries(
     const health = healthFor(key);
     const entryRequirements = {
       visaPolicyBR: border.policy,
+      modality: border.kind,
       maxStay: border.stay,
       passportValidity: border.passport || 'Viaje com passaporte válido por pelo menos seis meses como margem prudente; confira a regra consular específica.',
       documents: border.docs,

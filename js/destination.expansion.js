@@ -34,6 +34,8 @@ export const COST_PROFILES = Object.freeze({
 
 export const EXPANSION_SEEDS = Object.freeze([
   // Americas: regional season overrides avoid the legacy generic/all-year curves.
+  ['Canada', 'Toronto e arredores', 'YYZ', 'urban', 'CCCMMHHHMMCC', '112233332211', 'highCost', 'Museus, bairros e passeios urbanos; inverno frio e dias curtos, sem prometer neve ou clima igual em todo o país.'],
+  ['Canada', 'Vancouver e parques costeiros próximos', 'YVR', 'heritage', 'CCMMMMMMMMCC', '112233332211', 'longCost', 'Cidade e natureza costeira; inverno úmido e fresco, verão mais agradável para caminhadas. Não representa as Montanhas Rochosas.'],
   ['Uruguay', 'Montevidéu e Costa de Oro', null, 'coast', 'HHMMMMMMMMMH', '333221112223', 'uruguay', 'Praias no verão; fora dele, o foco é patrimônio e gastronomia. Não inclui hospedagem em Punta del Este.'],
   ['Paraguay', 'Assunção e Areguá', null, 'heritage', 'HHHHMMMMHHHH', '112233332211', 'nearby', 'Cultura, cerâmica e lago de Areguá; calor de verão limita caminhadas, não é um roteiro de praia.'],
   ['Bolivia', 'La Paz e Tiwanaku', 'LPB', 'heritage', 'MMMMMMMMMMMM', '111233333221', 'regional', 'Dias amenos em altitude e noites frias; aclimatação necessária, sem inferir clima tropical de Santa Cruz.'],
