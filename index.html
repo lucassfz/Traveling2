@@ -130,7 +130,7 @@
     <div class="miles-hub__content" id="miles-content"></div>
   </aside>
 
-  <aside class="country-panel" id="country-panel" aria-label="Guia do país">
+  <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
     <header class="country-panel__toolbar">
       <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel">✕</button>
       <div class="country-panel__path" id="country-path">Mundo</div>
@@ -142,6 +142,8 @@
       <div>
         <div class="country-panel__region" id="country-region">—</div>
         <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
+        <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>✈ Explorar destino</button>
+        <p class="country-explore-status" id="country-explore-status" role="status" aria-live="polite"></p>
       </div>
     </div>
 

@@ -1039,7 +1039,7 @@ export class MapEngine {
     this.keyLight.intensity = dark ? 2.5 : 1.72;
     this.fillLight.intensity = dark ? 0.76 : 0.46;
     this.renderer.toneMappingExposure = dark ? 1.08 : 1;
-    this.flightVisualization.setTheme(colorToken('--color-accent'), colorToken('--color-text'));
+    this.flightVisualization.setTheme(colorToken('--color-accent'), colorToken(dark ? '--color-text' : '--color-surface'));
     this.#refreshCountryMaterials();
   }
 
@@ -1059,7 +1059,7 @@ export class MapEngine {
     const preflightMs = reducedMotion ? 0 : 950;
     const startedAt = performance.now() + preflightMs;
     const savedSelection = this.selectedCountry;
-    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1 };
+    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1, arrivalReported: false };
     // Keep the thin cyan route legible over the destination's selected fill.
     // Restore selection on exit; neither visited state nor filters are changed.
     this.clearSelection();
@@ -1106,6 +1106,10 @@ export class MapEngine {
         this.camera.position.set(focus.x, focus.y, focus.z).normalize().multiplyScalar(preview.distance);
         this.camera.lookAt(GLOBE_ORIGIN);
         preview.lastProgress = progress;
+      }
+      if (progress >= 1 && !preview.arrivalReported) {
+        preview.arrivalReported = true;
+        this.callbacks.onRouteArrived?.();
       }
     } else if (!this.cameraFlight) this.controls.update();
     this.#updateHorizonClip();

@@ -86,7 +86,10 @@ export class DiscoveryUI {
         <button class="discovery-text-button" data-action="edit">Editar preferências</button>`;
     }
     this.element.innerHTML = `<div class="discovery-header"><span class="eyebrow">${typeof this.step === 'number' ? `Sua viagem · ${this.step} de 3` : 'Sua próxima viagem'}</span><button class="icon-button" aria-label="Fechar descoberta" data-action="close">✕</button></div><h2 id="discovery-title" tabindex="-1">${escape(title)}</h2>${body}`;
-    if (focus) this.element.querySelector('h2').focus({ preventScroll: true });
+    if (focus) {
+      this.element.scrollTop = 0;
+      this.element.querySelector('h2').focus({ preventScroll: true });
+    }
   }
 
   async click(event) {

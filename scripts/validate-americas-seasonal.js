@@ -1,6 +1,8 @@
 import { COUNTRIES } from '../js/countries.dataset.js';
 import { AMERICAS_SEASONAL_ENRICHMENT } from '../js/americas.seasonal.dataset.js';
 import { checklistGroups, hasSeasonalChecklist } from '../js/checklist.engine.js';
+import { CARIBBEAN_AUDIT_ENRICHMENT } from '../js/caribbean.audit.dataset.js';
+import { AirportRepository } from '../js/airports.repository.js';
 
 const countries = Object.entries(COUNTRIES).filter(([, country]) => ['NA', 'SA'].includes(country.continent));
 const errors = [];
@@ -26,6 +28,18 @@ for (const [key, country] of countries) {
 }
 for (const key of Object.keys(AMERICAS_SEASONAL_ENRICHMENT)) {
   if (!countries.some(([countryKey]) => countryKey === key)) errors.push(`${key}: entrada fora do catálogo das Américas`);
+}
+const airports = new AirportRepository();
+for (const key of Object.keys(CARIBBEAN_AUDIT_ENRICHMENT)) {
+  const country = COUNTRIES[key];
+  if (!country) { errors.push(`${key}: complemento fora do catálogo`); continue; }
+  if (/A melhor época depende/.test(country.bestTime) || new Set(country.months).size < 2) errors.push(`${key}: época genérica`);
+  if (country.foods?.length < 2 || country.etiquette?.length < 2) errors.push(`${key}: cultura genérica`);
+  if (country.checklist?.length < 3) errors.push(`${key}: checklist incompleto`);
+  if (/Confirme o padrão elétrico local/.test(country.voltage) || !/^https:\/\//.test(CARIBBEAN_AUDIT_ENRICHMENT[key].voltageSource)) errors.push(`${key}: voltagem sem dado/fonte`);
+  const airport = await airports.resolve(country.airport);
+  if (!airport || airport.country !== country.alpha2) errors.push(`${key}: aeroporto não resolve no país`);
+  if (country.visaPolicyBR?.eligibility !== 'unknown' || country.entryRequirements) errors.push(`${key}: entrada sem fonte oficial foi classificada indevidamente`);
 }
 console.log(`Américas: ${countries.length} destinos, 12 meses por destino; erros: ${errors.length}`);
 for (const error of errors) console.error(`ERRO ${error}`);

@@ -29,7 +29,7 @@ function createAirplane(material) {
   const fin = new THREE.Mesh(new THREE.BoxGeometry(0.0016, 0.006, 0.006), material);
   fin.position.set(0, 0.0035, -0.012);
   airplane.add(fin);
-  airplane.scale.setScalar(1.3);
+  airplane.scale.setScalar(1.45);
   return airplane;
 }
 

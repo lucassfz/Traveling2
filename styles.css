@@ -24,13 +24,13 @@
   --breakpoint-lg: 1200px;
 
   /* Tema claro: camadas opacas e distintas mantêm o mapa como plano de fundo. */
-  --color-background: #e8f0f5;
-  --color-background-subtle: #dce8f0;
-  --color-background-elevated: #f4f8fb;
+  --color-background: #ebeff0;
+  --color-background-subtle: #e2e8ea;
+  --color-background-elevated: #f6f8f8;
   --color-surface: #ffffff;
-  --color-surface-raised: #edf4f8;
-  --color-surface-hover: #e8f2f8;
-  --color-surface-active: #dceef8;
+  --color-surface-raised: #f0f4f4;
+  --color-surface-hover: #e9f0f1;
+  --color-surface-active: #dcebef;
   --color-text: #0f172a;
   --color-text-secondary: #30465a;
   --color-text-muted: #52697d;
@@ -38,43 +38,43 @@
   --color-accent-strong: #075c89;
   --color-accent-soft: rgba(2, 121, 179, .11);
   --color-on-accent: #ffffff;
-  --color-border: #bfd0dc;
-  --color-border-soft: #d5e1e9;
-  --color-border-strong: #a8bdcb;
+  --color-border: #c3d0d4;
+  --color-border-soft: #d8e1e3;
+  --color-border-strong: #a9bcc2;
   --color-input: #ffffff;
-  --color-overlay: #f5f9fc;
-  --color-overlay-soft: rgba(250, 252, 254, .96);
+  --color-overlay: #f6f8f8;
+  --color-overlay-soft: rgba(250, 252, 252, .96);
   --color-shadow: rgba(22, 47, 69, .15);
   --color-focus: #0279b3;
-  --color-ocean: #9abed0;
-  --color-ocean-emissive: #b8d2de;
-  --color-graticule: #397a9b;
-  --color-globe-atmosphere: #569abb;
-  --color-globe-ambient: rgba(38, 111, 151, .14);
-  --color-land: #668ba3;
-  --color-land-hover: #497794;
-  --color-land-dimmed: #c4d6e1;
-  --color-land-border: #3f6580;
+  --color-ocean: #789ba9;
+  --color-ocean-emissive: #8babb7;
+  --color-graticule: #4a7787;
+  --color-globe-atmosphere: #668e9d;
+  --color-globe-ambient: rgba(53, 82, 94, .10);
+  --color-land: #637f8c;
+  --color-land-hover: #4c6d7c;
+  --color-land-dimmed: #bfced2;
+  --color-land-border: #445f6b;
   --color-land-selected: #0279b3;
   --color-border-selected: #075c89;
   --color-land-visited: #10b981;
   --color-land-visa-free: #10b981;
   --color-land-visa-free-border: #047857;
   --color-light-ambient: #ffffff;
-  --color-light-sky: #d4e9f4;
-  --color-light-ground: #9fb6c7;
+  --color-light-sky: #d9e5e8;
+  --color-light-ground: #9fb4bb;
   --color-light-key: #f7fbfd;
-  --color-light-fill: #9bc5db;
+  --color-light-fill: #a5c3cd;
   --shadow-header: 0 7px 22px -10px rgba(25, 53, 74, .22);
   --shadow-panel: -18px 0 48px rgba(25, 53, 74, .16);
   --shadow-card: 0 5px 18px -9px rgba(25, 53, 74, .20);
 
-  --color-continent-europe: #8b5cf6;
-  --color-continent-north-america: #0284c7;
-  --color-continent-south-america: #10b981;
-  --color-continent-africa: #f59e0b;
-  --color-continent-asia: #ef4444;
-  --color-continent-oceania: #ec4899;
+  --color-continent-europe: #786b9b;
+  --color-continent-north-america: #397e96;
+  --color-continent-south-america: #4a876f;
+  --color-continent-africa: #a87e42;
+  --color-continent-asia: #aa6e6d;
+  --color-continent-oceania: #9b6e8c;
   --color-success: #168064;
   --color-warning: #a16207;
   --color-danger: #dc2626;
@@ -1290,6 +1290,7 @@ select:focus-visible {
 .miles-empty { color: var(--color-text-secondary); font-size: .875rem; }
 
 .miles-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-5); }
+.miles-actions button:first-child { border-color: var(--color-accent); background: var(--color-accent-soft); color: var(--color-accent-strong); font-weight: 700; }
 .miles-actions button, .miles-choice-row button, .miles-airport-choices button, .miles-route-context button, .route-airport-actions button, .route-preview-airports {
   min-height: 44px; padding: 9px var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm);
   background: var(--color-surface); color: var(--color-text); font: inherit; font-size: .82rem; text-align: left; cursor: pointer;
@@ -1304,6 +1305,10 @@ select:focus-visible {
 .miles-tool-form label, .miles-compare-controls label { display: grid; gap: var(--space-1); min-width: 0; color: var(--color-text-secondary); font-size: .78rem; font-weight: 700; }
 .miles-tool-form input, .miles-tool-form select, .miles-compare-controls select { width: 100%; min-width: 0; min-height: 44px; padding: 8px var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-input); color: var(--color-text); font: inherit; font-size: .86rem; }
 .miles-tool-form > button { min-height: 44px; align-self: end; }
+.miles-card-options { grid-column: 1 / -1; padding: var(--space-2) 0; border-top: 1px solid var(--color-border-soft); }
+.miles-card-options summary { width: fit-content; color: var(--color-accent-strong); font-size: .8rem; font-weight: 700; cursor: pointer; }
+.miles-card-options summary:focus-visible, .miles-result-more summary:focus-visible, .miles-tool-help summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.miles-card-options__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); padding-top: var(--space-3); }
 .miles-tool-result { color: var(--color-text-secondary); font-size: .85rem; line-height: 1.55; }
 .miles-tool-result:not(:empty) { padding: var(--space-4); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); background: var(--color-surface); }
 .miles-tool-result p { margin: 0 0 var(--space-2); }
@@ -1314,10 +1319,14 @@ select:focus-visible {
 .miles-tool-help summary { color: var(--color-accent-strong); font-weight: 700; cursor: pointer; }
 .miles-tool-help p { margin-bottom: 0; }
 .miles-tool-help .miles-detail-list { margin-top: var(--space-4); }
+.miles-learning { margin-top: var(--space-6); border-color: var(--color-border-soft); background: var(--color-surface-raised); }
+.miles-learning .miles-paths { margin-top: var(--space-4); }
 .miles-result-card { min-width: 0; padding: var(--space-4) 0; border-top: 1px solid var(--color-border-soft); }
 .miles-result-card h4 { margin: var(--space-1) 0 var(--space-3); font-size: .98rem; }
 .miles-result-card .miles-copy-list { margin: var(--space-2) 0 var(--space-4); }
 .miles-result-card .miles-trust { margin-top: var(--space-3); }
+.miles-result-more { margin-top: var(--space-3); }
+.miles-result-more summary { width: fit-content; color: var(--color-accent-strong); font-size: .8rem; font-weight: 700; cursor: pointer; }
 .miles-compare-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .miles-compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
 .miles-compare-grid .miles-facts div { grid-template-columns: 1fr; gap: 0; }
@@ -1336,6 +1345,7 @@ select:focus-visible {
 
 @media (max-width: 500px) {
   .miles-actions, .miles-tool-form, .miles-compare-controls, .miles-compare-grid { grid-template-columns: minmax(0, 1fr); }
+  .miles-card-options__fields { grid-template-columns: minmax(0, 1fr); }
   .miles-choice-row button { flex-basis: calc(50% - var(--space-2)); }
 }
 
@@ -1446,6 +1456,11 @@ select:focus-visible {
   line-height: 1.05;
   overflow-wrap: break-word;
 }
+
+.country-explore-button { margin-top: var(--space-3); }
+.country-explore-button:disabled { border-color: var(--color-border-soft); background: var(--color-surface-raised); color: var(--color-text-muted); cursor: not-allowed; }
+.country-explore-status { margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: .75rem; line-height: 1.4; }
+.country-explore-status:empty { display: none; }
 
 .country-tabs {
   display: flex;
