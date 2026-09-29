@@ -46,17 +46,17 @@
   --color-overlay-soft: rgba(250, 252, 252, .96);
   --color-shadow: rgba(22, 47, 69, .15);
   --color-focus: #0279b3;
-  --color-ocean: #789ba9;
-  --color-ocean-emissive: #8babb7;
+  --color-ocean: #6d909e;
+  --color-ocean-emissive: #84a4b0;
   --color-graticule: #4a7787;
   --color-globe-atmosphere: #668e9d;
   --color-globe-ambient: rgba(53, 82, 94, .10);
-  --color-land: #637f8c;
+  --color-land: #6a8490;
   --color-land-hover: #4c6d7c;
   --color-land-dimmed: #bfced2;
   --color-land-border: #445f6b;
-  --color-land-selected: #0279b3;
-  --color-border-selected: #075c89;
+  --color-land-selected: #25799a;
+  --color-border-selected: #23617d;
   --color-land-visited: #10b981;
   --color-land-visa-free: #10b981;
   --color-land-visa-free-border: #047857;
@@ -915,8 +915,17 @@ select:focus-visible {
   left: var(--space-4);
   z-index: 105;
   display: flex;
+  align-items: center;
   gap: 6px;
   pointer-events: none;
+}
+
+.navigation-trail__label {
+  margin-right: 3px;
+  color: var(--color-text-muted);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .04em;
 }
 
 .navigation-trail__button {

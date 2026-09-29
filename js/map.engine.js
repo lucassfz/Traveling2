@@ -1023,7 +1023,7 @@ export class MapEngine {
     this.oceanMaterial.roughness = dark ? 0.82 : 0.78;
     this.oceanMaterial.clearcoat = dark ? 0.03 : 0.05;
     this.atmosphereMaterial.uniforms.atmosphereColor.value.copy(colorToken('--color-globe-atmosphere'));
-    this.atmosphereMaterial.uniforms.atmosphereOpacity.value = dark ? 0.12 : 0.045;
+    this.atmosphereMaterial.uniforms.atmosphereOpacity.value = dark ? 0.12 : 0.07;
     this.graticuleMaterial.color.copy(colorToken('--color-graticule'));
     this.graticuleMaterial.opacity = dark ? 0.055 : 0.05;
     this.globalBorderMaterial?.color.copy(colorToken('--color-land-border'));

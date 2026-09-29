@@ -115,6 +115,7 @@ const state = {
   visited: new Set(readJsonStorage('traveling.visited', [])),
   checklist: readJsonStorage('traveling.checklist', {}),
   history: [],
+  historyActiveIndex: null,
   isVisaFreeBRFilterActive: false,
   brlPerUsd: 5,
   map: null,
@@ -236,19 +237,21 @@ function addHistory(entry) {
   state.history = state.history.filter(item => `${item.type}:${item.key}` !== key);
   state.history.push(entry);
   if (state.history.length > 7) state.history.shift();
+  state.historyActiveIndex = state.history.length - 1;
   renderHistory();
 }
 
 function renderHistory() {
-  elements.navigationTrail.innerHTML = state.history.map((entry, index) => `
+  elements.navigationTrail.innerHTML = state.history.length ? `<span class="navigation-trail__label">Recentes</span>${state.history.map((entry, index) => `
     <button
-      class="navigation-trail__button ${index === state.history.length - 1 ? 'navigation-trail__button--active' : ''}"
+      class="navigation-trail__button ${index === state.historyActiveIndex ? 'navigation-trail__button--active' : ''}"
       type="button"
       data-history-index="${index}"
-      aria-label="${escapeHtml(entry.label)}"
-      title="${escapeHtml(entry.label)}"
+      aria-label="Ir para ${escapeHtml(entry.label)}"
+      ${index === state.historyActiveIndex ? 'aria-current="location"' : ''}
+      title="Ir para ${escapeHtml(entry.label)}"
     ></button>
-  `).join('');
+  `).join('')}` : '';
 }
 
 function switchTab(tabName) {
@@ -725,6 +728,8 @@ function closeCountryPanel(restoreFocus = false) {
   clearMedia();
   state.map?.clearSelection();
   state.countryKey = null;
+  state.historyActiveIndex = null;
+  renderHistory();
   if (restoreFocus) elements.searchInput.focus({ preventScroll: true });
 }
 
@@ -748,6 +753,7 @@ function home() {
   state.countryKey = null;
   state.continent = null;
   state.history = [];
+  state.historyActiveIndex = null;
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
@@ -1007,8 +1013,16 @@ function bindUiEvents() {
   elements.navigationTrail.addEventListener('click', event => {
     const button = event.target.closest('[data-history-index]');
     if (!button) return;
-    const entry = state.history[Number(button.dataset.historyIndex)];
+    const index = Number(button.dataset.historyIndex);
+    const entry = state.history[index];
     if (!entry) return;
+    state.historyActiveIndex = index;
+    for (const dot of elements.navigationTrail.querySelectorAll('[data-history-index]')) {
+      const active = Number(dot.dataset.historyIndex) === index;
+      dot.classList.toggle('navigation-trail__button--active', active);
+      if (active) dot.setAttribute('aria-current', 'location');
+      else dot.removeAttribute('aria-current');
+    }
     if (entry.type === 'country') selectCountry(entry.key, { recordHistory: false });
     else selectContinent(entry.key, { recordHistory: false });
   });
