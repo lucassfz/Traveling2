@@ -1,6 +1,12 @@
 import { haversineKm } from './geospatial.js';
 
-const AIRPORT_DATA_URL = 'https://raw.githubusercontent.com/datasets/airport-codes/master/data/airport-codes.csv';
+// Fixado em um commit (2026-11-06): o branch master é regenerado diariamente e
+// uma mudança de colunas quebraria parseAirportCsv sem aviso. Para atualizar,
+// troque o hash e confira o cabeçalho (iata_code, gps_code, ident, coordinates).
+const AIRPORT_DATA_URL = 'https://raw.githubusercontent.com/datasets/airport-codes/0ebaf2a8ab955eb542f84b7b5960ecf563f64edc/data/airport-codes.csv';
+// Após uma falha de rede, novas tentativas esperam este intervalo em vez de
+// refazer o download (≈8,8 MB) a cada tecla digitada no campo de origem.
+const LOAD_RETRY_COOLDOWN_MS = 60_000;
 
 const CORE_AIRPORTS = Object.freeze([
   ['GRU','SBGR','São Paulo/Guarulhos','São Paulo','BR',-23.4356,-46.4731],
@@ -146,6 +152,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 7000) {
 export class AirportRepository {
   #all = null;
   #loadPromise = null;
+  #lastFailure = null;
   #lookup = new Map();
   #coreCodes = new Set(CORE_AIRPORTS.flatMap(airport => [airport.iata, airport.icao]).filter(Boolean));
 
@@ -167,13 +174,20 @@ export class AirportRepository {
   async loadAll() {
     if (this.#all) return this.#all;
     if (this.#loadPromise) return this.#loadPromise;
+    if (this.#lastFailure && Date.now() - this.#lastFailure.at < LOAD_RETRY_COOLDOWN_MS) throw this.#lastFailure.error;
     this.#loadPromise = (async () => {
-      const response = await fetchWithTimeout(AIRPORT_DATA_URL, { mode: 'cors', cache: 'force-cache' }, 7000);
-      if (!response.ok) throw new Error(`Falha ao carregar base global de aeroportos (${response.status}).`);
-      const parsed = parseAirportCsv(await response.text());
-      this.#all = parsed;
-      for (const airport of parsed) this.#indexAirport(airport, true);
-      return parsed;
+      try {
+        const response = await fetchWithTimeout(AIRPORT_DATA_URL, { mode: 'cors', cache: 'force-cache' }, 7000);
+        if (!response.ok) throw new Error(`Falha ao carregar base global de aeroportos (${response.status}).`);
+        const parsed = parseAirportCsv(await response.text());
+        this.#all = parsed;
+        this.#lastFailure = null;
+        for (const airport of parsed) this.#indexAirport(airport, true);
+        return parsed;
+      } catch (error) {
+        this.#lastFailure = { at: Date.now(), error };
+        throw error;
+      }
     })();
     try {
       return await this.#loadPromise;

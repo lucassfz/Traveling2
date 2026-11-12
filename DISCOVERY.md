@@ -2,6 +2,8 @@
 
 Revisão: 26/09/2026. Projeto: `C:\Users\PC-LUCAS\OneDrive - SENAC - SP\traveling-gis-miles-overhaul`, branch `main`. Trabalho continuado sobre a implementação existente; sem commit, push ou publicação.
 
+> **Atualização (12/11/2026):** os números abaixo são da revisão de 26/09. O estado atual, segundo `node scripts/validate-discovery.js`, é **135 perfis em 115 países**, com 81 países fora da cobertura editorial. O projeto agora tem 14 validadores; veja a lista no `README.md`.
+
 ## Resultado e causa
 
 Cobertura anterior: 27 perfis / 26 países. Cobertura atual: **133 perfis / 114 países de um catálogo de 196**. São 88 países adicionais. Nenhum país foi reclassificado e nenhum History, foto ou guia foi reescrito.

@@ -4,8 +4,9 @@ import { prepareGeometry, preparedGeometryContains, unwrapRing } from '../js/geo
 
 const errors = [];
 const assert = (condition, message) => { if (!condition) errors.push(message); };
-const atlasResponse = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
-const clientResponse = await fetch('https://cdn.jsdelivr.net/npm/topojson-client@3/+esm');
+// Mesmas versões exatas usadas por js/map.engine.js.
+const atlasResponse = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json');
+const clientResponse = await fetch('https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm');
 if (!atlasResponse.ok || !clientResponse.ok) throw new Error('Não foi possível carregar a topologia para validação.');
 const atlas = await atlasResponse.json();
 const clientSource = await clientResponse.text();

@@ -5,6 +5,7 @@ import {
   createRafThrottle,
   geometryToPolygons,
   geographicToCartesian,
+  normalizeLongitude,
   prepareGeometry,
   preparedGeometryContains,
   unwrapRing
@@ -17,7 +18,9 @@ import { atlasFeatureParts } from './map.topology.js';
 import { routePoint } from './flight.route.js';
 import { FlightVisualization } from './flight.visualization.js';
 
-const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+// Versões exatas: uma faixa (@2, @3) pode mudar a geometria ou a API sem aviso.
+const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+const TOPOJSON_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
 const GLOBE_RADIUS = 1;
 const LAND_RADIUS = 1.007;
 const BORDER_RADIUS = 1.012;
@@ -301,26 +304,48 @@ function polygonToMesh(polygon, material, countryKey, continent) {
   return mesh;
 }
 
+// Countries crossing ±180° (Russia, Fiji) are cut along the antimeridian in the
+// atlas. That cut is a polygon edge, not a real border, so it is never drawn.
+function isAntimeridianCut(a, b) {
+  const onAntimeridian = point => Math.abs(Math.abs(normalizeLongitude(point[0])) - 180) < 1e-3;
+  return onAntimeridian(a) && onAntimeridian(b);
+}
+
+// Highlight outline for one country (selected, visited, visa-free). Built on
+// demand; the shared base borders come from #buildGlobalBorders.
 function polygonBorder(polygon, material) {
   const group = new THREE.Group();
-  for (const rawRing of polygon) {
-    const rawUnwrappedRing = rawRing;
-    const closeRing = hasStableRingClosure(rawUnwrappedRing);
-    const ring = densifyRing(rawUnwrappedRing, 4.5, closeRing);
-    const points = ring.map(([longitude, latitude]) => (
-      latLngToCartesian(latitude, longitude, BORDER_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
-    ));
-    if (closeRing && points.length) points.push(points[0].clone());
-    if (points.length < 2) continue;
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    // A continuous, explicitly closed line preserves valid local edges while
-    // avoiding a renderer-generated segment across malformed source rings.
-    const line = new THREE.Line(geometry, material);
-    line.renderOrder = 4;
-    group.add(line);
+  for (const ring of polygon) {
+    if (ring.length < 2) continue;
+    const edgeCount = hasStableRingClosure(ring) ? ring.length : ring.length - 1;
+    const runs = [];
+    let run = [ring[0]];
+    for (let index = 0; index < edgeCount; index += 1) {
+      const start = ring[index];
+      const end = ring[(index + 1) % ring.length];
+      if (isAntimeridianCut(start, end)) {
+        if (run.length > 1) runs.push(run);
+        run = [end];
+      } else run.push(end);
+    }
+    if (run.length > 1) runs.push(run);
+
+    for (const points of runs) {
+      const samples = densifyRing(points, 4.5, false);
+      samples.push(points.at(-1));
+      const vertices = samples.map(([longitude, latitude]) => (
+        latLngToCartesian(latitude, longitude, BORDER_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
+      ));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vertices), material);
+      // Drawn after the shared borders (renderOrder 4) at the same radius.
+      line.renderOrder = 4.5;
+      group.add(line);
+    }
   }
   return group;
 }
+
+const HIGHLIGHTED_BORDER_STATES = new Set(['selected', 'visited', 'visa-free', 'visa-free-hover']);
 
 export class MapEngine {
   constructor(stageElement, callbacks = {}) {
@@ -513,7 +538,7 @@ export class MapEngine {
     this.callbacks.onProgress?.('Carregando geometria mundial…');
     const [topology, topojson] = await Promise.all([
       fetchJsonWithTimeout(WORLD_ATLAS_URL, 7000),
-      import('https://cdn.jsdelivr.net/npm/topojson-client@3/+esm')
+      import(TOPOJSON_CLIENT_URL)
     ]);
     const features = topojson.feature(topology, topology.objects.countries).features;
     this.callbacks.onProgress?.('Construindo países em 3D…');
@@ -569,18 +594,27 @@ export class MapEngine {
         opacity: 0.86,
         depthWrite: false,
         depthTest: true,
-        linewidth: 0.75,
         clippingPlanes: [this.horizonClipPlane]
       });
       const group = existing?.group ?? new THREE.Group();
       const borderContainer = existing?.borderContainer ?? new THREE.Group();
       const childCountBefore = group.children.length;
+      const meshPolygons = [];
 
       for (const polygon of polygons) {
         const mesh = polygonToMesh(polygon, landMaterial, countryKey, continent);
         if (mesh) {
           group.add(mesh);
           this.raycastMeshes.push(mesh);
+          meshPolygons.push(polygon);
+        }
+      }
+
+      if (existing) {
+        existing.borderPolygons.push(...meshPolygons);
+        // A highlight requested mid-build already outlined earlier parts.
+        if (existing.borderBuilt) {
+          for (const polygon of meshPolygons) borderContainer.add(polygonBorder(polygon, borderMaterial));
         }
       }
 
@@ -593,12 +627,14 @@ export class MapEngine {
       if (!existing) {
         group.userData = { countryKey, continent };
         borderContainer.userData = { countryKey, continent };
-        borderContainer.visible = true;
+        borderContainer.visible = false;
         this.worldGroup.add(group);
         this.borderGroup.add(borderContainer);
         this.countryRecords.set(countryKey, {
           group,
           borderContainer,
+          borderPolygons: meshPolygons,
+          borderBuilt: false,
           landMaterial,
           borderMaterial,
           continent
@@ -658,7 +694,7 @@ export class MapEngine {
       opacity: 0.82,
       depthWrite: false,
       depthTest: true,
-      linewidth: 0.5,
+      // WebGL draws Line objects at 1px regardless of linewidth.
       clippingPlanes: [this.horizonClipPlane]
     });
 
@@ -872,6 +908,12 @@ export class MapEngine {
               : 0.025;
     record.landMaterial.opacity = state === 'visa-dimmed' ? 0.25 : state === 'dimmed' ? 0.52 : 1;
     record.landMaterial.transparent = state === 'visa-dimmed' || state === 'dimmed';
+    const highlighted = HIGHLIGHTED_BORDER_STATES.has(state);
+    if (highlighted && !record.borderBuilt) {
+      record.borderBuilt = true;
+      for (const polygon of record.borderPolygons) record.borderContainer.add(polygonBorder(polygon, record.borderMaterial));
+    }
+    record.borderContainer.visible = highlighted;
     const borderColor = colorToken(borderName);
     if (state === 'visited') borderColor.offsetHSL(0, 0, -0.14);
     record.borderMaterial.color.copy(borderColor);

@@ -99,9 +99,29 @@ const elements = {
   milesContent: document.getElementById('miles-content')
 };
 
+// localStorage pode lançar exceção (modo privado, armazenamento bloqueado ou
+// cota cheia). A interface continua funcionando; só a persistência é perdida.
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Traveling: não foi possível salvar "${key}" no armazenamento local.`, error);
+    return false;
+  }
+}
+
 function readJsonStorage(key, fallback) {
   try {
-    const value = JSON.parse(localStorage.getItem(key));
+    const value = JSON.parse(readStorage(key));
     return value ?? fallback;
   } catch {
     return fallback;
@@ -150,13 +170,13 @@ function escapeHtml(value) {
 }
 
 function savePersistentState() {
-  localStorage.setItem('traveling.visited', JSON.stringify([...state.visited]));
-  localStorage.setItem('traveling.checklist', JSON.stringify(state.checklist));
+  writeStorage('traveling.visited', JSON.stringify([...state.visited]));
+  writeStorage('traveling.checklist', JSON.stringify(state.checklist));
 }
 
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem('traveling.theme', theme);
+  writeStorage('traveling.theme', theme);
   const isDark = theme === 'dark';
   elements.themeButton.textContent = isDark ? '☀️' : '🌙';
   elements.themeButton.setAttribute('aria-label', isDark ? 'Ativar modo claro' : 'Ativar modo escuro');
@@ -165,7 +185,8 @@ function setTheme(theme) {
 }
 
 function initializeTheme() {
-  setTheme(localStorage.getItem('traveling.theme') || 'dark');
+  const saved = readStorage('traveling.theme');
+  setTheme(saved === 'light' || saved === 'dark' ? saved : 'dark');
 }
 
 function renderVisitedCount() {

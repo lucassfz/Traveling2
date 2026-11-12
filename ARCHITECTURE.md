@@ -4,18 +4,19 @@
 - `js/app.js`: application state, UI orchestration, search, panels, flight form.
 - `js/map.engine.js`: Three.js globe, progressive world build, raycasting and camera.
 - `js/geospatial.js`: authoritative WGS84 spherical transforms, Haversine and PIP.
-- `js/countries.dataset.js`: 193-country catalog + curated/regional enrichment.
+- `js/countries.dataset.js`: 196-entry catalog (sovereign states plus Kosovo, Taiwan and French Guiana) + curated/regional enrichment.
 - `js/country.exploration.js`: ISO flag identity and editorial eligibility for discovery, independent of WebGL.
 - `js/checklist.engine.js`: compatible checklist groups, optional destination/season tips and real progress counts.
-- `js/europe.dataset.js`: 20 priority European country enrichments and dated Brazilian entry guidance.
+- `js/europe.entry.js`: single source of the European entry rules for Brazilian passports (Schengen, associated states, national regimes, EES/ETIAS sources).
+- `js/europe.dataset.js` / `js/europe.priority.dataset.js`: legacy and priority layers for 20 European countries.
+- `js/europe.complete.dataset.js`: final layer for all 45 European destinations; its entry records override the older layers.
 - `js/landmarks.media.js`: static, attributed Wikimedia media linked to landmark identities.
 - `js/miles.engine.js`: five-tab Miles & Airports interface, native expandable explanations, airport search, and verified-data rendering.
 - `js/miles.data.js`: educational paths and structured catalogs for card profiles, lounge types, upgrades, and 11 airport guides.
 - `js/airports.repository.js`: offline core airports + optional global CSV lazy-load.
 - `js/pricing.engine.js`: distance/season/cabin award and cash estimations.
 - `js/media.service.js`: serves only curated landmark media; never substitutes a generic photo.
-- `scripts/validate-content.js` and `scripts/validate-landmarks.js`: read-only catalog audits.
-- `scripts/validate-exploration.js`: read-only checks for discovery, flags and seasonal checklist compatibility.
+- `scripts/validate-*.js`: 14 read-only audits (see `README.md` for which ones need network).
 
 ## Country exploration at scale
 `countries.dataset.js` remains the registry/aggregation layer. Future Africa, Oceania and Asia enrichments should follow the existing regional-module shape and join there, without changing `app.js` or `map.engine.js`. There is one reusable country drawer: selecting a country replaces its content; closing it removes its media. No country-specific drawer trees or landmark images are created at startup. `Descobrir destino` computes eligible keys once from curated entry, culture, checklist and verified-media fields, then uses the existing `selectCountry` and globe fly-to path. Haiti and Bahamas, whose entry records need review, are not eligible.
@@ -26,6 +27,9 @@ The existing `checklist` groups and saved positional keys remain valid. A region
 
 ## Antipodal click fix
 The previous picker evaluated land meshes before determining the front intersection of the ocean sphere. A ray through open water can continue through the sphere and intersect land on the far side. The new picker first finds the nearest ocean-sphere intersection and rejects every land hit farther than that front surface (plus a small tolerance). Only then can a mesh be selected. If there is no front-side land mesh hit, the front-surface XYZ point is converted back to latitude/longitude and must pass strict antimeridian-safe point-in-polygon.
+
+## Country border highlight
+Base borders are the shared TopoJSON arcs (`#buildGlobalBorders`), drawn once for the whole world. A country gets its own outline only while it is selected, visited or highlighted by the visa-free filter; that outline is built lazily the first time and then just shown or hidden. Antimeridian cut edges (Russia, Fiji) are skipped so no false line appears at ±180°. WebGL lines are always 1 px wide; highlights differ by color and opacity only.
 
 ## Authoritative geographic frame
 East-positive longitude, +Y north:

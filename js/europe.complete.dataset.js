@@ -1,58 +1,8 @@
-// Curadoria das cinco abas de viagem para os 44 países classificados como EU
+// Curadoria das cinco abas de viagem para os 45 países classificados como EU
 // pelo catálogo. História e mídia permanecem nas camadas originais.
 import { EUROPE_ENRICHMENT } from './europe.dataset.js';
 import { EUROPE_PRIORITY_ENRICHMENT } from './europe.priority.dataset.js';
-
-const EU_BRAZIL = 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:22025X01998';
-const EES_SOURCE = 'https://home-affairs.ec.europa.eu/news/entryexit-system-will-become-fully-operational-10-april-2026-2026-03-30_en';
-const ETIAS_SOURCE = 'https://travel-europe.europa.eu/etias';
-const EES = Object.freeze({ status: 'operacional', notes: 'Registra entrada, saída e biometria de turistas elegíveis nas fronteiras externas dos 29 países participantes; não é visto.', officialSource: EES_SOURCE });
-const ETIAS = Object.freeze({ status: 'não exigido em 2026-09', notes: 'A UE prevê iniciar o sistema no último trimestre de 2026; ainda não recebe pedidos.', officialSource: ETIAS_SOURCE });
-const NO_EES = Object.freeze({ status: 'não se aplica', notes: 'Destino fora dos 29 países que usam o EES.' });
-const NO_ETIAS = Object.freeze({ status: 'não se aplica', notes: 'Destino fora dos 30 países previstos para o ETIAS.' });
-// As chaves com espaço são explícitas para não depender de traduções ou IDs do mapa.
-const SCHENGEN_KEYS = new Set([
-  'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Czech Rep.', 'Denmark', 'Estonia', 'Finland', 'France', 'Germany',
-  'Greece', 'Hungary', 'Iceland', 'Italy', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta',
-  'Netherlands', 'Norway', 'Poland', 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden', 'Switzerland'
-]);
-const entry = (visaPolicyBR, maxStay, officialSource, options = {}) => ({
-  visaPolicyBR, maxStay,
-  passportValidity: options.passportValidity || 'Passaporte válido durante a visita; leve documento em bom estado.',
-  documents: options.documents || 'Leve passagem de saída, endereço da hospedagem e meios para custear a viagem.',
-  health: options.health || 'Seguro de viagem é recomendado; não há vacina obrigatória geral para chegada direta do Brasil.',
-  ees: options.ees || NO_EES, etias: options.etias || NO_ETIAS,
-  officialSource, verifiedAt: '2026-09', status: options.status || 'verified'
-});
-const SCHENGEN_ENTRY = entry(
-  'Passaporte brasileiro comum: turismo de curta duração sem visto no espaço Schengen.',
-  'Até 90 dias em qualquer período móvel de 180 dias no conjunto Schengen; não reinicia ao cruzar outra fronteira Schengen.',
-  EU_BRAZIL,
-  { passportValidity: 'Emitido nos últimos 10 anos e válido por pelo menos 3 meses após a saída prevista do espaço Schengen.', ees: EES, etias: ETIAS }
-);
-const ASSOCIATED_SCHENGEN_ENTRY = {
-  Iceland: entry('Brasileiros com passaporte comum visitam a Islândia sem visto para turismo curto, sob regras Schengen.', 'Até 90 dias em 180 no conjunto Schengen. A Islândia prevê possível extensão bilateral apenas no país, sob condições próprias.', 'https://island.is/en/entry-requirements-to-iceland/bilateral-agreements-on-extended-stay', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
-  Liechtenstein: entry('Brasileiros com passaporte comum fazem turismo curto sem visto em Liechtenstein, que integra Schengen; acesso usual via Suíça ou Áustria.', SCHENGEN_ENTRY.maxStay, 'https://www.llv.li/en/national-administration/migration-and-passport-office/visa', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
-  Norway: entry('Brasileiros com passaporte comum não precisam de visto para turismo curto na Noruega, integrante de Schengen.', SCHENGEN_ENTRY.maxStay, 'https://www.udi.no/en/want-to-apply/visit-and-holiday/visitors-visa-to-norway/?c=bra', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS }),
-  Switzerland: entry('Brasileiros com passaporte comum fazem turismo curto sem visto na Suíça, integrante de Schengen.', SCHENGEN_ENTRY.maxStay, 'https://www.sem.admin.ch/sem/en/home/international-rueckkehr/ch-migrationsaussenpolitik/abkommen/visumbefreiung.html', { passportValidity: SCHENGEN_ENTRY.passportValidity, ees: EES, etias: ETIAS })
-};
-const NATIONAL_ENTRY = {
-  Albania: entry('Brasileiros não precisam de visto para turismo curto na Albânia; o país não integra Schengen.', 'Até 90 dias em 180 dias na Albânia, em contagem separada do Schengen.', 'https://punetejashtme.gov.al/en/regjimi-i-vizave-per-te-huajt/', { passportValidity: 'Emitido nos últimos 10 anos e válido por 3 meses após a saída da Albânia.' }),
-  Andorra: entry('Andorra não exige visto próprio. O acesso terrestre passa por França ou Espanha, onde valem as regras de entrada Schengen.', 'Curta visita a Andorra; acompanhe também seus dias e eventuais reentradas no espaço Schengen.', 'https://www.govern.ad/en/ministries-and-secretaries-of-state/ministry-of-foreign-affairs/travel-to-andorra', { documents: 'Passaporte e comprovantes do roteiro; se você depender de visto Schengen, ele deve permitir reentrada após Andorra.', ees: { status: 'no trajeto', notes: 'Pode ocorrer na fronteira externa do espaço Schengen, não em um sistema andorrano.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando iniciar, poderá ser relevante para a passagem por França/Espanha; hoje não é exigido.' } }),
-  Belarus: entry('Acordo bilateral dispensa visto de turismo para passaporte brasileiro comum; atenção às rotas terrestres e conexões.', 'Até 90 dias por ano a contar da primeira entrada, conforme o acordo bilateral.', 'https://aplicacao.itamaraty.gov.br/ApiConcordia/Documento/download/16294', { status: 'needs-review', documents: 'Passagem de saída, hospedagem, seguro aceito localmente e documentos exigidos pela rota de entrada.', health: 'Seguro médico aceito na Bielorrússia pode ser exigido; confira cobertura e trânsito antes de embarcar.' }),
-  'Bosnia and Herz.': entry('Brasileiros com passaporte comum estão dispensados de visto para turismo na Bósnia e Herzegovina.', 'Até 90 dias, sem exceder 180 dias no ano contados da primeira entrada, conforme acordo bilateral.', 'https://www.mvp.gov.ba/en/org_cmd57sdlc000nn43u2rk8pgsd_638883525257338153'),
-  Cyprus: entry('Passaporte brasileiro comum: turismo sem visto na República de Chipre. Chipre é da UE, mas não integra Schengen.', 'Até 90 dias em 180 dias em Chipre; contagem separada da permanência Schengen.', 'https://www.gov.cy/information/visas/', { passportValidity: 'Passaporte válido por pelo menos 3 meses após a saída planejada de Chipre.', etias: { ...ETIAS, notes: 'Chipre está entre os países previstos; não há exigência de ETIAS em 2026-09.' } }),
-  Ireland: entry('Brasileiros não precisam de visto irlandês prévio para visita curta; a admissão é decidida pela imigração da Irlanda, fora de Schengen.', 'Geralmente até 90 dias, conforme permissão concedida na chegada.', 'https://www.irishimmigration.ie/visa-non-visa-required-nationalities/', { documents: 'Tenha passagem de saída, hospedagem, recursos e motivo da visita; o agente pode solicitá-los.' }),
-  Macedonia: entry('O acordo Brasil–Macedônia do Norte dispensa visto de turismo para passaporte comum.', 'Até 90 dias a partir da entrada, conforme acordo bilateral; não se soma ao limite Schengen.', 'https://aplicacao.itamaraty.gov.br/ApiConcordia/Documento/download/13494'),
-  Moldova: entry('Brasileiros com passaporte comum têm isenção de visto para turismo na Moldávia.', 'Até 90 dias durante 6 meses desde a primeira entrada, conforme acordo bilateral.', 'https://www.planalto.gov.br/ccivil_03/_ato2019-2022/2022/decreto/d11128.htm'),
-  Monaco: entry('Mônaco não integra formalmente Schengen; o acesso usual é pela França e segue as exigências de entrada francesa para brasileiros.', 'Visita curta; os dias do roteiro na França contam para o limite Schengen.', 'https://ambassade-en-chine.gouv.mc/en/information-and-services/visiting-monaco', { ees: { status: 'no trajeto', notes: 'Aplica-se ao cruzar a fronteira externa francesa, não dentro de Mônaco.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando começar, poderá valer para entrar pela França; hoje não é exigido.' } }),
-  Montenegro: entry('Brasileiros com passaporte válido entram sem visto para turismo em Montenegro.', 'Até 90 dias em 180 dias em Montenegro; contagem separada de Schengen.', 'https://www.gov.me/en/diplomatic-missions/embassies-and-consulates-of-montenegro/brazil', { documents: 'Passagem de saída, endereço de hospedagem e recursos; hospedagem deve providenciar o registro local da estadia.' }),
-  Russia: entry('Acordo bilateral dispensa visto para turismo de curta duração com passaporte brasileiro comum; confirme rota e conexões antes de comprar.', 'Até 90 dias em cada período de 180 dias, conforme acordo Brasil–Rússia.', 'https://www.planalto.gov.br/ccivil_03/_ato2007-2010/2010/decreto/d7271.htm', { documents: 'Passagem de saída, hospedagem, seguro e documentos da conexão; a hospedagem normalmente cuida do registro migratório.', health: 'Seguro médico com cobertura efetiva na Rússia é prudente; avalie disponibilidade de atendimento e meios de pagamento.', status: 'needs-review' }),
-  'San Marino': entry('San Marino não emite visto turístico próprio; a chegada é por território italiano, com a regra de entrada Schengen da Itália.', 'Visita curta; planeje os dias totais do roteiro italiano/Schengen.', 'https://visitsanmarino.com/pub1/VisitSM/contenuto/About-San-Marino/FORMALITA--DI-FRONTIERA.html', { ees: { status: 'no trajeto', notes: 'Pode ser registrado ao entrar no espaço Schengen pela Itália.', officialSource: EES_SOURCE }, etias: { ...ETIAS, notes: 'Quando iniciar, poderá ser necessário para entrar na Itália; hoje não é exigido.' } }),
-  Serbia: entry('Brasileiros com passaporte comum entram sem visto para turismo na Sérvia.', 'Até 90 dias em 6 meses desde a primeira entrada; não utiliza dias Schengen.', 'https://www.mfa.gov.rs/en/citizens/travel-serbia/visa-regime/brazil'),
-  Ukraine: entry('Acordo bilateral dispensa visto para turismo curto com passaporte brasileiro; a segurança e a viabilidade de viagem são excepcionais no momento.', 'Até 90 dias em 180 dias, conforme acordo bilateral.', 'https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2011/decreto/d7621.htm', { documents: 'Passaporte, plano de saída e confirmação de transporte disponível; verifique avisos consulares e cobertura efetiva do seguro.', health: 'A assistência e o transporte podem estar afetados pelo conflito armado; não planeje turismo sem avaliação consular atual.', status: 'needs-review' }),
-  'United Kingdom': entry('Brasileiros que visitam sem visto normalmente precisam obter a ETA britânica antes de viajar; ela é vinculada ao passaporte.', 'Visita geralmente até 6 meses; o controle de fronteira decide a admissão.', 'https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-eta-national-list', { passportValidity: 'Passaporte válido durante toda a estadia.', documents: 'ETA aprovada, passagem de saída, hospedagem e recursos; exceções à ETA dependem da situação migratória.', health: 'Seguro de viagem é recomendado; atendimento fora de urgências pode gerar cobrança.' })
-};
+import { EES, ETIAS, SCHENGEN_KEYS, SCHENGEN_ENTRY, ASSOCIATED_SCHENGEN_ENTRY, NATIONAL_ENTRY } from './europe.entry.js';
 
 // Dados compactos dos 33 países não cobertos pela camada prioritária.
 // f = sabores [nome, descrição]; e = costumes; note = transporte/pagamento local.

@@ -1,47 +1,6 @@
 // Camada regional para o mesmo modelo consumido pelo drawer. As regras de
-// fronteira foram consultadas em 2026-09; continuam sujeitas a mudança.
-const EU_BORDER = 'https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:22025X01998';
-const EES_SOURCE = 'https://home-affairs.ec.europa.eu/news/entry-exit-system-fully-operational-10-april-2026-who-exempt-2026-07-27_en';
-const ETIAS_SOURCE = 'https://travel-europe.europa.eu/etias';
-const SCHENGEN_ENTRY = Object.freeze({
-  visaPolicyBR: 'Passaporte brasileiro comum: turismo curto sem visto no espaço Schengen. A permanência é compartilhada entre os países participantes.',
-  maxStay: 'Até 90 dias em qualquer período móvel de 180 dias no conjunto Schengen (acordo UE–Brasil vigente desde 1º/3/2026).',
-  passportValidity: 'Documento emitido há menos de 10 anos e válido por ao menos 3 meses após a saída prevista.',
-  documents: 'Passagem de saída, hospedagem e recursos podem ser solicitados na fronteira.',
-  health: 'Seguro médico de viagem é recomendado; não há exigência sanitária geral para turismo vindo do Brasil.',
-  ees: { status: 'operacional', notes: 'Registro de entradas/saídas e biometria em fronteiras externas para viajantes elegíveis.', officialSource: EES_SOURCE },
-  etias: { status: 'não exigido em 2026-09', notes: 'A UE prevê início no último trimestre de 2026, sem data definitiva anunciada.', officialSource: ETIAS_SOURCE },
-  officialSource: EU_BORDER, verifiedAt: '2026-09', status: 'verified'
-});
-
-const ASSOCIATED_SCHENGEN_ENTRY = Object.freeze({
-  ...SCHENGEN_ENTRY,
-  visaPolicyBR: 'Passaporte brasileiro comum: turismo curto sem visto; a permanência conta no limite conjunto do espaço Schengen.',
-  maxStay: 'Até 90 dias em 180 dias no conjunto Schengen, sujeito às regras nacionais aplicáveis.',
-  officialSource: 'https://home-affairs.ec.europa.eu/policies/schengen/border-crossing/short-stay-calculator_en'
-});
-
-const UK_ENTRY = Object.freeze({
-  visaPolicyBR: 'Brasileiros em visita curta normalmente não precisam de visto, mas precisam de ETA válida antes do embarque, salvo exceção legal.',
-  maxStay: 'Visita geralmente até 6 meses; autorização de entrada depende do controle migratório.',
-  passportValidity: 'Passaporte válido por toda a estadia.',
-  documents: 'ETA vinculada ao passaporte, saída, hospedagem e recursos podem ser verificados.',
-  health: 'Confira orientações sanitárias para seu itinerário.',
-  ees: { status: 'não se aplica', notes: 'Reino Unido não integra o espaço Schengen.' },
-  etias: { status: 'não se aplica', notes: 'O Reino Unido usa ETA própria.' },
-  officialSource: 'https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-eta-national-list', verifiedAt: '2026-09', status: 'verified'
-});
-
-const IRELAND_ENTRY = Object.freeze({
-  visaPolicyBR: 'Passaporte brasileiro comum não exige visto irlandês prévio para visita curta; admissão é decidida na fronteira.',
-  maxStay: 'Permissão curta geralmente até 90 dias, conforme carimbo da imigração.',
-  passportValidity: 'Passaporte válido; confirme exigências específicas antes do embarque.',
-  documents: 'Passagem de saída, hospedagem, motivo da visita e recursos podem ser solicitados.',
-  health: 'Confira orientações sanitárias para seu itinerário.',
-  ees: { status: 'não se aplica', notes: 'Irlanda não participa do EES/Schengen.' },
-  etias: { status: 'não se aplica', notes: 'ETIAS não é autorização para entrar na Irlanda.' },
-  officialSource: 'https://www.irishimmigration.ie/visa-non-visa-required-nationalities/', verifiedAt: '2026-09', status: 'verified'
-});
+// entrada vêm da fonte única europe.entry.js (consulta 2026-09).
+import { ASSOCIATED_SCHENGEN_ENTRY, NATIONAL_ENTRY, SCHENGEN_ENTRY } from './europe.entry.js';
 
 // Campos compactos: aeroporto principal, cidade, eletricidade, comida,
 // etiqueta, contexto histórico. Metadados básicos vêm do catálogo existente.
@@ -110,7 +69,7 @@ const BEST_TIME = Object.freeze({
 
 export const EUROPE_DATA = Object.freeze(Object.fromEntries(Object.entries(PROFILES).map(([key, profile]) => [key, {
   airport: profile[0], airportCity: profile[1], voltage: profile[2], food: profile[3], etiquette: profile[4], history: profile[5],
-  entryRequirements: key === 'United Kingdom' ? UK_ENTRY : key === 'Ireland' ? IRELAND_ENTRY : ['Switzerland', 'Norway'].includes(key) ? ASSOCIATED_SCHENGEN_ENTRY : SCHENGEN_ENTRY
+  entryRequirements: NATIONAL_ENTRY[key] || ASSOCIATED_SCHENGEN_ENTRY[key] || SCHENGEN_ENTRY
 }])));
 
 export const EUROPE_ENRICHMENT = Object.freeze(Object.fromEntries(Object.entries(EUROPE_DATA).map(([key, data]) => [key, {
