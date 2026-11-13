@@ -1042,7 +1042,10 @@ function ensureMilesEngine() {
 // (para o contador do botão); a interface só quando o painel abre.
 let plannerPromise = null;
 function ensurePlanner() {
-  plannerPromise ??= import('./planner/planner.ui.js').then(({ PlannerUI }) => {
+  plannerPromise ??= Promise.all([
+    import('./planner/planner.ui.js'),
+    import('./planner/flight.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSection }]) => {
     state.planner = new PlannerUI({
       element: elements.plannerContent,
       store: tripStore,
@@ -1050,7 +1053,10 @@ function ensurePlanner() {
       onShowCountry: countryKey => {
         if (window.innerWidth < 1200) setPlannerOpen(false);
         selectCountry(countryKey);
-      }
+      },
+      sections: [
+        createFlightSection({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES })
+      ]
     });
     return state.planner;
   }).catch(error => {
