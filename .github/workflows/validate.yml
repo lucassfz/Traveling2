@@ -1,0 +1,42 @@
+name: Validate data
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    name: Offline audits
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run offline validators
+        run: npm run validate
+
+  online:
+    # Baixa arquivos fixados da CDN (three, world-atlas). Falhas de rede não
+    # bloqueiam o PR, mas aparecem como aviso no resumo da execução.
+    name: Online audits (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run online validators
+        run: npm run validate:online

@@ -1475,8 +1475,16 @@ select:focus-visible {
   display: flex;
   overflow-x: auto;
   border-bottom: 1px solid var(--color-border-soft);
-  background: var(--color-background-elevated);
+  /* Sombras de rolagem: as camadas "local" cobrem as sombras nas pontas; quando
+     há abas fora da área visível, a sombra da borda correspondente aparece. */
+  background:
+    linear-gradient(90deg, var(--color-background-elevated) 40%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(270deg, var(--color-background-elevated) 40%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--color-shadow), transparent) left / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--color-shadow), transparent) right / 14px 100% no-repeat scroll,
+    var(--color-background-elevated);
   scrollbar-width: none;
+  scroll-behavior: smooth;
 }
 
 .country-tabs::-webkit-scrollbar {
@@ -2224,7 +2232,8 @@ select:focus-visible {
   :root { --header-height: 60px; --panel-width: 100vw; }
   .app-header { padding: 0 var(--space-3); }
   .app-header__brand { font-size: .92rem; letter-spacing: .18em; }
-  .explorer-counter { display: none; }
+  .explorer-counter { gap: 4px; padding: 0 8px; white-space: nowrap; }
+  .explorer-counter__label { display: none; }
   .visa-filter__label { display: none; }
   .visa-filter { min-width: 38px; justify-content: center; padding: 0 8px; }
   .search { width: min(230px, 44vw); }
@@ -2240,11 +2249,39 @@ select:focus-visible {
   .app-header .icon-button, .discover-button { width: 34px; height: 34px; }
   .search { width: clamp(92px, calc(100vw - 230px), 170px); }
   .search__results { position: fixed; top: calc(var(--header-height) - 2px); right: 3vw; left: 3vw; width: auto; }
-  .continent-nav { display: none; }
+  /* Barra inferior no celular: continentes numa faixa rolável e, abaixo dela,
+     Milhas à esquerda e filtro de visto + visitados à direita. Os dois controles
+     continuam no cabeçalho (mesmo DOM e eventos), mas saem para a base da tela;
+     sem backdrop-filter o cabeçalho deixa de ser o bloco de contenção deles. */
+  .app-header { backdrop-filter: none; background: var(--color-overlay); }
+  .continent-nav {
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--space-3) + 52px + env(safe-area-inset-bottom));
+    max-width: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .continent-nav::-webkit-scrollbar { display: none; }
+  .continent-nav__button { flex: 0 0 auto; min-height: 34px; opacity: .8; }
+  .visa-filter,
+  .explorer-counter {
+    position: fixed;
+    bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    height: 44px;
+    min-height: 44px;
+    box-shadow: var(--shadow-card);
+  }
+  .visa-filter { right: 8px; width: 68px; }
+  .explorer-counter { right: calc(8px + 68px + 6px); }
+  .explorer-counter__value { font-size: .95rem; }
+  body:has(.country-panel--open, .miles-hub--open, .discovery-panel:not([hidden])) .visa-filter,
+  body:has(.country-panel--open, .miles-hub--open, .discovery-panel:not([hidden])) .explorer-counter { display: none; }
   .country-panel { width: 100vw; max-width: none; }
   .country-panel__identity { padding: var(--space-4); }
   .country-panel__flag { flex-basis: 46px; width: 46px; height: 35px; }
-  .visa-filter { display: none; }
   .country-tab { padding: var(--space-4); }
   .media-strip { margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4); padding: var(--space-3) var(--space-4); }
   .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -284,6 +284,15 @@ function switchTab(tabName) {
     button.tabIndex = active ? 0 : -1;
     button.classList.toggle('country-tabs__button--active', active);
     button.setAttribute('aria-selected', String(active));
+    // Em telas estreitas as abas rolam na horizontal: mantém a ativa visível.
+    // Rola só a faixa de abas (scrollIntoView poderia rolar a página).
+    if (active) {
+      const list = button.parentElement;
+      const tab = button.getBoundingClientRect();
+      const bounds = list.getBoundingClientRect();
+      if (tab.left < bounds.left) list.scrollLeft += tab.left - bounds.left;
+      else if (tab.right > bounds.right) list.scrollLeft += tab.right - bounds.right;
+    }
   }
   for (const panel of elements.tabPanels) {
     const active = panel.dataset.tabPanel === tabName;

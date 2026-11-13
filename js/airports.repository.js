@@ -1,11 +1,11 @@
 import { haversineKm } from './geospatial.js';
 
-// Fixado em um commit (2026-11-06): o branch master é regenerado diariamente e
-// uma mudança de colunas quebraria parseAirportCsv sem aviso. Para atualizar,
-// troque o hash e confira o cabeçalho (iata_code, gps_code, ident, coordinates).
-const AIRPORT_DATA_URL = 'https://raw.githubusercontent.com/datasets/airport-codes/0ebaf2a8ab955eb542f84b7b5960ecf563f64edc/data/airport-codes.csv';
-// Após uma falha de rede, novas tentativas esperam este intervalo em vez de
-// refazer o download (≈8,8 MB) a cada tecla digitada no campo de origem.
+// Base global versionada no repositório (≈0,7 MB, só aeroportos com código IATA),
+// gerada por scripts/build-airports.js a partir do CSV fixado de
+// datasets/airport-codes. Servida pela mesma origem: sem baixar o CSV de 8,8 MB.
+const AIRPORT_DATA_URL = new URL('../data/airports.json', import.meta.url);
+// Após uma falha, novas tentativas esperam este intervalo em vez de repetir a
+// requisição a cada tecla digitada no campo de origem.
 const LOAD_RETRY_COOLDOWN_MS = 60_000;
 
 const CORE_AIRPORTS = Object.freeze([
@@ -88,54 +88,30 @@ function normalizeCode(value) {
   return String(value ?? '').trim().toUpperCase();
 }
 
-function parseCsvLine(line) {
-  const cells = [];
-  let current = '';
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    if (char === '"') {
-      if (quoted && line[index + 1] === '"') {
-        current += '"';
-        index += 1;
-      } else quoted = !quoted;
-    } else if (char === ',' && !quoted) {
-      cells.push(current);
-      current = '';
-    } else current += char;
-  }
-  cells.push(current);
-  return cells;
-}
-
-function parseAirportCsv(csvText) {
-  const lines = csvText.split(/\r?\n/).filter(Boolean);
-  if (!lines.length) return [];
-  const headers = parseCsvLine(lines[0]);
-  const index = Object.fromEntries(headers.map((header, position) => [header, position]));
+// Linhas compactas [iata, icao, name, city, country, lat, lng]; os campos já
+// vêm normalizados por scripts/build-airports.js.
+function parseAirportJson(data) {
+  if (!Array.isArray(data?.airports)) throw new Error('Base global de aeroportos em formato inesperado.');
   const airports = [];
-
-  for (let row = 1; row < lines.length; row += 1) {
-    const cells = parseCsvLine(lines[row]);
-    const iata = normalizeCode(cells[index.iata_code]);
-    const icao = normalizeCode(cells[index.gps_code] || cells[index.ident]);
-    if (!iata && !icao) continue;
-    const coordinates = String(cells[index.coordinates] ?? '').split(',').map(Number);
-    if (coordinates.length !== 2 || coordinates.some(value => !Number.isFinite(value))) continue;
-    // The airport-codes CSV stores coordinates as latitude, longitude.
-    const [lat, lng] = coordinates;
-    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
-    airports.push({
-      iata,
-      icao,
-      name: cells[index.name] || iata || icao,
-      city: cells[index.municipality] || cells[index.name] || iata || icao,
-      country: cells[index.iso_country] || '',
-      lat,
-      lng
-    });
+  for (const row of data.airports) {
+    if (!Array.isArray(row) || row.length < 7) continue;
+    const [iata, icao, name, city, country, lat, lng] = row;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    airports.push({ iata, icao, name, city, country, lat, lng });
   }
   return airports;
+}
+
+// Navegador: requisição à mesma origem. Node (scripts/validate-*.js): leitura
+// direta do arquivo, pois fetch() não aceita URLs file:.
+async function readAirportData() {
+  if (AIRPORT_DATA_URL.protocol === 'file:') {
+    const { readFile } = await import('node:fs/promises');
+    return JSON.parse(await readFile(AIRPORT_DATA_URL, 'utf8'));
+  }
+  const response = await fetchWithTimeout(AIRPORT_DATA_URL, {}, 10000);
+  if (!response.ok) throw new Error(`Falha ao carregar base global de aeroportos (${response.status}).`);
+  return response.json();
 }
 
 
@@ -177,9 +153,7 @@ export class AirportRepository {
     if (this.#lastFailure && Date.now() - this.#lastFailure.at < LOAD_RETRY_COOLDOWN_MS) throw this.#lastFailure.error;
     this.#loadPromise = (async () => {
       try {
-        const response = await fetchWithTimeout(AIRPORT_DATA_URL, { mode: 'cors', cache: 'force-cache' }, 7000);
-        if (!response.ok) throw new Error(`Falha ao carregar base global de aeroportos (${response.status}).`);
-        const parsed = parseAirportCsv(await response.text());
+        const parsed = parseAirportJson(await readAirportData());
         this.#all = parsed;
         this.#lastFailure = null;
         for (const airport of parsed) this.#indexAirport(airport, true);

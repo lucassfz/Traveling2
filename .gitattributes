@@ -1,0 +1,17 @@
+# Normaliza finais de linha: o repositório guarda LF e o checkout também usa LF,
+# em Windows, macOS ou Linux. Evita diffs inteiros causados só por CRLF.
+* text=auto eol=lf
+
+# Binários: nunca converter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
+*.docx binary
