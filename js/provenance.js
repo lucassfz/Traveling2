@@ -1,3 +1,5 @@
+import { escapeHtml } from './core/html.js';
+
 // Etiqueta única para dizer de onde vem cada número exibido: dado verificado em
 // fonte oficial, dado ao vivo, estimativa do próprio Traveling ou cálculo feito
 // com valores digitados pelo usuário. Sempre texto + cor (nunca só cor).
@@ -9,15 +11,6 @@ export const PROVENANCE_KINDS = Object.freeze({
   calculated: 'Calculado com seus valores',
   unverified: 'Pendente de verificação'
 });
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 export function safeHttpsUrl(value) {
   try {

@@ -8,18 +8,10 @@ import {
   UPGRADE_METHODS
 } from './miles.data.js';
 import { provenanceLabel } from './provenance.js';
+import { escapeHtml } from './core/html.js';
 import { annualFeeAmount, cardMatches, evaluateRedemption, filterLoungesByTerminal, findVerifiedLounges, loungeNetworks, rankAirportMatches, verifiedRecord } from './miles.tools.js';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 }).format(value);
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 function isVerified(item) {
   return verifiedRecord(item);
