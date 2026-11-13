@@ -1,0 +1,35 @@
+name: Airport data
+
+# Prova que data/airports.json é exatamente o que scripts/build-airports.js gera
+# a partir do CSV fixado. Roda quando o arquivo, o gerador ou este workflow mudam.
+on:
+  pull_request:
+    paths:
+      - data/airports.json
+      - scripts/build-airports.js
+      - .github/workflows/airports.yml
+  push:
+    branches: [main]
+    paths:
+      - data/airports.json
+      - scripts/build-airports.js
+      - .github/workflows/airports.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproducible:
+    name: Generator reproduces committed file
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Regenerate data/airports.json
+        run: npm run build:airports
+      - name: Compare with committed file
+        run: git diff --exit-code --stat data/airports.json
