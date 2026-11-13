@@ -1,4 +1,6 @@
 import { AirportRepository } from './airports.repository.js';
+import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
+import { escapeHtml } from './core/html.js';
 import {
   CONTINENT_LABELS,
   COUNTRIES,
@@ -101,41 +103,12 @@ const elements = {
   milesContent: document.getElementById('miles-content')
 };
 
-// localStorage pode lançar exceção (modo privado, armazenamento bloqueado ou
-// cota cheia). A interface continua funcionando; só a persistência é perdida.
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (error) {
-    console.warn(`Traveling: não foi possível salvar "${key}" no armazenamento local.`, error);
-    return false;
-  }
-}
-
-function readJsonStorage(key, fallback) {
-  try {
-    const value = JSON.parse(readStorage(key));
-    return value ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 const state = {
   countryKey: null,
   continent: null,
   tab: 'overview',
-  visited: new Set(readJsonStorage('traveling.visited', [])),
-  checklist: readJsonStorage('traveling.checklist', {}),
+  visited: new Set(readJsonStorage(STORAGE_KEYS.visited, [])),
+  checklist: readJsonStorage(STORAGE_KEYS.checklist, {}),
   history: [],
   historyActiveIndex: null,
   isVisaFreeBRFilterActive: false,
@@ -164,23 +137,14 @@ const airportRepository = new AirportRepository();
 const destinationAirportCache = new Map();
 const discoveryKeys = discoveryCoverage(COUNTRIES).countryKeys;
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
 function savePersistentState() {
-  writeStorage('traveling.visited', JSON.stringify([...state.visited]));
-  writeStorage('traveling.checklist', JSON.stringify(state.checklist));
+  writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
+  writeJsonStorage(STORAGE_KEYS.checklist, state.checklist);
 }
 
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  writeStorage('traveling.theme', theme);
+  writeStorage(STORAGE_KEYS.theme, theme);
   const isDark = theme === 'dark';
   elements.themeButton.textContent = isDark ? '☀️' : '🌙';
   elements.themeButton.setAttribute('aria-label', isDark ? 'Ativar modo claro' : 'Ativar modo escuro');
@@ -189,7 +153,7 @@ function setTheme(theme) {
 }
 
 function initializeTheme() {
-  const saved = readStorage('traveling.theme');
+  const saved = readStorage(STORAGE_KEYS.theme);
   setTheme(saved === 'light' || saved === 'dark' ? saved : 'dark');
 }
 
