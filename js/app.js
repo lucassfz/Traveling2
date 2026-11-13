@@ -1175,6 +1175,7 @@ async function initializeMap() {
       }
     });
     state.map.setVisitedCountries?.(state.visited);
+    syncGlobeInset();
     renderVisaFreeFilter();
     await state.map.init();
     elements.globeFallback.classList.remove('globe__fallback--visible');
@@ -1185,6 +1186,18 @@ async function initializeMap() {
     const detail = elements.globeFallback.querySelector('span');
     if (detail) detail.textContent = 'O mapa 3D não carregou. A busca, os guias, voos e o hub de milhas continuam disponíveis.';
   }
+}
+
+// O painel do país cobre a lateral direita do globo; o motor desloca a
+// projeção para que o país selecionado fique na área ainda visível.
+function syncGlobeInset() {
+  const open = elements.panel.classList.contains('country-panel--open');
+  state.map?.setViewInset?.({ right: open ? elements.panel.getBoundingClientRect().width : 0 });
+}
+
+function watchGlobeInset() {
+  new MutationObserver(syncGlobeInset).observe(elements.panel, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('resize', syncGlobeInset);
 }
 
 function markInterfaceReady() {
@@ -1230,6 +1243,7 @@ function initialize() {
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   updateAirportSuggestions();
   bindUiEvents();
+  watchGlobeInset();
   state.milesEngine = new MilesEngine({
     tabsElement: elements.milesTabs,
     contentElement: elements.milesContent,
