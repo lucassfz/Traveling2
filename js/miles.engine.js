@@ -7,6 +7,7 @@ import {
   MILES_TABS,
   UPGRADE_METHODS
 } from './miles.data.js';
+import { provenanceLabel } from './provenance.js';
 import { annualFeeAmount, cardMatches, evaluateRedemption, filterLoungesByTerminal, findVerifiedLounges, loungeNetworks, rankAirportMatches, verifiedRecord } from './miles.tools.js';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 }).format(value);
@@ -20,26 +21,22 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
-function officialUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
 function isVerified(item) {
   return verifiedRecord(item);
 }
 
 function trustLine(item) {
-  if (item?.status === 'outdated') return '<span class="miles-trust">Informação desatualizada · confirme as regras atuais em fonte oficial</span>';
-  if (!isVerified(item)) return '<span class="miles-trust">Dados específicos pendentes de verificação</span>';
-  const [year, month] = item.verifiedAt.split('-').map(Number);
-  const date = new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(Date.UTC(year, month - 1, 1)));
-  return `<span class="miles-trust">Verificado em ${escapeHtml(date)} · <a href="${escapeHtml(officialUrl(item.officialSource))}" target="_blank" rel="noopener noreferrer">Fonte oficial</a>${item.uncertainFields?.length ? ` · A confirmar: ${escapeHtml(item.uncertainFields.join(', '))}` : ''}</span>`;
+  const common = { tag: 'span', className: 'miles-trust' };
+  if (item?.status === 'outdated') return provenanceLabel('unverified', { ...common, label: 'Informação desatualizada', detail: 'confirme as regras atuais em fonte oficial' });
+  if (!isVerified(item)) return provenanceLabel('unverified', { ...common, detail: 'dados específicos ainda não confirmados' });
+  return provenanceLabel('verified', {
+    ...common,
+    date: item.verifiedAt,
+    dateLabel: 'em',
+    detail: item.uncertainFields?.length ? `A confirmar: ${item.uncertainFields.join(', ')}` : '',
+    source: item.officialSource,
+    sourceText: 'Fonte oficial'
+  });
 }
 
 function normalize(value) {
@@ -356,7 +353,7 @@ export class MilesEngine {
     const calculation = evaluateRedemption(Object.fromEntries(values));
     result.innerHTML = calculation.error
       ? `<p class="miles-error">${escapeHtml(calculation.error)}</p>`
-      : `<p>Com <strong>${calculation.used.toLocaleString('pt-BR')} pontos + ${money(calculation.taxes)} em taxas</strong>, você substituiria cerca de <strong>${money(calculation.replaced)}</strong> do preço da passagem.</p><p><strong>Referência:</strong> ${money(calculation.perThousand)} por 1.000 pontos.</p>`;
+      : `<p>Com <strong>${calculation.used.toLocaleString('pt-BR')} pontos + ${money(calculation.taxes)} em taxas</strong>, você substituiria cerca de <strong>${money(calculation.replaced)}</strong> do preço da passagem.</p><p><strong>Referência:</strong> ${money(calculation.perThousand)} por 1.000 pontos.</p>${provenanceLabel('calculated', { detail: 'preço, pontos e taxas informados por você' })}`;
   }
 
   renderCardMatch() {
