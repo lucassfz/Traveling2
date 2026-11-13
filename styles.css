@@ -2415,3 +2415,114 @@ body.route-mode .app-header__brand { pointer-events: none; }
 @media (max-width: 600px) {
   .flight-preview-panel { top: calc(var(--header-height) + 8px); left: 8px; width: min(300px, calc(100vw - 16px)); padding: var(--space-3); }
 }
+
+/* ---------- Planner v0 (js/planner) ----------
+   Reusa o painel lateral e o lançador do hub de Milhas (.miles-hub,
+   .miles-launcher). Só um dos dois painéis fica aberto por vez. */
+.country-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.country-actions .country-explore-button { margin-top: 0; }
+.country-plan-button { min-height: 42px; }
+
+.trips-launcher { top: calc(50% + 74px); transform: none; height: 116px; }
+.trips-launcher__count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: .65rem;
+  line-height: 18px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.trips-launcher__count[hidden] { display: none; }
+
+.planner { display: grid; gap: var(--space-5); min-width: 0; }
+.planner-empty { display: grid; gap: var(--space-2); color: var(--color-text-secondary); font-size: .9rem; line-height: 1.55; }
+.planner-empty p { margin: 0; }
+.planner-switcher { max-width: 360px; }
+
+.planner-destination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+.planner-destination > div { flex: 1; min-width: 0; }
+.planner-destination__flag { font-size: 1.8rem; line-height: 1; }
+.planner-destination__name { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; }
+
+.planner-section { display: grid; gap: var(--space-3); min-width: 0; }
+.planner-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.planner-section__title { margin: 0; font-size: .95rem; font-weight: 700; }
+.planner-section__meta { color: var(--color-text-muted); font-size: .78rem; font-variant-numeric: tabular-nums; }
+
+.planner-summary {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+.planner-summary__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.planner-summary__label { display: block; color: var(--color-text-muted); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.planner-summary__value { display: block; margin-top: 2px; font-size: 1.02rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.planner-summary__value--over { color: var(--color-danger); }
+.planner-summary__split { margin: 0; color: var(--color-text-secondary); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.planner-summary .provenance { margin-top: 0; }
+.planner-meter { height: 8px; overflow: hidden; border-radius: 999px; background: var(--color-surface-raised); }
+.planner-meter span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); transition: width var(--motion-fast); }
+.planner-meter--over span { background: var(--color-danger); }
+
+.planner-lines { display: grid; gap: var(--space-2); }
+.planner-lines__empty { margin: 0; color: var(--color-text-muted); font-size: .82rem; }
+.planner-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.5fr) minmax(0, .9fr) minmax(0, 1fr) 36px;
+  gap: var(--space-2);
+  align-items: center;
+}
+.planner-line .form-field__control { height: 38px; padding: 0 var(--space-2); font-size: .82rem; }
+.planner-line__amount { text-align: right; font-variant-numeric: tabular-nums; }
+.planner-line__remove { width: 36px; height: 36px; }
+.planner-line__source { grid-column: 1 / -1; margin-top: -2px; }
+.planner-line-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.planner-hint { margin: 0; color: var(--color-text-muted); font-size: .76rem; line-height: 1.5; }
+
+.planner-footer { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--color-border-soft); }
+.planner-saved { margin: 0; color: var(--color-text-muted); font-size: .76rem; }
+.planner-saved--warning { color: var(--color-warning); font-weight: 600; }
+.planner-delete p { margin: 0 0 var(--space-2); color: var(--color-text-secondary); font-size: .82rem; }
+.planner-delete__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.planner-delete__confirm { border-color: color-mix(in srgb, var(--color-danger) 60%, var(--color-border)); color: var(--color-danger); }
+.planner-text-button { padding: 4px 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: .78rem; text-decoration: underline; cursor: pointer; }
+.planner-text-button:hover { color: var(--color-danger); }
+
+@media (max-width: 600px) {
+  .trips-launcher {
+    top: auto;
+    left: calc(104px + 6px);
+    min-width: 44px;
+    height: 44px;
+    padding: 0 10px;
+    border-left: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+  }
+  .trips-launcher .miles-launcher__label { display: none; }
+  .trips-launcher__count { margin-left: -4px; }
+  .planner-summary__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planner-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
+  .planner-line__note { grid-column: 1 / -1; grid-row: 1; }
+  .planner-line__category { grid-row: 2; }
+  .planner-line__amount { grid-row: 2; }
+  .planner-line__remove { grid-row: 2; }
+  .planner-line__status { grid-column: 1 / -1; grid-row: 3; }
+}
+@media (max-width: 360px) {
+  .explorer-counter__total { display: none; }
+}
