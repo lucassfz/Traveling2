@@ -34,3 +34,7 @@ mudança entra direto nele.
 | `npm run build:airports` | regenera `data/airports.json` a partir do CSV fixado | Sim |
 
 Requer Node.js 20 ou mais recente.
+
+O workflow `Airport data` regenera `data/airports.json` sempre que o arquivo ou o
+gerador mudam e falha se o resultado for diferente do arquivo versionado. Para
+atualizar a base, rode `npm run build:airports` e versione o arquivo gerado.
