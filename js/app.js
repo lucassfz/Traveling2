@@ -6,12 +6,9 @@ import {
   COUNTRIES,
   searchCountries
 } from './countries.dataset.js';
-import { MilesEngine } from './miles.engine.js';
 import { getCountryMedia } from './media.service.js';
 import { flagImageUrl, isVisaFreeForBrazil } from './country.exploration.js';
 import { entryPresentation } from './entry.presentation.js';
-import { discoveryCoverage } from './destination.discovery.js';
-import { DiscoveryUI } from './discovery.ui.js';
 import { checklistGroups, checklistProgress, hasSeasonalChecklist } from './checklist.engine.js';
 import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
@@ -19,6 +16,7 @@ import { brasiliaTimezoneNote } from './timezone.br.js';
 import { provenanceLabel } from './provenance.js';
 import { loadFxSnapshot, localPerBrl } from './fx.service.js';
 import { createFlightsTab } from './drawer/flights.tab.js';
+import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 
 const MONTHS = Object.freeze(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']);
 const elements = {
@@ -128,7 +126,6 @@ const state = {
 };
 
 const airportRepository = new AirportRepository();
-const discoveryKeys = discoveryCoverage(COUNTRIES).countryKeys;
 const {
   resolveDestinationAirport,
   primeDestinationAirport,
@@ -141,7 +138,7 @@ const {
   calculateRoute,
   openMilesForRoute,
   fetchExchangeRate,
-} = createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen });
+} = createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen, ensureMilesEngine });
 
 function savePersistentState() {
   writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
@@ -274,9 +271,20 @@ function switchTab(tabName) {
     panel.hidden = !active;
     panel.setAttribute('aria-labelledby', `country-tab-button-${panel.dataset.tabPanel}`);
   }
+  if (tabName === 'history') ensureHistoryLoaded();
   if (tabName === 'flights') {
     airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
   }
+}
+
+function ensureHistoryLoaded() {
+  return loadHistoryCatalog().then(() => {
+    if (state.countryKey) renderCountryHistory(state.countryKey, COUNTRIES[state.countryKey]);
+  }).catch(() => {
+    if (state.countryKey && !historyCatalogIfLoaded()) {
+      elements.historyCopy.innerHTML = '<p class="body-copy">Não foi possível carregar o panorama histórico. Verifique a conexão e abra a aba novamente.</p>';
+    }
+  });
 }
 
 function clearMedia() {
@@ -477,9 +485,18 @@ function renderCulture(country) {
   elements.vibe.innerHTML = (country.vibe ?? []).map(value => `<span class="tag">${escapeHtml(value)}</span>`).join('');
 }
 
-function renderCountryHistory(country) {
-  if (Array.isArray(country.history) && country.history.length) {
-    elements.historyCopy.innerHTML = country.history.map(item => `
+// A História vem de js/history.loader.js. Até carregar, a aba mostra um aviso;
+// o carregamento começa quando a aba abre (ou antes, com o navegador ocioso).
+function renderCountryHistory(countryKey, country) {
+  const catalog = historyCatalogIfLoaded();
+  if (!catalog) {
+    elements.historyCopy.innerHTML = '<p class="body-copy">Carregando panorama histórico…</p>';
+    if (state.tab === 'history') ensureHistoryLoaded();
+    return;
+  }
+  const history = catalog[countryKey] ?? country.history;
+  if (Array.isArray(history) && history.length) {
+    elements.historyCopy.innerHTML = history.map(item => `
       <article class="history-item">
         <span class="history-item__icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
         <div>
@@ -490,8 +507,8 @@ function renderCountryHistory(country) {
     `).join('');
     return;
   }
-  const legacy = typeof country.history === 'string' && country.history.trim()
-    ? country.history
+  const legacy = typeof history === 'string' && history.trim()
+    ? history
     : 'Panorama histórico ainda em curadoria para este país.';
   elements.historyCopy.innerHTML = `<p class="body-copy">${escapeHtml(legacy)}</p>`;
 }
@@ -550,7 +567,7 @@ function renderCountry(countryKey) {
   renderMonths(country);
   renderEntry(country);
   renderCulture(country);
-  renderCountryHistory(country);
+  renderCountryHistory(countryKey, country);
   renderChecklist(countryKey, country);
   elements.countryExploreStatus.textContent = '';
   primeDestinationAirport(countryKey);
@@ -576,7 +593,7 @@ function selectCountry(countryKey, { recordHistory = true } = {}) {
 function discoverDestination() {
   closeCountryPanel();
   setMilesOpen(false);
-  state.discovery.open();
+  ensureDiscovery().then(discovery => discovery.open()).catch(() => {});
 }
 
 function closeCountryPanel(restoreFocus = false) {
@@ -693,7 +710,10 @@ function showTooltip(countryKey, clientX, clientY) {
 }
 
 function setMilesOpen(open, restoreFocus = false) {
-  if (open) state.discovery?.close();
+  if (open) {
+    state.discovery?.close();
+    ensureMilesEngine().catch(() => {});
+  }
   if (open && window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
   elements.milesHub.classList.toggle('miles-hub--open', open);
   elements.milesHub.inert = !open;
@@ -934,35 +954,89 @@ function markInterfaceReady() {
   requestAnimationFrame(() => state.splash?.play());
 }
 
+// Descoberta sob demanda: perfis e interface (~22 KB) só carregam no primeiro
+// clique em "Descobrir destino" (ou com o navegador ocioso).
+let discoveryPromise = null;
+function ensureDiscovery() {
+  discoveryPromise ??= import('./discovery.ui.js').then(({ DiscoveryUI }) => {
+    state.discovery = new DiscoveryUI({
+      element: document.getElementById('discovery-panel'), trigger: elements.discoverButton, countries: COUNTRIES,
+      onHighlight: match => {
+        closeFlightPreview(false);
+        state.countryKey = match.countryKey;
+        state.continent = COUNTRIES[match.countryKey].continent;
+        state.destinationAirport = null;
+        state.map?.selectCountry(match.countryKey);
+        renderContinentState();
+      },
+      onExplore: (match, preferences) => {
+        elements.monthSelect.value = String(preferences.month);
+        elements.checklistMonthSelect.value = String(preferences.month);
+        selectCountry(match.countryKey);
+        elements.countryName.focus({ preventScroll: true });
+      },
+      onRoute: (match, button) => openFlightPreview({
+        countryKey: match.countryKey, airportCode: match.profile.airport, returnFocus: button,
+        isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'
+          && state.discovery.matches[state.discovery.index]?.profile.id === match.profile.id
+      }),
+      onClose: () => closeFlightPreview(false)
+    });
+    return state.discovery;
+  }).catch(error => {
+    discoveryPromise = null;
+    throw error;
+  });
+  return discoveryPromise;
+}
+
+// Hub de Milhas sob demanda (~18 KB e ~775 elementos de DOM). Até carregar,
+// um substituto guarda o contexto de rota e repassa as chamadas.
+let milesEnginePromise = null;
+let pendingMilesRoute = null;
+const milesPlaceholder = Object.freeze({
+  setRouteContext(origin, destination) { pendingMilesRoute = [origin, destination]; },
+  hasAirportGuide: () => false,
+  showAirport(code, tab) { ensureMilesEngine().then(engine => engine.showAirport(code, tab)).catch(() => {}); },
+  selectTab(key, focus) { ensureMilesEngine().then(engine => engine.selectTab(key, focus)).catch(() => {}); },
+  destroy() {}
+});
+
+function ensureMilesEngine() {
+  milesEnginePromise ??= import('./miles.engine.js').then(({ MilesEngine }) => {
+    const engine = new MilesEngine({
+      tabsElement: elements.milesTabs,
+      contentElement: elements.milesContent,
+      airportRepository
+    });
+    engine.mount();
+    if (pendingMilesRoute) engine.setRouteContext(...pendingMilesRoute);
+    state.milesEngine = engine;
+    return engine;
+  }).catch(error => {
+    milesEnginePromise = null;
+    throw error;
+  });
+  return milesEnginePromise;
+}
+
+// Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
+// executar a interface) os módulos sob demanda, para abrirem sem espera.
+function prefetchDeferredModules() {
+  const run = () => {
+    loadHistoryCatalog().catch(() => {});
+    import('./miles.engine.js').catch(() => {});
+    import('./discovery.ui.js').catch(() => {});
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 6000 });
+  else window.setTimeout(run, 4000);
+}
+
 function initialize() {
   initializeTheme();
-  elements.discoverButton.disabled = discoveryKeys.length === 0;
-  elements.discoverButton.title = discoveryKeys.length ? 'Encontrar um destino para sua viagem' : 'Nenhum perfil disponível';
+  elements.discoverButton.title = 'Encontrar um destino para sua viagem';
   elements.discoverButton.setAttribute('aria-controls', 'discovery-panel');
   elements.discoverButton.setAttribute('aria-expanded', 'false');
-  state.discovery = new DiscoveryUI({
-    element: document.getElementById('discovery-panel'), trigger: elements.discoverButton, countries: COUNTRIES,
-    onHighlight: match => {
-      closeFlightPreview(false);
-      state.countryKey = match.countryKey;
-      state.continent = COUNTRIES[match.countryKey].continent;
-      state.destinationAirport = null;
-      state.map?.selectCountry(match.countryKey);
-      renderContinentState();
-    },
-    onExplore: (match, preferences) => {
-      elements.monthSelect.value = String(preferences.month);
-      elements.checklistMonthSelect.value = String(preferences.month);
-      selectCountry(match.countryKey);
-      elements.countryName.focus({ preventScroll: true });
-    },
-    onRoute: (match, button) => openFlightPreview({
-      countryKey: match.countryKey, airportCode: match.profile.airport, returnFocus: button,
-      isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'
-        && state.discovery.matches[state.discovery.index]?.profile.id === match.profile.id
-    }),
-    onClose: () => closeFlightPreview(false)
-  });
   state.splash = new SplashEngine(elements.splash);
   state.starfield = new StarfieldEngine(elements.starfield);
   renderVisaFreeFilter();
@@ -972,13 +1046,9 @@ function initialize() {
   updateAirportSuggestions();
   bindUiEvents();
   watchGlobeInset();
-  state.milesEngine = new MilesEngine({
-    tabsElement: elements.milesTabs,
-    contentElement: elements.milesContent,
-    airportRepository
-  });
-  state.milesEngine.mount();
+  state.milesEngine = milesPlaceholder;
   markInterfaceReady();
+  prefetchDeferredModules();
   fetchExchangeRate();
   loadFxSnapshot().then(snapshot => {
     state.fxSnapshot = snapshot;

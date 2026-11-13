@@ -1,7 +1,12 @@
 # Traveling — GIS / Miles Architecture
 
 ## Modules
-- `js/app.js`: application state, UI orchestration, search, panels, flight form.
+- `js/app.js`: application state, UI orchestration, search, country drawer, and on-demand loading of the Miles hub, Discovery and History.
+- `js/core/storage.js`, `js/core/html.js`: shared localStorage helpers (with `STORAGE_KEYS`) and `escapeHtml`.
+- `js/drawer/flights.tab.js`: Flights tab (airports, route estimate, globe route preview, dollar rate); exports `estimateRoute` and `exchangeRateLabel` for reuse.
+- `js/provenance.js`: one label per money figure (verified, live, Traveling estimate, calculated, unverified).
+- `js/fx.service.js`: Banco Central do Brasil rates (PTAX API, then `data/fx-snapshot.json`).
+- `js/history.loader.js`: loads the four history datasets with `import()` when the History tab opens or the browser is idle; they are not part of `COUNTRIES`.
 - `js/map.engine.js`: Three.js globe, progressive world build, raycasting and camera.
 - `js/geospatial.js`: authoritative WGS84 spherical transforms, Haversine and PIP.
 - `js/countries.dataset.js`: 196-entry catalog (sovereign states plus Kosovo, Taiwan and French Guiana) + curated/regional enrichment.
@@ -44,6 +49,9 @@ Inverse:
 All country meshes, borders, markers, fly-to camera targets, and fallback PIP use these same functions.
 
 ## Loading behavior
+
+Startup loads the catalog, globe and drawer only. History (~160 KB), the Miles hub (~63 KB, plus its DOM) and Discovery (~60 KB) load with dynamic `import()` on first use, and are prefetched with `requestIdleCallback` once the interface is ready. Until the Miles hub loads, a placeholder keeps the latest route context. The globe renders on demand: `MapEngine.invalidate()` schedules frames only while something changes.
+
 The application UI no longer waits for the world atlas. The interface becomes interactive first, while the globe reports progressive status. Network fetches have timeouts. A classic-script boot guard hides the global loader after 8 seconds even if ES-module/CDN loading fails before `app.js` executes.
 
 ## Media verification
