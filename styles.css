@@ -2535,3 +2535,10 @@ body.route-mode .app-header__brand { pointer-events: none; }
 #planner-awards:empty { display: none; }
 #planner-awards { display: grid; gap: 2px; }
 #planner-awards .planner-hint { font-variant-numeric: tabular-nums; }
+.planner-prep__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.planner-prep__row > div { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; }
+.planner-prep__row strong { font-size: .88rem; }
+.planner-prep__status--success { color: var(--color-success); }
+.planner-prep__status--warning { color: var(--color-warning); }
+.planner-prep__status--danger { color: var(--color-danger); }
+.planner-subsection .provenance { margin-top: 0; }

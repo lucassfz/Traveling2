@@ -6,8 +6,8 @@ const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;
 
 // Owns only this compact panel. Country details, globe and flight remain in app.
 export class DiscoveryUI {
-  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onClose }) {
-    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onClose });
+  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose }) {
+    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose });
     this.preferences = { interests: [], climate: 'any', budget: 'any', month: new Date().getMonth(), visaFree: false };
     this.step = 1;
     this.matches = [];
@@ -85,6 +85,7 @@ export class DiscoveryUI {
         <div class="discovery-result-actions">
           <button class="primary-button" data-action="explore">Explorar ${escape(match.country.namePt)}</button>
           <button class="secondary-button" data-action="route">✈ Ver rota saindo de GRU</button>
+          ${this.onPlan ? '<button class="secondary-button" data-action="plan">＋ Planejar esta viagem</button>' : ''}
           <button class="discovery-text-button" data-action="another" ${this.matches.length < 2 ? 'disabled' : ''}>↻ Mostrar outro destino</button>
         </div>
         <p class="discovery-feedback" role="status"></p>
@@ -138,6 +139,11 @@ export class DiscoveryUI {
       this.onHighlight(this.matches[this.index]);
     }
     if (action === 'explore') { this.onExplore(this.matches[this.index], this.preferences); return; }
+    if (action === 'plan' && this.onPlan) {
+      const budgetCeiling = BUDGETS.find(band => band.id === this.preferences.budget)?.ceiling ?? Infinity;
+      this.onPlan(this.matches[this.index], { ...this.preferences, budgetCeiling });
+      return;
+    }
     if (action === 'route') {
       const version = this.version;
       const feedback = this.element.querySelector('.discovery-feedback');
