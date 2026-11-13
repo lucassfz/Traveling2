@@ -1,4 +1,5 @@
 const DEFAULT_PARTICLE_COUNT = 108;
+const FRAME_INTERVAL_MS = 66;
 
 function randomBetween(minimum, maximum) {
   return minimum + Math.random() * (maximum - minimum);
@@ -39,6 +40,8 @@ export class StarfieldEngine {
     if (!this.context) return;
     if (!this.isDark) {
       cancelAnimationFrame(this.frameId);
+      clearTimeout(this.frameTimer);
+      this.frameTimer = 0;
       this.frameId = 0;
       this.context.clearRect(0, 0, this.width || 0, this.height || 0);
       return;
@@ -70,12 +73,17 @@ export class StarfieldEngine {
   }
 
   #scheduleFrame() {
-    if (!this.isDark || this.destroyed || this.frameId) return;
+    if (!this.isDark || this.destroyed || this.frameId || this.frameTimer) return;
     if (this.prefersReducedMotion) {
       this.#draw(performance.now());
       return;
     }
-    this.frameId = requestAnimationFrame(timestamp => this.#render(timestamp));
+    // O cintilar tem ciclos de 6 a 18 s: ~15 quadros/s bastam e evitam acordar
+    // a página 60 vezes por segundo só para o fundo.
+    this.frameTimer = window.setTimeout(() => {
+      this.frameTimer = 0;
+      this.frameId = requestAnimationFrame(timestamp => this.#render(timestamp));
+    }, FRAME_INTERVAL_MS);
   }
 
   #render(timestamp) {
@@ -102,6 +110,8 @@ export class StarfieldEngine {
   destroy() {
     this.destroyed = true;
     cancelAnimationFrame(this.frameId);
+    clearTimeout(this.frameTimer);
+    this.frameTimer = 0;
     this.resizeObserver?.disconnect();
     this.reducedMotionQuery?.removeEventListener?.('change', this.onReducedMotionChange);
     this.context?.clearRect(0, 0, this.width || 0, this.height || 0);
