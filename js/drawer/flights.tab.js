@@ -38,8 +38,12 @@ export function exchangeRateLabel(fx) {
  * @param {object} ctx.airportRepository Instância de AirportRepository.
  * @param {object} ctx.countries         COUNTRIES.
  * @param {(open: boolean) => void} ctx.setMilesOpen
+ * @param {() => Promise<object>} ctx.ensureMilesEngine Carrega o hub de Milhas sob demanda.
  */
-export function createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen }) {
+export function createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen, ensureMilesEngine }) {
+  // Os botões de guia de aeroporto dependem dos dados do hub de Milhas.
+  const loadMiles = () => ensureMilesEngine().catch(() => null);
+
   const destinationAirportCache = new Map();
 
   async function resolveDestinationAirport(countryKey) {
@@ -151,6 +155,8 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       ]);
       if (requestId !== state.routeRequestId || !isCurrent()) return false;
       if (!origin || !destination) throw new Error('Aeroporto indisponível. Verifique sua conexão e tente novamente.');
+      const miles = await loadMiles();
+      if (requestId !== state.routeRequestId || !isCurrent()) return false;
       const route = buildFlightRoute(origin, destination);
       if (!state.map.startRoutePreview(route)) throw new Error('O globo 3D está indisponível.');
       const minutes = estimatedTravelMinutes(route.distanceKm);
@@ -162,7 +168,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       elements.flightPreviewDetails.textContent = `${Math.round(route.distanceKm).toLocaleString('pt-BR')} km · Tempo de viagem estimado: cerca de ${hours} h${remaining ? ` ${remaining} min` : ''}`;
       state.routePreviewActive = true;
       state.milesEngine?.setRouteContext(origin, destination);
-      const guideAirport = [origin, destination].find(airport => state.milesEngine?.hasAirportGuide(airport.iata));
+      const guideAirport = [origin, destination].find(airport => miles?.hasAirportGuide(airport.iata));
       elements.flightPreviewAirports.hidden = !guideAirport;
       elements.flightPreviewAirports.dataset.airportCode = guideAirport?.iata || '';
       if (guideAirport) elements.flightPreviewAirports.textContent = `Ver guia do aeroporto · ${guideAirport.iata}`;
@@ -284,7 +290,8 @@ export function createFlightsTab({ elements, state, airportRepository, countries
         ${exchangeRateLabel(state.brlPerUsd)}
         <p class="route-result__disclaimer">${escapeHtml(estimate.disclaimer)}</p>
       `;
-      const guideActions = [origin, destination].map((airport, index) => state.milesEngine?.hasAirportGuide(airport.iata)
+      const miles = await loadMiles();
+    const guideActions = [origin, destination].map((airport, index) => miles?.hasAirportGuide(airport.iata)
         ? `<button type="button" data-route-airport="${escapeHtml(airport.iata)}">Guia ${index ? 'do destino' : 'da origem'} · ${escapeHtml(airport.iata)}</button>` : '').join('');
       elements.routeAirportActions.hidden = false;
       elements.routeAirportActions.innerHTML = `${guideActions}<button type="button" data-route-redemption="true">Comparar com preço real</button>`;

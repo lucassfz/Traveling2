@@ -3,6 +3,7 @@ import { HISTORY_ENRICHMENT } from '../js/history.americas-europe.dataset.js';
 import { AFRICA_HISTORY } from '../js/history.africa.dataset.js';
 import { ASIA_HISTORY } from '../js/history.asia.dataset.js';
 import { OCEANIA_HISTORY } from '../js/history.oceania.dataset.js';
+import { loadHistoryCatalog } from '../js/history.loader.js';
 
 const datasets = [HISTORY_ENRICHMENT, AFRICA_HISTORY, ASIA_HISTORY, OCEANIA_HISTORY];
 const targetCodes = ['NA', 'SA', 'EU', 'AF', 'AS', 'OC'];
@@ -13,6 +14,7 @@ const usedText = new Map();
 const wordCounts = [];
 let blocks = 0;
 const allHistory = {};
+const loadedHistory = await loadHistoryCatalog();
 
 for (const dataset of datasets) {
   for (const [key, history] of Object.entries(dataset)) {
@@ -29,7 +31,7 @@ for (const [key, country] of target) {
     issues.push(`${key}: História ausente ou fora do intervalo de 3 a 5 blocos`);
     continue;
   }
-  if (country.history !== history) issues.push(`${key}: camada histórica não resolvida pelo catálogo`);
+  if (loadedHistory[key] !== history) issues.push(`${key}: camada histórica não resolvida pelo carregador`);
 
   const titles = new Set();
   let words = 0;
