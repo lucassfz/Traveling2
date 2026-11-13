@@ -1,0 +1,18 @@
+# Dependências e saídas de build
+node_modules/
+dist/
+.cache/
+
+# Logs e variáveis locais (nunca versionar chaves)
+*.log
+npm-debug.log*
+.env
+.env.*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configurações locais de ferramentas
+.claude/settings.local.json
