@@ -395,6 +395,13 @@ export class MapEngine {
     this.hotspotRecords = new Map();
     this.hotspotHitMeshes = [];
     this.disposed = false;
+    // Largura (px) coberta por um painel à direita do globo. O centro de
+    // projeção é deslocado para a área visível; o alvo da órbita continua sendo
+    // o centro do globo, então rotação, recorte do horizonte e picking não mudam.
+    this.viewInsetTarget = 0;
+    this.viewInsetCurrent = 0;
+    this.viewSize = { width: 1, height: 1 };
+    this.reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     // Equivalent to an orthographic clipAngle(89.9): anything on the rear
     // hemisphere is clipped before land/border fragments reach the framebuffer.
     this.horizonClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HORIZON_CLIP_EPSILON);
@@ -1132,13 +1139,52 @@ export class MapEngine {
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
     this.renderer.setSize(width, height, false);
+    this.viewSize = { width, height };
     this.camera.aspect = width / height;
+    this.#applyViewOffset();
+  }
+
+  // Mantém o país selecionado na parte visível do globo quando um painel cobre
+  // a lateral direita. `right` é a largura coberta, em px; 0 remove o ajuste.
+  setViewInset({ right = 0 } = {}) {
+    this.viewInsetTarget = Number.isFinite(right) ? Math.max(0, right) : 0;
+  }
+
+  // Sem ajuste durante a prévia de rota (o painel some) ou quando sobraria
+  // pouca área visível (o painel ocupa quase toda a tela).
+  #effectiveViewInset() {
+    const { width } = this.viewSize;
+    const inset = this.routePreview ? 0 : this.viewInsetTarget;
+    return inset > 0 && width - inset >= 240 ? inset : 0;
+  }
+
+  #applyViewOffset() {
+    const { width, height } = this.viewSize;
+    const shift = this.viewInsetCurrent / 2;
+    if (shift < 0.5) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(width, height, shift, 0, width, height);
     this.camera.updateProjectionMatrix();
+  }
+
+  #updateViewInset(timestamp) {
+    const target = this.#effectiveViewInset();
+    const last = this.viewInsetFrame ?? timestamp;
+    this.viewInsetFrame = timestamp;
+    if (this.reducedMotionQuery.matches || Math.abs(target - this.viewInsetCurrent) < 0.5) {
+      if (this.viewInsetCurrent === target) return;
+      this.viewInsetCurrent = target;
+    } else {
+      // Aproximação exponencial (~300 ms), acompanhando a abertura do painel.
+      const step = 1 - Math.exp(-Math.max(0, timestamp - last) / 90);
+      this.viewInsetCurrent += (target - this.viewInsetCurrent) * step;
+    }
+    this.#applyViewOffset();
   }
 
   #render(timestamp) {
     if (this.disposed) return;
     requestAnimationFrame(nextTimestamp => this.#render(nextTimestamp));
+    this.#updateViewInset(timestamp);
     this.#updateCameraFlight(timestamp);
     if (this.routePreview) {
       const progress = this.flightVisualization.update(timestamp);
