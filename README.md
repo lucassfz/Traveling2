@@ -11,10 +11,10 @@ Canonical requested modules:
 
 The Miles & Airports hub uses dated official-source records for cards, lounge ecosystems, airport lounges and airline upgrades. The Europe enrichment covers all 45 destinations classified as Europe; the shared entry rules live in `js/europe.entry.js`. Entry requirements can change and must be reconfirmed before travel. Landmark photos are static, attributed Wikimedia Commons selections. Destinations without verified photos show a neutral missing-image state rather than a generic fallback. See `DATA_SOURCES.md` for provenance and limitations.
 
-Read-only data audits (16 scripts, none of them rewrites data). They need Node.js 20+ and also run on every pull request through GitHub Actions (`.github/workflows/validate.yml`). See `CONTRIBUTING.md` for the branch and PR workflow.
+Read-only data audits (17 scripts, none of them rewrites data). They need Node.js 20+ and also run on every pull request through GitHub Actions (`.github/workflows/validate.yml`). See `CONTRIBUTING.md` for the branch and PR workflow.
 
 ```sh
-npm run validate          # the 13 offline audits below
+npm run validate          # the 14 offline audits below
 npm run validate:online   # the 3 network audits below
 
 # Offline
@@ -31,6 +31,7 @@ node scripts/validate-landmarks.js
 node scripts/validate-miles.js
 node scripts/validate-provenance.js
 node scripts/validate-fx.js
+node scripts/validate-planner.js
 
 # Need network (fetch the pinned CDN files)
 node scripts/validate-flight-route.js

@@ -5,7 +5,8 @@
 export const STORAGE_KEYS = Object.freeze({
   visited: 'traveling.visited',
   checklist: 'traveling.checklist',
-  theme: 'traveling.theme'
+  theme: 'traveling.theme',
+  trips: 'traveling.trips'
 });
 
 export function readStorage(key) {
