@@ -1,5 +1,6 @@
 import { BUDGETS, CLIMATES, DISCOVERY_MONTHS, INTERESTS, TRIP_REFERENCE } from './destination.profiles.js';
 import { formatTripRange, nextDiscoveryIndex, noMatchAdvice, rankDestinations } from './destination.discovery.js';
+import { provenanceLabel } from './provenance.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
@@ -73,7 +74,11 @@ export class DiscoveryUI {
       body = `<p class="discovery-region">${escape(match.profile.region)} · ${DISCOVERY_MONTHS[this.preferences.month]}</p>
         <small>${escape(match.matchSummary)}</small>
         <strong class="discovery-price">${formatTripRange(match.range)} <small>/ pessoa · 7 dias</small></strong>
-        <small>Faixa de planejamento, não cotação. Saída de GRU; conexões podem ser necessárias.</small>
+        ${provenanceLabel('estimate', {
+          date: match.profile.reviewedOn,
+          dateLabel: 'revisada em',
+          detail: 'faixa de planejamento, não cotação · saída de GRU; conexões podem ser necessárias'
+        })}
         <ul class="discovery-reasons">${match.reasons.slice(0, 2).map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>
         <small>${escape(match.reasons[3])}</small>
         <details><summary>Temporada, entrada e cuidados</summary><p>${escape(match.reasons[2])}</p>${match.reasons.slice(4).map(reason => `<p>${escape(reason)}</p>`).join('')}<p>${escape(match.profile.note)}</p><p>${escape(TRIP_REFERENCE)}</p></details>

@@ -29,7 +29,7 @@ mudança entra direto nele.
 
 | Comando | O que roda | Rede |
 | --- | --- | --- |
-| `npm run validate` | 11 auditorias de dados e conteúdo | Não |
+| `npm run validate` | 12 auditorias de dados, conteúdo e etiquetas | Não |
 | `npm run validate:online` | geografia do mapa, rota e visualização de voo (baixam arquivos fixados da CDN) | Sim |
 | `npm run build:airports` | regenera `data/airports.json` a partir do CSV fixado | Sim |
 
