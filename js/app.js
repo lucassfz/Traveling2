@@ -15,7 +15,8 @@ import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
 import { brasiliaTimezoneNote } from './timezone.br.js';
 import { buildFlightRoute, estimatedTravelMinutes } from './flight.route.js';
-import { formatProvenanceDate, provenanceLabel } from './provenance.js';
+import { provenanceLabel } from './provenance.js';
+import { loadFxSnapshot, localPerBrl, resolveUsdRate } from './fx.service.js';
 import {
   estimateFlightPricing,
   formatDistance,
@@ -138,8 +139,9 @@ const state = {
   history: [],
   historyActiveIndex: null,
   isVisaFreeBRFilterActive: false,
-  brlPerUsd: 5,
-  brlPerUsdInfo: null,
+  // { rate, date, kind, label, source } de js/fx.service.js, ou null.
+  brlPerUsd: null,
+  fxSnapshot: null,
   map: null,
   splash: null,
   starfield: null,
@@ -400,11 +402,31 @@ function updateCurrencyConverter() {
 
 function renderCurrencyConverter(country) {
   const converter = country.currencyConverter;
-  if (!converter || !Number.isFinite(converter.brlExchangeRate)) {
+  // Preferência: boletim de fechamento do BCB; a taxa editorial do dataset só
+  // aparece se o boletim ainda não carregou ou não tem a moeda.
+  const official = localPerBrl(state.fxSnapshot, converter?.targetCode);
+  if (!converter || !(official || Number.isFinite(converter.brlExchangeRate))) {
     elements.currencyConverter.innerHTML = '';
     return;
   }
-  const rate = converter.brlExchangeRate;
+  const rate = official ?? converter.brlExchangeRate;
+  const rateLabel = official
+    ? provenanceLabel('verified', {
+      label: 'Cotação de fechamento (BCB)',
+      date: state.fxSnapshot.date,
+      detail: 'taxa de venda; não inclui spread, IOF ou tarifas',
+      source: state.fxSnapshot.sourceUrl,
+      sourceText: 'Ver fonte',
+      className: 'currency-converter-card__note'
+    })
+    : provenanceLabel('verified', {
+      label: 'Taxa de referência',
+      date: converter.rateAsOf,
+      detail: 'não inclui spread, IOF ou tarifas',
+      source: converter.source,
+      sourceText: 'Ver fonte',
+      className: 'currency-converter-card__note'
+    });
   elements.currencyConverter.innerHTML = `
     <section class="currency-converter-card" data-rate="${escapeHtml(rate)}" data-currency-code="${escapeHtml(converter.targetCode || 'USD')}" data-currency-symbol="${escapeHtml(converter.targetSymbol || '')}">
       <header class="currency-converter-card__header">
@@ -425,14 +447,7 @@ function renderCurrencyConverter(country) {
           <output class="currency-converter-card__output" data-currency-output></output>
         </div>
       </div>
-      ${provenanceLabel('verified', {
-        label: 'Taxa de referência',
-        date: converter.rateAsOf,
-        detail: 'não inclui spread, IOF ou tarifas',
-        source: converter.source,
-        sourceText: 'Ver fonte',
-        className: 'currency-converter-card__note'
-      })}
+      ${rateLabel}
     </section>
   `;
   updateCurrencyConverter();
@@ -887,7 +902,7 @@ async function calculateRoute() {
       destination,
       cabin: elements.cabinSelect.value,
       month: Number(elements.monthSelect.value),
-      brlPerUsd: state.brlPerUsd
+      brlPerUsd: state.brlPerUsd?.rate ?? null
     });
 
     elements.routeResult.innerHTML = `
@@ -898,7 +913,9 @@ async function calculateRoute() {
         </article>
         <article class="route-result__card">
           <div class="route-result__label">Passagem · faixa estimada por trecho</div>
-          <div class="route-result__value">${escapeHtml(formatMoney(estimate.cash.brl.low))}–${escapeHtml(formatMoney(estimate.cash.brl.high))}</div>
+          <div class="route-result__value">${estimate.cash.brl
+            ? `${escapeHtml(formatMoney(estimate.cash.brl.low))}–${escapeHtml(formatMoney(estimate.cash.brl.high))}`
+            : `${escapeHtml(formatMoney(estimate.cash.usd.low, 'USD'))}–${escapeHtml(formatMoney(estimate.cash.usd.high, 'USD'))}`}</div>
         </article>
         <article class="route-result__card">
           <div class="route-result__label">Cabine</div>
@@ -914,9 +931,10 @@ async function calculateRoute() {
         `).join('')}
       </div>
       ${provenanceLabel('estimate', {
-        detail: `modelo por distância, mês e cabine · ${exchangeRateNote()}`,
+        detail: 'modelo por distância, mês e cabine',
         className: 'route-result__provenance'
       })}
+      ${exchangeRateLabel()}
       <p class="route-result__disclaimer">${escapeHtml(estimate.disclaimer)}</p>
     `;
     const guideActions = [origin, destination].map((airport, index) => state.milesEngine?.hasAirportGuide(airport.iata)
@@ -939,26 +957,21 @@ function openMilesForRoute(airportCode = null) {
   else state.milesEngine?.selectTab('overview');
 }
 
+// PTAX do Banco Central; se a API falhar, o boletim de fechamento versionado.
 async function fetchExchangeRate() {
-  try {
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', { cache: 'no-store' });
-    if (!response.ok) return;
-    const data = await response.json();
-    if (Number.isFinite(data?.rates?.BRL)) {
-      state.brlPerUsd = Number(data.rates.BRL);
-      state.brlPerUsdInfo = { source: 'ExchangeRate-API', date: typeof data.date === 'string' ? data.date : null };
-    }
-  } catch {
-    // The pricing engine intentionally keeps a conservative fallback when offline.
-  }
+  state.brlPerUsd = await resolveUsdRate();
 }
 
-// Câmbio usado na estimativa, sempre explícito — inclusive quando é o padrão.
-function exchangeRateNote() {
-  const rate = state.brlPerUsd.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-  const info = state.brlPerUsdInfo;
-  if (!info) return `câmbio padrão US$ 1 = R$ ${rate} (cotação indisponível)`;
-  return `câmbio US$ 1 = R$ ${rate} (${info.source}${info.date ? `, ${formatProvenanceDate(info.date)}` : ''})`;
+// Câmbio usado na estimativa, sempre explícito — inclusive quando falta.
+function exchangeRateLabel() {
+  const fx = state.brlPerUsd;
+  if (!fx) return provenanceLabel('unverified', { label: 'Câmbio indisponível', detail: 'valores mostrados em dólar' });
+  return provenanceLabel(fx.kind, {
+    label: fx.label,
+    date: fx.date,
+    detail: `US$ 1 = R$ ${fx.rate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} (venda)`,
+    source: fx.source
+  });
 }
 
 function showTooltip(countryKey, clientX, clientY) {
@@ -1262,6 +1275,10 @@ function initialize() {
   state.milesEngine.mount();
   markInterfaceReady();
   fetchExchangeRate();
+  loadFxSnapshot().then(snapshot => {
+    state.fxSnapshot = snapshot;
+    if (state.countryKey) renderCurrencyConverter(COUNTRIES[state.countryKey]);
+  }).catch(() => {});
   initializeMap();
   window.addEventListener('pagehide', () => {
     state.map?.destroy();

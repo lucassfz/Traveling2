@@ -93,6 +93,13 @@ Pontos de entrada ainda `needs-review` (31): Afeganistão, Bahrein, Bangladesh, 
 - Kosovo: [Ministério das Relações Exteriores — lista arquivada de nacionalidades isentas, incluindo Brasil](https://arkivi.mfa-ks.net/en/sherbimet_konsullore/504/shtetet-t-cilat-nuk-kane-nevoj-pr-viz/504.html) e [Ministério do Interior — orientação de janeiro de 2026](https://mpb.rks-gov.net/f/57/11006/INFORMATION-FOR-FOREIGN-CITIZENS-ENTERING-THE-REPUBLIC-OF-KOSOVO). O limite geral de visita curta é 90 dias em 180, com comunicação do endereço em três dias. A isenção brasileira permanece `needs-review` antes do embarque porque a lista nominal disponível é arquivada. Kosovo não participa de Schengen, EES ou ETIAS. `XK` é um código operacional amplamente usado para a bandeira, não um ISO 3166-1 alfa-2 formal.
 - Américas: as dicas mensais de checklist são orientação editorial de preparação, não previsão meteorológica. A [climatologia do National Hurricane Center](https://www.nhc.noaa.gov/climo/) sustenta o alerta de temporada de furacões no Atlântico/Caribe (junho–novembro) e Pacífico oriental (meados de maio–novembro); o [SENAMHI do Peru](https://www.senamhi.gob.pe/load/file/01401SENA-34.pdf) descreve chuvas mais fortes na serra e selva entre dezembro e março. Consulte serviços meteorológicos e operadores locais perto da viagem.
 
+## Câmbio
+
+- Fonte única: Banco Central do Brasil. Estimativas de voo usam a [PTAX](https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes) do dólar (taxa de venda do último boletim de fechamento), consultada pela API Olinda do BCB e guardada durante a sessão.
+- Reserva e conversor: `data/fx-snapshot.json`, boletim de fechamento PTAX com 156 moedas (taxas de compra e venda em reais), gerado por `npm run build:fx`. A data do boletim aparece junto de cada valor.
+- Não há taxa fixa no código. Sem nenhuma cotação, a aba Voos mostra os valores em dólar e avisa que o câmbio está indisponível.
+- As taxas são de referência: não incluem spread bancário, IOF ou tarifas de cartão e casas de câmbio.
+
 ## Marcos e mídia
 
 Identidade e localização: [Wikidata](https://www.wikidata.org/). Arquivo, autoria e licença: [Wikimedia Commons](https://commons.wikimedia.org/). Cada mídia curada guarda a página específica de seu arquivo em `js/landmarks.media.js`; o drawer a expõe como crédito clicável. Os novos arquivos americanos usam o redirecionamento oficial `Special:FilePath` com largura de 960 px e título verificado; não há busca externa por assunto em tempo de execução. Os marcos legados sem identidade verificada ficam sem mídia e com `status: needs-review`.

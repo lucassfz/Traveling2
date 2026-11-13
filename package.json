@@ -6,8 +6,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "validate": "node scripts/validate-africa.js && node scripts/validate-americas-seasonal.js && node scripts/validate-asia-oceania.js && node scripts/validate-content.js && node scripts/validate-discovery.js && node scripts/validate-entry-presentation.js && node scripts/validate-europe.js && node scripts/validate-exploration.js && node scripts/validate-history.js && node scripts/validate-landmarks.js && node scripts/validate-miles.js && node scripts/validate-provenance.js",
+    "validate": "node scripts/validate-africa.js && node scripts/validate-americas-seasonal.js && node scripts/validate-asia-oceania.js && node scripts/validate-content.js && node scripts/validate-discovery.js && node scripts/validate-entry-presentation.js && node scripts/validate-europe.js && node scripts/validate-exploration.js && node scripts/validate-history.js && node scripts/validate-landmarks.js && node scripts/validate-miles.js && node scripts/validate-provenance.js && node scripts/validate-fx.js",
     "validate:online": "node scripts/validate-flight-route.js && node scripts/validate-map-geography.js && node scripts/validate-flight-visualization.js",
-    "build:airports": "node scripts/build-airports.js"
+    "build:airports": "node scripts/build-airports.js",
+    "build:fx": "node scripts/build-fx.js"
   }
 }

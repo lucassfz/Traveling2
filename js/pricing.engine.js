@@ -52,7 +52,9 @@ export function estimateFlightPricing({
   destination,
   cabin = 'economy',
   month = new Date().getMonth(),
-  brlPerUsd = 5
+  // Reais por dólar (PTAX do BCB). Sem cotação válida, os valores em reais não
+  // são calculados: nenhuma taxa fixa é inventada aqui.
+  brlPerUsd = null
 }) {
   if (!origin || !destination) throw new Error('Origem e destino são obrigatórios.');
   const cabinConfig = CABIN_FACTORS[cabin] ?? CABIN_FACTORS.economy;
@@ -62,7 +64,7 @@ export function estimateFlightPricing({
   const baseCash = cashBaseUsd(distanceKm) * season * cabinConfig.cash;
   const usdLow = roundTo(clamp(baseCash * 0.78, 45, 12_000), 5);
   const usdHigh = roundTo(clamp(baseCash * 1.38, usdLow + 20, 20_000), 5);
-  const exchange = Number.isFinite(Number(brlPerUsd)) && Number(brlPerUsd) > 0 ? Number(brlPerUsd) : 5;
+  const exchange = brlPerUsd !== null && Number.isFinite(Number(brlPerUsd)) && Number(brlPerUsd) > 0 ? Number(brlPerUsd) : null;
 
   const baseAward = awardBaseMiles(distanceKm) * season * cabinConfig.award;
   const awards = Object.fromEntries(Object.entries(PROGRAM_FACTORS).map(([program, factor]) => {
@@ -74,9 +76,8 @@ export function estimateFlightPricing({
   }));
 
   const benchmarkMiles = awards['LATAM Pass'];
-  const averageCashBrl = ((usdLow + usdHigh) / 2) * exchange;
   const averageMiles = (benchmarkMiles.low + benchmarkMiles.high) / 2;
-  const centsPerMileBrl = averageMiles > 0 ? averageCashBrl / averageMiles : 0;
+  const centsPerMileBrl = exchange && averageMiles > 0 ? ((usdLow + usdHigh) / 2) * exchange / averageMiles : null;
 
   return {
     distanceKm,
@@ -84,10 +85,10 @@ export function estimateFlightPricing({
     seasonMultiplier: season,
     cash: {
       usd: { low: usdLow, high: usdHigh },
-      brl: {
+      brl: exchange ? {
         low: roundTo(usdLow * exchange, 10),
         high: roundTo(usdHigh * exchange, 10)
-      }
+      } : null
     },
     awards,
     benchmarkValueBrlPerMile: centsPerMileBrl,
