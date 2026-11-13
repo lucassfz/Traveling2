@@ -1,3 +1,21 @@
+const SEEN_KEY = 'traveling.splash.seen';
+
+function readSeen() {
+  try {
+    return sessionStorage.getItem(SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markSeen() {
+  try {
+    sessionStorage.setItem(SEEN_KEY, '1');
+  } catch {
+    // Sem armazenamento: a animação volta a tocar, como antes.
+  }
+}
+
 /**
  * Small state machine for the SVG flight opener.
  * It does not wait for remote map assets: the dashboard remains usable if the
@@ -17,6 +35,14 @@ export class SplashEngine {
 
   play() {
     if (!this.root || this.state !== 'idle') return;
+    // A animação completa roda uma vez por sessão do navegador; nas próximas
+    // aberturas a tela de abertura só esmaece assim que o app está pronto.
+    if (readSeen()) {
+      this.state = 'flying';
+      this.exit();
+      return;
+    }
+    markSeen();
     this.state = 'flying';
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     if (!prefersReducedMotion) {

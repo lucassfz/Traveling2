@@ -540,7 +540,9 @@ export class MapEngine {
     this.resize();
     if (!this.renderStarted) {
       this.renderStarted = true;
-      requestAnimationFrame(timestamp => this.#render(timestamp));
+      this.controls.addEventListener('start', () => this.invalidate());
+      this.controls.addEventListener('change', () => this.invalidate());
+      this.invalidate();
     }
     this.callbacks.onProgress?.('Carregando geometria mundial…');
     const [topology, topojson] = await Promise.all([
@@ -654,6 +656,7 @@ export class MapEngine {
 
       if (index % 16 === 0) {
         this.callbacks.onProgress?.(`Construindo mapa… ${Math.round((index / Math.max(1, parts.length - 1)) * 100)}%`);
+        this.invalidate();
         await new Promise(resolve => requestAnimationFrame(resolve));
       }
     }
@@ -873,6 +876,7 @@ export class MapEngine {
   }
 
   #updateCountryMaterial(countryKey) {
+    this.invalidate();
     const record = this.countryRecords.get(countryKey);
     if (!record) {
       this.#updateHotspotMaterial(countryKey);
@@ -945,6 +949,7 @@ export class MapEngine {
   }
 
   #updateHotspotMaterial(countryKey) {
+    this.invalidate();
     const record = this.hotspotRecords.get(countryKey);
     if (!record) return;
     const state = this.#countryState(countryKey);
@@ -1005,6 +1010,7 @@ export class MapEngine {
   }
 
   flyTo(latitude, longitude, distance = 2.05, duration = 850) {
+    this.invalidate();
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       this.cameraFlight = null;
       this.controls.enabled = true;
@@ -1064,6 +1070,7 @@ export class MapEngine {
   }
 
   setTheme() {
+    this.invalidate();
     const theme = document.documentElement.dataset.theme || 'dark';
     const dark = theme === 'dark';
     this.oceanMaterial.color.copy(colorToken('--color-ocean'));
@@ -1093,6 +1100,7 @@ export class MapEngine {
   }
 
   startRoutePreview(route) {
+    this.invalidate();
     if (!this.ready || this.disposed) return false;
     this.stopRoutePreview(false);
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1121,6 +1129,7 @@ export class MapEngine {
   }
 
   stopRoutePreview(restoreCamera = true) {
+    this.invalidate();
     if (!this.routePreview) return;
     const savedCamera = this.routePreview.savedCamera;
     const savedSelection = this.routePreview.savedSelection;
@@ -1135,6 +1144,7 @@ export class MapEngine {
   }
 
   resize() {
+    this.invalidate();
     const rect = this.stage.getBoundingClientRect();
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
@@ -1148,6 +1158,7 @@ export class MapEngine {
   // a lateral direita. `right` é a largura coberta, em px; 0 remove o ajuste.
   setViewInset({ right = 0 } = {}) {
     this.viewInsetTarget = Number.isFinite(right) ? Math.max(0, right) : 0;
+    this.invalidate();
   }
 
   // Sem ajuste durante a prévia de rota (o painel some) ou quando sobraria
@@ -1171,7 +1182,7 @@ export class MapEngine {
     const last = this.viewInsetFrame ?? timestamp;
     this.viewInsetFrame = timestamp;
     if (this.reducedMotionQuery.matches || Math.abs(target - this.viewInsetCurrent) < 0.5) {
-      if (this.viewInsetCurrent === target) return;
+      if (this.viewInsetCurrent === target) return false;
       this.viewInsetCurrent = target;
     } else {
       // Aproximação exponencial (~300 ms), acompanhando a abertura do painel.
@@ -1179,13 +1190,30 @@ export class MapEngine {
       this.viewInsetCurrent += (target - this.viewInsetCurrent) * step;
     }
     this.#applyViewOffset();
+    return this.viewInsetCurrent !== target;
+  }
+
+  // Renderização sob demanda: um quadro só é desenhado quando algo muda
+  // (interação, voo de câmera, prévia de rota, material, tema, tamanho). Com o
+  // globo parado, nenhum requestAnimationFrame fica agendado.
+  invalidate(frames = 2) {
+    this.pendingFrames = Math.max(this.pendingFrames ?? 0, frames);
+    this.#requestFrame();
+  }
+
+  #requestFrame() {
+    if (this.frameScheduled || this.disposed || !this.renderStarted) return;
+    this.frameScheduled = true;
+    requestAnimationFrame(timestamp => this.#render(timestamp));
   }
 
   #render(timestamp) {
+    this.frameScheduled = false;
     if (this.disposed) return;
-    requestAnimationFrame(nextTimestamp => this.#render(nextTimestamp));
-    this.#updateViewInset(timestamp);
+    let animating = this.#updateViewInset(timestamp);
+    if (this.cameraFlight) animating = true;
     this.#updateCameraFlight(timestamp);
+    if (this.routePreview) animating = true;
     if (this.routePreview) {
       const progress = this.flightVisualization.update(timestamp);
       const preview = this.routePreview;
@@ -1199,9 +1227,11 @@ export class MapEngine {
         preview.arrivalReported = true;
         this.callbacks.onRouteArrived?.();
       }
-    } else if (!this.cameraFlight) this.controls.update();
+    } else if (!this.cameraFlight && this.controls.update()) animating = true; // amortecimento ainda girando
     this.#updateHorizonClip();
     this.renderer.render(this.scene, this.camera);
+    this.pendingFrames = Math.max(0, (this.pendingFrames ?? 0) - 1);
+    if (animating || this.pendingFrames > 0) this.#requestFrame();
   }
 
   destroy() {
