@@ -44,6 +44,10 @@ const elements = {
   panelClose: document.getElementById('country-panel-close'),
   path: document.getElementById('country-path'),
   visitButton: document.getElementById('visit-button'),
+  wishlistButton: document.getElementById('wishlist-button'),
+  wishlistToggle: document.getElementById('wishlist-toggle'),
+  wishlistCount: document.getElementById('wishlist-count'),
+  wishlistPanel: document.getElementById('wishlist-panel'),
   countryFlag: document.getElementById('country-flag'),
   countryRegion: document.getElementById('country-region'),
   countryName: document.getElementById('country-name'),
@@ -108,6 +112,7 @@ const state = {
   continent: null,
   tab: 'overview',
   visited: new Set(readJsonStorage(STORAGE_KEYS.visited, [])),
+  wishlist: new Set(readJsonStorage(STORAGE_KEYS.wishlist, [])),
   checklist: readJsonStorage(STORAGE_KEYS.checklist, {}),
   history: [],
   historyActiveIndex: null,
@@ -152,7 +157,70 @@ const {
 
 function savePersistentState() {
   writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
+  writeJsonStorage(STORAGE_KEYS.wishlist, [...state.wishlist]);
   writeJsonStorage(STORAGE_KEYS.checklist, state.checklist);
+}
+
+function renderWishlistButton() {
+  const saved = state.wishlist.has(state.countryKey);
+  elements.wishlistButton.classList.toggle('wishlist-button--active', saved);
+  elements.wishlistButton.setAttribute('aria-pressed', String(saved));
+  elements.wishlistButton.textContent = saved ? '★ Na lista' : '☆ Quero ir';
+}
+
+function renderWishlistCount() {
+  elements.wishlistCount.textContent = String(state.wishlist.size);
+  if (!elements.wishlistPanel.hidden) renderWishlistPanel();
+}
+
+function toggleWishlist() {
+  if (!state.countryKey) return;
+  if (state.wishlist.has(state.countryKey)) state.wishlist.delete(state.countryKey);
+  else state.wishlist.add(state.countryKey);
+  savePersistentState();
+  renderWishlistButton();
+  renderWishlistCount();
+}
+
+const brl = value => `R$ ${value.toLocaleString('pt-BR')}`;
+
+async function renderWishlistPanel() {
+  const panel = elements.wishlistPanel;
+  const keys = [...state.wishlist].filter(key => COUNTRIES[key]);
+  if (!keys.length) {
+    panel.innerHTML = '<p class="wishlist-panel__empty">Sua lista está vazia. Abra um país e toque em “☆ Quero ir”.</p>';
+    return;
+  }
+  let estimate = null;
+  try {
+    const { wishlistEstimate } = await import('./wishlist.js');
+    estimate = wishlistEstimate(keys);
+  } catch (error) {
+    console.warn('Traveling: estimativas da lista indisponíveis.', error);
+  }
+  const ranges = new Map(estimate?.items.map(item => [item.countryKey, item]) ?? []);
+  const rows = keys.map(key => {
+    const item = ranges.get(key);
+    const cost = item?.range ? `${brl(item.range.min)}–${brl(item.range.max)}` : 'sem estimativa';
+    return `<li class="wishlist-panel__item">
+      <button type="button" class="wishlist-panel__open" data-wishlist-open="${escapeHtml(key)}">
+        <strong>${escapeHtml(COUNTRIES[key].namePt)}</strong>
+        <span>${escapeHtml(item?.region ? `${item.region} · ${cost}` : cost)}</span>
+      </button>
+      <button type="button" class="wishlist-panel__remove" data-wishlist-remove="${escapeHtml(key)}" aria-label="Remover ${escapeHtml(COUNTRIES[key].namePt)} da lista">✕</button>
+    </li>`;
+  }).join('');
+  const total = estimate?.total
+    ? `<p class="wishlist-panel__total">Total estimado: <strong>${brl(estimate.total.min)}–${brl(estimate.total.max)}</strong>${estimate.unpriced ? ` <span>(${estimate.unpriced} sem estimativa)</span>` : ''}</p>`
+    : '';
+  panel.innerHTML = `<ul class="wishlist-panel__list">${rows}</ul>${total}
+    <p class="wishlist-panel__note">Por destino: 1 pessoa, 7 dias, saída de GRU, fora da alta temporada. Estimativa editorial, não cotação.</p>`;
+}
+
+function setWishlistOpen(open) {
+  elements.wishlistPanel.hidden = !open;
+  elements.wishlistToggle.setAttribute('aria-expanded', String(open));
+  if (open) renderWishlistPanel();
 }
 
 function setTheme(theme) {
@@ -570,6 +638,7 @@ function renderCountry(countryKey) {
   elements.path.textContent = `Mundo › ${country.region || CONTINENT_LABELS[country.continent]} › ${country.namePt}`;
   elements.visitButton.classList.toggle('visit-button--active', state.visited.has(countryKey));
   elements.visitButton.textContent = state.visited.has(countryKey) ? '✓ Visitado' : 'Marcar visitado';
+  renderWishlistButton();
 
   renderMedia(countryKey, country);
   renderBasics(country);
@@ -822,6 +891,30 @@ function bindUiEvents() {
 
   elements.panelClose.addEventListener('click', () => closeCountryPanel(true));
   elements.visitButton.addEventListener('click', toggleVisited);
+  elements.wishlistButton.addEventListener('click', toggleWishlist);
+  elements.wishlistToggle.addEventListener('click', event => {
+    event.stopPropagation();
+    setWishlistOpen(elements.wishlistPanel.hidden);
+  });
+  elements.wishlistPanel.addEventListener('click', event => {
+    event.stopPropagation();
+    const remove = event.target.closest('[data-wishlist-remove]');
+    if (remove) {
+      state.wishlist.delete(remove.dataset.wishlistRemove);
+      savePersistentState();
+      renderWishlistCount();
+      if (state.countryKey) renderWishlistButton();
+      return;
+    }
+    const open = event.target.closest('[data-wishlist-open]');
+    if (open) {
+      setWishlistOpen(false);
+      selectCountry(open.dataset.wishlistOpen);
+    }
+  });
+  document.addEventListener('click', () => {
+    if (!elements.wishlistPanel.hidden) setWishlistOpen(false);
+  });
   elements.countryExploreButton.addEventListener('click', exploreDestination);
   elements.countryPlanButton.addEventListener('click', () => planTrip(state.countryKey));
   elements.tripsLauncher.addEventListener('click', () => setPlannerOpen(!isPlannerOpen()));
@@ -904,6 +997,11 @@ function bindUiEvents() {
 
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
+    if (!elements.wishlistPanel.hidden) {
+      setWishlistOpen(false);
+      elements.wishlistToggle.focus();
+      return;
+    }
     if (state.routePreviewActive) {
       closeFlightPreview(true, true);
       return;
@@ -1140,6 +1238,7 @@ function initialize() {
   state.starfield = new StarfieldEngine(elements.starfield);
   renderVisaFreeFilter();
   renderVisitedCount();
+  renderWishlistCount();
   populateMonthSelect();
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   updateAirportSuggestions();

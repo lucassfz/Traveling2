@@ -2542,3 +2542,53 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-prep__status--warning { color: var(--color-warning); }
 .planner-prep__status--danger { color: var(--color-danger); }
 .planner-subsection .provenance { margin-top: 0; }
+/* Lista "Quero ir" */
+.wishlist { position: relative; }
+.wishlist__toggle { cursor: pointer; font: inherit; font-size: .75rem; }
+.wishlist-button--active { border-color: var(--color-warning); color: var(--color-warning); }
+.wishlist-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text-secondary);
+  font-size: .8rem;
+}
+.wishlist-panel[hidden] { display: none; }
+.wishlist-panel__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.wishlist-panel__item { display: flex; align-items: center; gap: 4px; }
+.wishlist-panel__open {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wishlist-panel__open strong { color: var(--color-text-primary, inherit); }
+.wishlist-panel__open span { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.wishlist-panel__open:hover,
+.wishlist-panel__remove:hover { background: var(--color-surface-hover); }
+.wishlist-panel__remove {
+  width: 28px; height: 28px;
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--color-text-muted);
+  cursor: pointer;
+}
+.wishlist-panel__total { margin: var(--space-3) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--color-border-soft); }
+.wishlist-panel__total strong { color: var(--color-accent-strong); }
+.wishlist-panel__note, .wishlist-panel__empty { margin: var(--space-2, 8px) 0 0; color: var(--color-text-muted); font-size: .72rem; }

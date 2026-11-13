@@ -4,6 +4,7 @@
 // Chaves usadas pelo app. Novas chaves entram aqui para evitar colisões.
 export const STORAGE_KEYS = Object.freeze({
   visited: 'traveling.visited',
+  wishlist: 'traveling.wishlist',
   checklist: 'traveling.checklist',
   theme: 'traveling.theme',
   trips: 'traveling.trips'

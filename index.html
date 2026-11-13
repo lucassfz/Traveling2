@@ -58,6 +58,15 @@
         <span class="explorer-counter__total" id="visited-total">/ 0</span>
       </div>
 
+      <div class="wishlist">
+        <button class="explorer-counter wishlist__toggle" id="wishlist-toggle" type="button" aria-expanded="false" aria-controls="wishlist-panel" aria-label="Abrir lista Quero ir">
+          <span aria-hidden="true">⭐</span>
+          <span class="explorer-counter__label">Quero ir</span>
+          <strong class="explorer-counter__value" id="wishlist-count">0</strong>
+        </button>
+        <div class="wishlist-panel" id="wishlist-panel" role="region" aria-label="Lista Quero ir" hidden></div>
+      </div>
+
       <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
         <span class="visa-filter__flag" aria-hidden="true">🇧🇷</span>
         <span class="visa-filter__label">Isento de visto</span>
@@ -153,6 +162,7 @@
       <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel">✕</button>
       <div class="country-panel__path" id="country-path">Mundo</div>
       <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
+      <button class="visit-button wishlist-button" id="wishlist-button" type="button" aria-pressed="false">☆ Quero ir</button>
     </header>
 
     <div class="country-panel__identity">
