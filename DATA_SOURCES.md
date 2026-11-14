@@ -105,3 +105,9 @@ Pontos de entrada ainda `needs-review` (31): Afeganistão, Bahrein, Bangladesh, 
 Identidade e localização: [Wikidata](https://www.wikidata.org/). Arquivo, autoria e licença: [Wikimedia Commons](https://commons.wikimedia.org/). Cada mídia curada guarda a página específica de seu arquivo em `js/landmarks.media.js`; o drawer a expõe como crédito clicável. Os novos arquivos americanos usam o redirecionamento oficial `Special:FilePath` com largura de 960 px e título verificado; não há busca externa por assunto em tempo de execução. Os marcos legados sem identidade verificada ficam sem mídia e com `status: needs-review`.
 
 Cobertura atual (`node scripts/validate-landmarks.js`, 12/11/2026): 219 marcos no catálogo, dos quais 198 têm identidade verificada e mídia curada; todos os 196 destinos têm ao menos uma imagem verificada, incluindo os 36 americanos (35 países soberanos e a Guiana Francesa). A meta preferencial de 2–3 marcos por destino e a auditoria geográfica integral dos 21 marcos legados em `needs-review` ainda não foram alcançadas. Não foram inventadas imagens ou coordenadas para completar a meta.
+
+## Divisões geográficas (estados e cidades)
+
+Cada país com divisões tem um arquivo `data/geo/<ISO2>.json`, carregado só quando a pessoa entra no país (`js/geo/geo.repository.js`). O arquivo guarda apenas fatos verificáveis — nome, código oficial, tipo, macrorregião, capital e, para lugares, coordenadas — e lista as próprias fontes com licença e data de consulta. Texto editorial (o que fazer, quando ir) não entra nesses arquivos. `npm run validate` confere o formato com `scripts/validate-geo.js`.
+
+- Brasil (`data/geo/BR.json`): 26 estados e o Distrito Federal, com código, nome e macrorregião da [API de Localidades do IBGE](https://servicodados.ibge.gov.br/api/docs/localidades), consultada em 14/11/2026. As capitais foram ligadas ao código de município do IBGE na mesma API. Cidades e coordenadas ainda não foram incluídas.

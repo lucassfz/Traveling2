@@ -29,7 +29,7 @@ mudança entra direto nele.
 
 | Comando | O que roda | Rede |
 | --- | --- | --- |
-| `npm run validate` | 14 auditorias de dados, conteúdo, etiquetas, câmbio e planejador | Não |
+| `npm run validate` | 15 auditorias de dados, conteúdo, etiquetas, câmbio, planejador e divisões geográficas | Não |
 | `npm run validate:online` | geografia do mapa, rota e visualização de voo (baixam arquivos fixados da CDN) | Sim |
 | `npm run build:airports` | regenera `data/airports.json` a partir do CSV fixado | Sim |
 | `npm run build:fx` | atualiza `data/fx-snapshot.json` com o boletim de fechamento do Banco Central | Sim |
