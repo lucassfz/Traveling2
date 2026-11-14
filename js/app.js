@@ -14,7 +14,7 @@ import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
 import { brasiliaTimezoneNote } from './timezone.br.js';
 import { provenanceLabel } from './provenance.js';
-import { loadFxSnapshot, localPerBrl } from './fx.service.js';
+import { loadFxSnapshot, localPerBrl, resolveCurrencyRate } from './fx.service.js';
 import { createFlightsTab } from './drawer/flights.tab.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 import { createTripStore } from './planner/trip.store.js';
@@ -112,6 +112,8 @@ const state = {
   // { rate, date, kind, label, source } de js/fx.service.js, ou null.
   brlPerUsd: null,
   fxSnapshot: null,
+  // Cotações PTAX do dia pedidas pelo Planner (código → resultado de fx.service.js).
+  liveRates: {},
   map: null,
   splash: null,
   starfield: null,
@@ -1023,13 +1025,29 @@ function ensureMilesEngine() {
 // Planejador (Planner v0). O armazenamento é carregado na abertura do app
 // (para o contador do botão); a interface só quando o painel abre.
 let plannerPromise = null;
+// Cotações do Planner: boletim de fechamento + PTAX do dia (dólar e as moedas
+// pedidas pelas viagens). Ao chegar uma cotação, o Planner recalcula o orçamento.
+const plannerRateRequests = new Map();
+function ensurePlannerRate(code) {
+  if (!/^[A-Z]{3}$/.test(code ?? '') || code === 'BRL' || code === 'USD' || plannerRateRequests.has(code)) return;
+  plannerRateRequests.set(code, resolveCurrencyRate(code).then(rate => {
+    if (rate) state.liveRates[code] = rate;
+    else plannerRateRequests.delete(code);
+    state.planner?.refresh();
+  }).catch(() => plannerRateRequests.delete(code)));
+}
+
 function ensurePlanner() {
   plannerPromise ??= Promise.all([
     import('./planner/planner.ui.js'),
     import('./planner/flight.section.js'),
-    import('./planner/prep.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }]) => {
+    import('./planner/prep.section.js'),
+    import('./planner/currency.js')
+  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }]) => {
+    const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
     state.planner = new PlannerUI({
+      getRates,
+      ensureRate: ensurePlannerRate,
       element: elements.plannerContent,
       store: tripStore,
       countries: COUNTRIES,
@@ -1040,7 +1058,7 @@ function ensurePlanner() {
       getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
       createTrip: countryKey => createTrip({ countryKey, step: 2 }),
       sections: [
-        ...createFlightSections({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES }),
+        ...createFlightSections({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES }),
         createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
       ]
     });
@@ -1136,10 +1154,11 @@ function initialize() {
   tripStore.subscribe(renderTripsCount);
   markInterfaceReady();
   prefetchDeferredModules();
-  fetchExchangeRate();
+  fetchExchangeRate().then(() => state.planner?.refresh()).catch(() => {});
   loadFxSnapshot().then(snapshot => {
     state.fxSnapshot = snapshot;
     if (state.countryKey) renderCurrencyConverter(COUNTRIES[state.countryKey]);
+    state.planner?.refresh();
   }).catch(() => {});
   initializeMap();
   window.addEventListener('pagehide', () => {

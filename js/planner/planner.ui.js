@@ -7,8 +7,13 @@ import { parseBrazilianNumber } from '../miles.tools.js';
 import { flagImageUrl } from '../country.exploration.js';
 import {
   BUDGET_CATEGORIES, LINE_STATUSES, MAX_LINES, MAX_TRAVELERS, PLANNER_STEPS,
-  addLine, removeLine, tripDays, tripMonth, tripProgress, tripTotals, updateLine, updateTrip
+  addLine, isEstimateLine, removeLine, tripDays, tripMonth, tripProgress, tripTotals, updateLine, updateTrip
 } from './trip.model.js';
+import { repriceLines } from './planner.estimates.js';
+import { currencyChoices, rateFor } from './currency.js';
+import { formatBRL, formatMoney, formatRate } from './money.js';
+
+export { formatBRL };
 
 const MONTH_NAMES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const MONTH_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -24,10 +29,6 @@ const STEP_LEADS = {
   prep: 'Documentos, regras de entrada e o checklist do destino.',
   summary: 'Tudo o que você planejou, num só lugar.'
 };
-
-export function formatBRL(value, { cents = false } = {}) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 }).format(value ?? 0);
-}
 
 // Valor digitado ("1.234,56", "1234.5", "R$ 800") → número, ou null.
 export function parseMoneyInput(value) {
@@ -72,9 +73,12 @@ export class PlannerUI {
    * @param {() => string[]} [options.getIdeas] Países salvos para sugerir no destino.
    * @param {(countryKey: string) => object} options.createTrip
    * @param {object[]} [options.sections]   Seções por etapa: { id, step, render(trip, ui), bind?, refresh? }.
+   * @param {() => object} [options.getRates]  Cotações em reais (currency.rateTable()).
+   * @param {(code: string) => void} [options.ensureRate] Pede a cotação atual de uma moeda.
    */
-  constructor({ element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas = () => [], createTrip, sections = [] }) {
-    Object.assign(this, { element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas, createTrip, sections });
+  constructor({ element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas = () => [], createTrip, sections = [], getRates = () => ({}), ensureRate = () => {} }) {
+    Object.assign(this, { element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas, createTrip, sections, getRates, ensureRate });
+    this.repricing = false;
     this.view = store.trips.length ? 'trip' : 'home';
     this.flash = '';
     this.confirmingDelete = false;
@@ -104,7 +108,10 @@ export class PlannerUI {
 
   render() {
     this.confirmingDelete = false;
+    if (this.view === 'trip') this.#reprice();
+    else this.#repriceAll();
     const trip = this.trip;
+    if (trip) this.#requestRates(trip);
     if (this.view === 'trip' && !trip) this.view = 'home';
     if (this.view === 'new') this.element.innerHTML = this.#newTripView();
     else if (this.view === 'trip') this.element.innerHTML = this.#wizard(trip);
@@ -122,8 +129,39 @@ export class PlannerUI {
     this.changingDestination = false;
   }
 
+  // Chamado pelo app quando cotações ou o checklist mudam.
   refresh() {
-    this.#refreshLive();
+    if (this.view === 'trip') this.#refreshLive();
+    else if (this.#repriceAll() && this.view === 'home') this.render();
+  }
+
+  // Recalcula estimativas e conversões da viagem ativa. true quando salvou.
+  #reprice(trip = this.trip) {
+    if (!trip || this.repricing) return false;
+    const lines = repriceLines(trip, this.getRates());
+    if (!lines) return false;
+    this.repricing = true;
+    try {
+      this.store.save(updateTrip(trip, { lines }));
+    } finally {
+      this.repricing = false;
+    }
+    return true;
+  }
+
+  // Mesmo cálculo para todas as viagens (totais da lista), mantendo a ativa.
+  #repriceAll() {
+    const active = this.store.activeTripId;
+    let changed = false;
+    for (const trip of this.store.trips) changed = this.#reprice(trip) || changed;
+    if (changed && active) this.store.setActive(active);
+    return changed;
+  }
+
+  // Moedas que a viagem usa: a do destino e as dos gastos digitados.
+  #requestRates(trip) {
+    const codes = new Set([this.countries[trip.countryKey]?.currencyCode, ...trip.lines.map(line => line.currency)]);
+    for (const code of codes) if (code && code !== 'BRL') this.ensureRate(code);
   }
 
   destroy() {
@@ -568,19 +606,55 @@ export class PlannerUI {
     if (!lines.length) return `<p class="planner-lines__empty">${escapeHtml(options.empty || 'Nenhum gasto ainda.')}</p>`;
     const fixedCategory = options.categories?.length === 1;
     const categories = BUDGET_CATEGORIES.filter(category => !options.exclude?.includes(category.id));
-    return lines.map((line, index) => `
+    const rates = this.getRates();
+    const destinationCurrency = this.countries[trip.countryKey]?.currencyCode;
+    return lines.map((line, index) => {
+      // Estimativa do Traveling: valor e descrição são calculados (só leitura).
+      // Para trocar pelo preço real, o usuário muda a situação para Cotação ou Pago.
+      const calculated = isEstimateLine(line);
+      const locked = calculated ? 'readonly aria-readonly="true"' : '';
+      const currency = line.currency ?? 'BRL';
+      const choices = currencyChoices(destinationCurrency, rates, currency);
+      return `
       <div class="planner-line ${fixedCategory ? 'planner-line--fixed' : ''}" data-line-id="${escapeHtml(line.id)}" role="group" aria-label="Gasto ${index + 1}">
-        ${fixedCategory ? '' : `<select class="form-field__control planner-line__category" aria-label="Categoria do gasto ${index + 1}" data-line-field="category">
+        ${fixedCategory ? '' : `<select class="form-field__control planner-line__category" aria-label="Categoria do gasto ${index + 1}" data-line-field="category" ${calculated ? 'disabled' : ''}>
           ${categories.map(category => `<option value="${category.id}" ${category.id === line.category ? 'selected' : ''}>${category.label}</option>`).join('')}
         </select>`}
-        <input class="form-field__control planner-line__note" type="text" maxlength="120" aria-label="Descrição do gasto ${index + 1}" placeholder="Descrição" value="${escapeHtml(line.note)}" data-line-field="note">
-        <input class="form-field__control planner-line__amount" type="text" inputmode="decimal" aria-label="Valor do gasto ${index + 1} em reais" placeholder="R$ 0" value="${line.amountBRL ? escapeHtml(moneyInputValue(line.amountBRL)) : ''}" data-line-field="amountBRL">
+        <input class="form-field__control planner-line__note" type="text" maxlength="120" aria-label="Descrição do gasto ${index + 1}" placeholder="${calculated ? '' : 'Descrição'}" value="${escapeHtml(line.note)}" data-line-field="note" ${locked}>
+        <div class="planner-line__money">
+          <input class="form-field__control planner-line__amount" type="text" inputmode="decimal" aria-label="${calculated ? `Valor calculado do gasto ${index + 1} em reais` : `Valor do gasto ${index + 1} em ${currency === 'BRL' ? 'reais' : currency}`}" placeholder="${currency === 'BRL' ? 'R$ 0' : `${currency} 0`}" value="${escapeHtml(this.#amountValue(line))}" data-line-field="${line.currency ? 'amount' : 'amountBRL'}" ${locked}>
+          ${calculated || choices.length < 2 ? '' : `<select class="form-field__control planner-line__currency" aria-label="Moeda do gasto ${index + 1}" data-line-field="currency">
+            ${choices.map(code => `<option value="${code}" ${code === currency ? 'selected' : ''}>${code}</option>`).join('')}
+          </select>`}
+        </div>
         <select class="form-field__control planner-line__status" aria-label="Situação do gasto ${index + 1}" data-line-field="status">
           ${Object.entries(LINE_STATUSES).map(([status, label]) => `<option value="${status}" ${status === line.status ? 'selected' : ''}>${label}</option>`).join('')}
         </select>
         <button class="icon-button planner-line__remove" type="button" aria-label="Remover gasto ${index + 1}" data-planner-action="remove-line">✕</button>
-        ${line.source?.kind === 'traveling-estimate' ? provenanceLabel('estimate', { detail: line.source.detail || 'valor sugerido pelo Traveling', className: 'planner-line__source' }) : ''}
-      </div>`).join('');
+        ${calculated || line.currency ? `<div class="planner-line__source" data-line-extra>${this.#lineExtra(line)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  #amountValue(line) {
+    const value = line.currency ? line.amount : line.amountBRL;
+    return value ? moneyInputValue(value) : '';
+  }
+
+  // Procedência da linha: estimativa do Traveling ou conversão para reais.
+  #lineExtra(line) {
+    if (isEstimateLine(line)) return provenanceLabel('estimate', { detail: `${line.source.detail || 'valor sugerido pelo Traveling'}. Para usar outro valor, marque como Cotação ou Pago` });
+    if (!line.currency) return '';
+    const rate = rateFor(line.currency, this.getRates());
+    if (!line.fx) {
+      return provenanceLabel('unverified', { label: 'Câmbio indisponível', detail: `o valor em reais aparece quando a cotação de ${line.currency} carregar` });
+    }
+    return provenanceLabel(rate?.kind === 'live' ? 'live' : 'verified', {
+      label: `${formatMoney(line.amount, line.currency)} = ${formatBRL(line.amountBRL, { cents: true })}`,
+      date: line.fx.date,
+      detail: `${line.currency} 1 = R$ ${formatRate(line.fx.rate)} (${rate?.label ?? 'BCB'}, venda); sem spread, IOF ou tarifas`,
+      source: rate?.source ?? undefined
+    });
   }
 
   #deleteControls() {
@@ -597,6 +671,8 @@ export class PlannerUI {
   #refreshLive() {
     const trip = this.trip;
     if (this.view !== 'trip' || !trip) return;
+    // Salvar o recálculo dispara outra atualização, que já desenha os valores novos.
+    if (this.#reprice(trip)) return;
     const set = (name, html) => { const slot = this.element.querySelector(`[data-live="${name}"]`); if (slot) slot.innerHTML = html; };
     set('stepper', this.#stepper(trip, this.step));
     set('trip-meta', this.#tripMeta(trip));
@@ -606,6 +682,20 @@ export class PlannerUI {
     set('travelers', String(trip.travelers));
     const visible = this.#visibleLines(trip);
     set('lines-total', visible.length ? formatBRL(visible.reduce((sum, line) => sum + line.amountBRL, 0)) : '');
+    // Valores calculados acompanham datas, viajantes, hospedagem e câmbio. Campos
+    // digitados pelo usuário não são reescritos (mantém foco e o que ele digita).
+    for (const line of visible) {
+      const row = this.element.querySelector(`[data-line-id="${CSS.escape(line.id)}"]`);
+      if (!row) continue;
+      if (isEstimateLine(line)) {
+        const note = row.querySelector('[data-line-field="note"]');
+        const value = row.querySelector('.planner-line__amount');
+        if (note) note.value = line.note;
+        if (value) value.value = this.#amountValue(line);
+      }
+      const extra = row.querySelector('[data-line-extra]');
+      if (extra) extra.innerHTML = this.#lineExtra(line);
+    }
     const end = this.element.querySelector('#planner-end');
     if (end) end.min = trip.startDate || '';
     const dec = this.element.querySelector('[data-planner-action="travelers-dec"]');
@@ -682,17 +772,39 @@ export class PlannerUI {
     const lineField = target.dataset.lineField;
     const row = target.closest('[data-line-id]');
     if (!lineField || !row) return;
+    const line = trip.lines.find(item => item.id === row.dataset.lineId);
+    if (!line) return;
+    // Valores calculados não aceitam digitação; só a situação muda.
+    if (isEstimateLine(line) && lineField !== 'status') return;
     let value = target.value;
-    if (lineField === 'amountBRL') {
+    if (lineField === 'amountBRL' || lineField === 'amount') {
       value = parseMoneyInput(value) ?? (target.value.trim() ? null : 0);
       if (value === null) {
-        target.setCustomValidity('Digite um valor em reais, por exemplo 1.200,50');
+        target.setCustomValidity(lineField === 'amount' ? `Digite um valor em ${line.currency}, por exemplo 1.200,50` : 'Digite um valor em reais, por exemplo 1.200,50');
         target.reportValidity();
         return;
       }
       target.setCustomValidity('');
     }
-    this.store.save(updateLine(trip, row.dataset.lineId, { [lineField]: value }));
+    if (lineField === 'status' && isEstimateLine(line) && value !== 'estimate') {
+      // Cotação ou Pago: a linha vira um valor do usuário, editável e fixo.
+      this.store.save(updateLine(trip, line.id, { status: value, source: null }));
+      this.#rerenderLines(line.id, 'amountBRL');
+      return;
+    }
+    if (lineField === 'currency') {
+      // O número digitado continua o mesmo; muda só a moeda em que ele está.
+      const typed = line.currency ? line.amount : line.amountBRL;
+      const changes = value === 'BRL'
+        ? { currency: 'BRL', amountBRL: typed }
+        // Em reais fica 0 até a conversão: nunca soma o número estrangeiro como se fosse real.
+        : { currency: value, amount: typed, amountBRL: 0, fx: null };
+      this.store.save(updateLine(trip, line.id, changes));
+      this.ensureRate(value);
+      this.#rerenderLines(line.id, 'currency');
+      return;
+    }
+    this.store.save(updateLine(trip, line.id, { [lineField]: value }));
   }
 
   #click(event) {
