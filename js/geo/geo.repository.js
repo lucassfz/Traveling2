@@ -18,6 +18,9 @@
 export const GEO_SCHEMA_VERSION = 1;
 export const DIVISION_TYPES = Object.freeze(['state', 'district', 'province', 'region']);
 export const PLACE_KINDS = Object.freeze(['city', 'town']);
+// Países com arquivo em data/geo. Evita pedir (e receber 404) para os demais;
+// o validador confere que a lista bate com os arquivos.
+export const GEO_COUNTRIES = Object.freeze(['BR']);
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const cache = new Map();
@@ -110,7 +113,7 @@ export function geoDataUrl(countryCode) {
 // Países sem arquivo devolvem null (a interface segue só com o país).
 export function loadGeo(countryCode) {
   const code = String(countryCode ?? '').toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) return Promise.resolve(null);
+  if (!GEO_COUNTRIES.includes(code)) return Promise.resolve(null);
   if (!cache.has(code)) {
     const promise = readGeoFile(geoDataUrl(code)).then(data => {
       if (!data) return null;
