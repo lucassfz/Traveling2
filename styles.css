@@ -1304,20 +1304,25 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
 .country-panel__identity > div { flex: 1; min-width: 0; }
 
 .country-panel__flag {
-  flex: 0 0 52px;
-  width: 52px;
-  height: 38px;
-  margin-top: 6px;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 42px;
+  margin-top: 4px;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border-radius: 6px;
-  background: var(--color-surface-raised);
-  box-shadow: 0 0 0 1px var(--color-border-soft), 0 6px 16px -8px var(--color-shadow);
 }
 
-.country-panel__flag img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.country-panel__flag--nepal img { width: 88%; height: 92%; object-fit: contain; }
+/* Bandeiras inteiras, na proporção de cada país (quadradas, largas ou o
+   Nepal), dentro de um espaço fixo; a moldura acompanha a própria imagem. */
+.country-panel__flag img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 64px;
+  max-height: 42px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--color-border-soft), 0 6px 16px -8px var(--color-shadow);
+}
 .country-panel__flag-fallback { color: var(--color-text-secondary); font-size: .875rem; font-weight: 700; }
 
 .country-panel__region {
@@ -1927,6 +1932,14 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
   outline: none;
 }
 
+/* Opções das listas: fundo e texto sólidos do tema. Sem isso, no tema escuro
+   o Windows desenha o texto claro sobre um fundo branco. */
+select option,
+select optgroup {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
 .form-field__control:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
@@ -2222,7 +2235,8 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
   .country-panel { width: 100vw; max-width: none; }
   .country-panel__toolbar { padding: var(--space-3) var(--space-4) 0; }
   .country-panel__identity { padding: var(--space-4) var(--space-4) var(--space-5); }
-  .country-panel__flag { flex-basis: 44px; width: 44px; height: 32px; }
+  .country-panel__flag { flex-basis: 52px; width: 52px; height: 34px; }
+  .country-panel__flag img { max-width: 52px; max-height: 34px; }
   .country-tabs { padding: 0 var(--space-3); }
   .country-tab { padding: var(--space-4); }
   .media-strip { margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) var(--space-4); padding: var(--space-3) var(--space-4); }
@@ -2367,7 +2381,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-trip-card {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -2381,7 +2395,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
 }
 .planner-trip-card:hover { border-color: var(--color-border-strong); }
 .planner-trip-card:active { transform: scale(.99); }
-.planner-trip-card__flag { width: 40px; height: 30px; border-radius: 5px; object-fit: cover; box-shadow: 0 0 0 1px var(--color-border-soft); }
+.planner-trip-card__flag { width: auto; height: auto; max-width: 40px; max-height: 30px; justify-self: center; border-radius: 4px; box-shadow: 0 0 0 1px var(--color-border-soft); }
 .planner-trip-card__body, .planner-trip-card__side { display: grid; gap: 4px; min-width: 0; }
 .planner-trip-card__body strong { font-size: 1rem; font-weight: 600; }
 .planner-trip-card small { color: var(--color-text-muted); font-size: .78rem; }
@@ -2395,7 +2409,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-back { justify-self: start; margin: calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1); padding: 4px 0; border: 0; background: none; color: var(--color-text-muted); font: inherit; font-size: .82rem; cursor: pointer; }
 .planner-back:hover { color: var(--color-text); }
 .wizard__trip { display: flex; align-items: center; gap: var(--space-3); }
-.wizard__flag { flex: none; width: 40px; height: 30px; border-radius: 5px; object-fit: cover; box-shadow: 0 0 0 1px var(--color-border-soft); }
+.wizard__flag { flex: none; width: auto; height: auto; max-width: 40px; max-height: 30px; border-radius: 4px; box-shadow: 0 0 0 1px var(--color-border-soft); }
 .wizard__trip > div { display: grid; gap: 2px; min-width: 0; }
 .wizard__trip-name { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; line-height: 1.1; }
 .wizard__trip-meta { color: var(--color-text-muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
@@ -2490,7 +2504,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
 }
 .planner-picker__option:hover, .planner-picker__option:focus-visible { background: var(--color-tint); outline: none; }
 .planner-picker__option small { color: var(--color-text-muted); font-size: .76rem; }
-.planner-picker__flag, .planner-idea__flag { width: 32px; height: 24px; border-radius: 4px; object-fit: cover; box-shadow: 0 0 0 1px var(--color-border-soft); }
+.planner-picker__flag, .planner-idea__flag { width: auto; height: auto; max-width: 32px; max-height: 24px; justify-self: center; border-radius: 3px; box-shadow: 0 0 0 1px var(--color-border-soft); }
 .planner-picker__empty { padding: 10px 12px; color: var(--color-text-muted); font-size: .85rem; }
 .planner-ideas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 .planner-idea {
@@ -2511,7 +2525,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-idea strong { font-size: .86rem; font-weight: 600; }
 .planner-idea small { color: var(--color-text-muted); font-size: .74rem; font-variant-numeric: tabular-nums; }
 .planner-destination-card { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-5); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); background: var(--color-tint); }
-.planner-destination-card__flag { flex: none; width: 64px; height: 48px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--color-border-soft), 0 8px 20px -10px var(--color-shadow); }
+.planner-destination-card__flag { flex: none; width: auto; height: auto; max-width: 64px; max-height: 48px; border-radius: 5px; box-shadow: 0 0 0 1px var(--color-border-soft), 0 8px 20px -10px var(--color-shadow); }
 .planner-destination-card__body { display: grid; gap: 4px; min-width: 0; }
 .planner-destination-card__name { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; line-height: 1.1; }
 .planner-destination-card small { color: var(--color-text-muted); font-size: .8rem; }
@@ -2663,7 +2677,7 @@ body.route-mode .app-header__brand { pointer-events: none; }
   .planner-line--fixed .planner-line__remove { grid-column: 3; grid-row: 1; }
   .planner-line--fixed .planner-line__note { grid-column: 1 / 3; }
   .planner-bars li { grid-template-columns: 100px minmax(0, 1fr) auto; }
-  .planner-trip-card { grid-template-columns: auto minmax(0, 1fr); }
+  .planner-trip-card { grid-template-columns: 40px minmax(0, 1fr); }
   .planner-trip-card__side { grid-column: 2; justify-items: start; text-align: left; }
 }
 
