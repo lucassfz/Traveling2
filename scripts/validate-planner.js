@@ -272,3 +272,32 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(tripProgress(updateTrip(planned, { budgetBRL: null })).done[3], false, 'sem orçamento nem outros gastos');
   console.log('Planner: passo a passo (etapas, progresso e etapa salva) verificado.');
 }
+
+// Escolhas por toque: mês, duração, grupo, pagamento, estilo e interesses.
+{
+  const { TRIP_DURATIONS, tripProgress } = await import('../js/planner/trip.model.js');
+  const base = createTrip({ countryKey: 'Japan', idFactory });
+  assert.equal(base.month, null);
+  assert.deepEqual(base.interests, []);
+  const chosen = updateTrip(base, { month: 4, duration: 10, group: 'couple', payWith: 'miles', style: 'balanced', interests: ['food', 'food', 'spaceship', 'culture'] });
+  assert.equal(tripMonth(chosen), 4, 'mês escolhido vale sem datas');
+  assert.equal(tripDays(chosen), 10, 'duração escolhida vale sem datas');
+  assert.deepEqual(chosen.interests, ['food', 'culture'], 'interesses sem repetição nem valores desconhecidos');
+  assert.deepEqual(tripProgress(chosen).done.slice(0, 4), [true, true, true, true]);
+  const invalid = updateTrip(base, { month: 12, duration: 4, group: 'x', payWith: 'x', style: 'x', transport: 'x' });
+  assert.deepEqual([invalid.month, invalid.duration, invalid.group, invalid.payWith, invalid.style, invalid.transport], [null, null, null, null, null, null]);
+  const exact = updateTrip(chosen, { startDate: '2027-09-01', endDate: '2027-09-05' });
+  assert.equal(tripMonth(exact), 8, 'datas exatas têm prioridade sobre o mês');
+  assert.equal(tripDays(exact), 5, 'datas exatas têm prioridade sobre a duração');
+  assert.ok(TRIP_DURATIONS.every(item => Number.isInteger(item.days) && item.label));
+  // Cidade do destino: só formato válido e do mesmo país.
+  const { normalizeCity } = await import('../js/planner/trip.model.js');
+  assert.equal(normalizeCity({ id: 'BR-1', name: 'São Paulo', lat: -23.5471, lng: -46.6361, region: 'São Paulo' }).lat, -23.547);
+  assert.equal(normalizeCity({ id: 'x', name: 'A', lat: 0, lng: 0 }), null);
+  assert.equal(normalizeCity({ id: 'BR-1', name: 'A', lat: 120, lng: 0 }), null);
+  const withCity = normalizeTrip({ countryKey: 'Japan', city: { id: 'JP-3', name: 'Kyoto', lat: 35.02, lng: 135.75 } }, { countries: COUNTRIES, idFactory });
+  assert.equal(withCity.city.name, 'Kyoto');
+  assert.equal(normalizeTrip({ countryKey: 'Japan', city: { id: 'BR-3', name: 'Recife', lat: -8, lng: -35 } }, { countries: COUNTRIES, idFactory }).city, null, 'cidade de outro país é descartada');
+  assert.equal(createTrip({ countryKey: 'Japan', city: { id: 'JP-3', name: 'Kyoto', lat: 35.02, lng: 135.75 }, idFactory }).city.id, 'JP-3');
+  console.log('Planner: escolhas por toque verificadas.');
+}

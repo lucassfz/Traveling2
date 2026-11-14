@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.14d">
+  <link rel="stylesheet" href="styles.css?v=2026.11.15b">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -100,6 +100,12 @@
       <span class="globe__spinner" aria-hidden="true"></span>
       <span>Construindo países em 3D…</span>
     </div>
+    <section class="city-card" id="city-card" aria-labelledby="city-card-title" hidden></section>
+    <div class="globe-zoom" role="group" aria-label="Zoom do globo">
+      <button class="globe-zoom__button" id="zoom-in" type="button" aria-label="Aproximar" title="Aproximar">+</button>
+      <button class="globe-zoom__button" id="zoom-out" type="button" aria-label="Afastar" title="Afastar">−</button>
+    </div>
+    <p class="globe-hint" id="globe-hint" hidden>Arraste para girar · aproxime para ver estados e cidades</p>
     <div class="globe__fallback" id="globe-fallback" role="status">
       <strong>Globo 3D indisponível</strong>
       <span>Use a busca para abrir os guias de países.</span>
@@ -130,9 +136,9 @@
   <aside class="miles-hub" id="miles-hub" aria-label="Milhas e aeroportos" inert>
     <header class="miles-hub__header">
       <div>
-        <span class="eyebrow">Guia de viagem</span>
-        <h2 class="miles-hub__title">Milhas &amp; Aeroportos</h2>
-        <p class="miles-hub__subtitle">Compare resgates, cartões, salas e aeroportos da sua viagem.</p>
+        <span class="eyebrow">Milhas</span>
+        <h2 class="miles-hub__title">Milhas e pontos</h2>
+        <p class="miles-hub__subtitle">Converta pontos, veja quanto valem e se compensa usar.</p>
       </div>
       <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar Milhas e Aeroportos"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </header>
@@ -305,6 +311,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.14d"></script>
+  <script type="module" src="js/app.js?v=2026.11.15b"></script>
 </body>
 </html>

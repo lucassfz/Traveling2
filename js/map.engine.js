@@ -17,6 +17,7 @@ import {
 import { atlasFeatureParts } from './map.topology.js';
 import { routePoint } from './flight.route.js';
 import { FlightVisualization } from './flight.visualization.js';
+import { AdminLayer } from './map.admin.layer.js';
 
 // Versões exatas: uma faixa (@2, @3) pode mudar a geometria ou a API sem aviso.
 const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
@@ -352,7 +353,7 @@ export class MapEngine {
     this.stage = stageElement;
     this.callbacks = callbacks;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 100);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.005, 100);
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
@@ -372,7 +373,9 @@ export class MapEngine {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.055;
     this.controls.enablePan = false;
-    this.controls.minDistance = 1.16;
+    // Perto o bastante para ler cidades (≈500 km de altitude) sem "entrar" no
+    // globo, cuja geometria de países é de baixa resolução; ver map.admin.layer.js.
+    this.controls.minDistance = 1.08;
     this.controls.maxDistance = 4.8;
     this.controls.rotateSpeed = 0.52;
     this.controls.zoomSpeed = 0.72;
@@ -417,6 +420,18 @@ export class MapEngine {
     this.#createGraticule();
     this.#createLights();
     this.flightVisualization = new FlightVisualization(this.scene, this.horizonClipPlane);
+    this.adminLayer = new AdminLayer({
+      scene: this.scene,
+      camera: this.camera,
+      stage: this.stage,
+      clipPlane: this.horizonClipPlane,
+      invalidate: () => this.invalidate(),
+      // País (ISO2) num ponto do globo: decide o "país em foco" da camada de zoom.
+      countryAt: (latitude, longitude) => {
+        const countryKey = this.#findCountryByGeo(latitude, longitude);
+        return countryKey ? COUNTRIES[countryKey]?.alpha2 ?? null : null;
+      }
+    });
     this.#bindPointerEvents();
     this.#bindResize();
     this.setTheme();
@@ -736,6 +751,15 @@ export class MapEngine {
   #bindPointerEvents() {
     this.onPointerMove = createRafThrottle((clientX, clientY) => {
       if (this.cameraFlight || this.routePreview) return;
+      // Cidades e estados (quando visíveis) têm prioridade sobre o país embaixo.
+      const place = this.pickPlace(clientX, clientY);
+      this.adminLayer.setHovered(place);
+      if (place) {
+        this.#setHovered(null);
+        this.stage.classList.add('globe__stage--interactive');
+        this.callbacks.onHover?.(null, clientX, clientY);
+        return;
+      }
       const countryKey = this.pickCountry(clientX, clientY);
       this.#setHovered(countryKey);
       if (countryKey) {
@@ -755,6 +779,7 @@ export class MapEngine {
     this.renderer.domElement.addEventListener('pointerleave', () => {
       this.onPointerMove.cancel();
       this.#setHovered(null);
+      this.adminLayer.setHovered(null);
       this.stage.classList.remove('globe__stage--interactive');
       this.callbacks.onHover?.(null);
     });
@@ -778,6 +803,17 @@ export class MapEngine {
       const duration = performance.now() - this.pointerDown.startedAt;
       this.pointerDown = null;
       if (travel > 7 || duration > 650) return;
+      const place = this.pickPlace(event.clientX, event.clientY);
+      if (place?.kind === 'city') {
+        this.callbacks.onCitySelect?.(place);
+        return;
+      }
+      if (place?.kind === 'state') {
+        // Estado: aproxima até ver as cidades dele.
+        const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
+        this.flyTo(place.lat, place.lng, Math.max(this.controls.minDistance, Math.min(distance * 0.82, 1.32)), 700);
+        return;
+      }
       const countryKey = this.pickCountry(event.clientX, event.clientY);
       if (countryKey) this.callbacks.onSelect?.(countryKey);
     });
@@ -969,6 +1005,7 @@ export class MapEngine {
     this.selectedCountry = countryKey;
     if (previous) this.#updateCountryMaterial(previous);
     if (countryKey) this.#updateCountryMaterial(countryKey);
+    this.adminLayer.setSelectedCountry(countryKey ? COUNTRIES[countryKey]?.alpha2 : null);
     if (fly && countryKey) {
       const country = COUNTRIES[countryKey];
       if (country?.latlng) this.flyTo(country.latlng[0], country.latlng[1], 2.02, 880);
@@ -979,6 +1016,7 @@ export class MapEngine {
     const previous = this.selectedCountry;
     this.selectedCountry = null;
     if (previous) this.#updateCountryMaterial(previous);
+    this.adminLayer.setSelectedCountry(null);
   }
 
 
@@ -1007,6 +1045,36 @@ export class MapEngine {
     this.clearSelection();
     this.#refreshCountryMaterials();
     this.flyTo(18, -18, 3.05, 900);
+  }
+
+  /** Cidades de um país (ISO2), do mesmo arquivo usado no globo. */
+  citiesOf(alpha2) {
+    return this.adminLayer.citiesOf(alpha2);
+  }
+
+  // Cidade ou estado sob o ponteiro (só quando a camada de zoom os mostra).
+  pickPlace(clientX, clientY) {
+    if (!this.ready) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top);
+  }
+
+  // Destaca uma cidade e a centraliza sem mudar o zoom (ou aproximando um pouco).
+  selectCity(city, { fly = true } = {}) {
+    this.adminLayer.setSelectedCity(city);
+    if (!city || !fly) return;
+    const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
+    this.flyTo(city.lat, city.lng, Math.min(distance, 1.3), 650);
+  }
+
+  // Aproxima (factor < 1) ou afasta (factor > 1) mantendo o mesmo ponto no centro.
+  zoom(factor) {
+    if (this.routePreview) return;
+    const { latitude, longitude } = cartesianToLatLng(this.camera.position, GLOBE_YAW, GLOBE_ORIGIN);
+    const current = this.camera.position.distanceTo(GLOBE_ORIGIN);
+    // A escala vale para a altitude (distância até a superfície), como num mapa.
+    const altitude = THREE.MathUtils.clamp((current - 1) * factor, this.controls.minDistance - 1, this.controls.maxDistance - 1);
+    this.flyTo(latitude, longitude, 1 + altitude, 380);
   }
 
   flyTo(latitude, longitude, distance = 2.05, duration = 850) {
@@ -1071,6 +1139,7 @@ export class MapEngine {
 
   setTheme() {
     this.invalidate();
+    this.adminLayer?.setTheme();
     const theme = document.documentElement.dataset.theme || 'dark';
     const dark = theme === 'dark';
     this.oceanMaterial.color.copy(colorToken('--color-ocean'));
@@ -1150,6 +1219,7 @@ export class MapEngine {
     const height = Math.max(1, rect.height);
     this.renderer.setSize(width, height, false);
     this.viewSize = { width, height };
+    this.adminLayer?.setSize(width, height);
     this.camera.aspect = width / height;
     this.#applyViewOffset();
   }
@@ -1229,6 +1299,12 @@ export class MapEngine {
       }
     } else if (!this.cameraFlight && this.controls.update()) animating = true; // amortecimento ainda girando
     this.#updateHorizonClip();
+    // Perto da superfície o giro por pixel precisa ser menor, como num mapa.
+    const altitude = this.camera.position.length() - 1;
+    this.controls.rotateSpeed = 0.52 * THREE.MathUtils.clamp(altitude / 1.6, 0.025, 1);
+    this.camera.updateMatrixWorld();
+    if (this.routePreview) this.adminLayer.hide();
+    else this.adminLayer.update();
     this.renderer.render(this.scene, this.camera);
     this.pendingFrames = Math.max(0, (this.pendingFrames ?? 0) - 1);
     if (animating || this.pendingFrames > 0) this.#requestFrame();
@@ -1242,6 +1318,7 @@ export class MapEngine {
     cancelAnimationFrame(this.resizeFrame);
     this.controls.dispose();
     this.flightVisualization.dispose();
+    this.adminLayer.dispose();
     this.hotspotGroup?.parent?.remove(this.hotspotGroup);
     this.hotspotGeometry?.dispose();
     this.hotspotHitGeometry?.dispose();

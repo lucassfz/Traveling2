@@ -1,4 +1,5 @@
 import { AirportRepository } from './airports.repository.js';
+import { createCityCard } from './city.card.js';
 import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
 import { escapeHtml } from './core/html.js';
 import {
@@ -579,9 +580,33 @@ function renderCountry(countryKey) {
   renderContinentState();
 }
 
+// Cidade clicada no globo: cartão próprio; o painel do país fica como está.
+let cityCard = null;
+function selectCity(city) {
+  if (!city) return;
+  cityCard ??= createCityCard({
+    root: document.getElementById('city-card'),
+    countries: COUNTRIES,
+    onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
+    onPlan: (countryKey, city) => { state.map?.selectCity(null); planTrip(countryKey, { city }); },
+    onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
+    onClose: () => state.map?.selectCity(null)
+  });
+  state.map?.selectCity(city);
+  cityCard.show(city);
+}
+
+function closeCityCard() {
+  if (!cityCard?.isOpen) return false;
+  cityCard.hide();
+  state.map?.selectCity(null);
+  return true;
+}
+
 function selectCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
+  closeCityCard();
   closeFlightPreview(false);
   state.discovery?.close();
   if (elements.milesHub.classList.contains('miles-hub--open')) setMilesOpen(false);
@@ -621,6 +646,7 @@ function selectContinent(continent) {
 }
 
 function home() {
+  closeCityCard();
   closeFlightPreview(false);
   state.discovery?.close();
   state.countryKey = null;
@@ -888,6 +914,7 @@ function bindUiEvents() {
 
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
+    if (closeCityCard()) return;
     if (state.routePreviewActive) {
       closeFlightPreview(true, true);
       return;
@@ -910,6 +937,7 @@ async function initializeMap() {
     state.map = new MapEngine(elements.globeStage, {
       onHover: showTooltip,
       onSelect: countryKey => selectCountry(countryKey),
+      onCitySelect: city => selectCity(city),
       onRouteArrived: () => {
         const countryKey = state.exploreRouteCountryKey;
         if (!countryKey || countryKey !== state.countryKey || !state.routePreviewActive) return;
@@ -927,6 +955,7 @@ async function initializeMap() {
       }
     });
     state.map.setVisitedCountries?.(state.visited);
+    bindGlobeHelpers();
     syncGlobeInset();
     renderVisaFreeFilter();
     await state.map.init();
@@ -938,6 +967,22 @@ async function initializeMap() {
     const detail = elements.globeFallback.querySelector('span');
     if (detail) detail.textContent = 'O mapa 3D não carregou. A busca, os guias, voos e o hub de milhas continuam disponíveis.';
   }
+}
+
+// Botões de zoom e a dica de uso (mostrada uma vez, some no primeiro gesto).
+function bindGlobeHelpers() {
+  const hint = document.getElementById('globe-hint');
+  const dismissHint = () => {
+    if (!hint || hint.hidden) return;
+    hint.hidden = true;
+    writeStorage(STORAGE_KEYS.globeHint, 'seen');
+  };
+  if (hint && readStorage(STORAGE_KEYS.globeHint) !== 'seen') {
+    hint.hidden = false;
+    for (const type of ['pointerdown', 'wheel']) elements.globeStage.addEventListener(type, dismissHint, { once: true, passive: true });
+  }
+  document.getElementById('zoom-in')?.addEventListener('click', () => { dismissHint(); state.map?.zoom(0.55); });
+  document.getElementById('zoom-out')?.addEventListener('click', () => { dismissHint(); state.map?.zoom(1.8); });
 }
 
 // O painel do país cobre a lateral direita do globo; o motor desloca a
@@ -984,8 +1029,11 @@ function ensureDiscovery() {
         isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'
           && state.discovery.matches[state.discovery.index]?.profile.id === match.profile.id
       }),
+      resolveAirport: code => airportRepository.resolve(code),
+      onCity: city => state.map?.selectCity(city),
       onPlan: (match, preferences) => planTrip(match.countryKey, {
         profileId: match.profile.id,
+        city: preferences.city ?? null,
         budgetBRL: Number.isFinite(preferences.budgetCeiling) ? preferences.budgetCeiling : null
       }),
       onClose: () => closeFlightPreview(false)
@@ -1062,9 +1110,13 @@ function ensurePlanner() {
       onDiscover: discoverDestination,
       // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
       getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
-      createTrip: countryKey => createTrip({ countryKey, step: 2 }),
+      // Começa na etapa 1: depois do país, a pessoa escolhe a cidade.
+      createTrip: countryKey => createTrip({ countryKey, step: 1 }),
       sections: [
-        ...createFlightSections({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES }),
+        ...createFlightSections({
+          airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
+          resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng)
+        }),
         createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
       ]
     });
@@ -1111,10 +1163,15 @@ function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
   const existing = tripStore.findByCountry(countryKey);
   let trip;
-  if (existing && prefill.profileId && !existing.profileId) trip = tripStore.save(updateTrip(existing, { profileId: prefill.profileId }));
-  else if (existing) trip = existing;
-  // O destino já está escolhido: a viagem nova começa na etapa das datas.
-  else trip = tripStore.save(createTrip({ countryKey, ...prefill, step: 2 }));
+  const city = prefill.city ? { id: prefill.city.id, name: prefill.city.name, lat: prefill.city.lat, lng: prefill.city.lng, region: prefill.city.region } : null;
+  if (existing) {
+    const changes = {};
+    if (prefill.profileId && !existing.profileId) changes.profileId = prefill.profileId;
+    if (city) changes.city = city;
+    trip = Object.keys(changes).length ? tripStore.save(updateTrip(existing, changes)) : existing;
+  }
+  // País e cidade escolhidos: começa nas datas. Só o país: começa na escolha da cidade.
+  else trip = tripStore.save(createTrip({ countryKey, ...prefill, city, step: city ? 2 : 1 }));
   ensurePlanner().then(planner => {
     planner.openTrip(trip.id);
     if (isPlannerOpen()) planner.render();
