@@ -1,0 +1,343 @@
+{
+  "schema": 1,
+  "country": "BR",
+  "sources": [
+    {
+      "id": "ibge-localidades",
+      "name": "IBGE — API de Localidades",
+      "url": "https://servicodados.ibge.gov.br/api/docs/localidades",
+      "license": "Dados públicos do governo federal",
+      "retrievedAt": "2026-11-14",
+      "covers": [
+        "divisions"
+      ]
+    }
+  ],
+  "divisions": [
+    {
+      "id": "BR-RO",
+      "code": "RO",
+      "ibge": 11,
+      "name": "Rondônia",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Porto Velho",
+        "ibge": 1100205
+      }
+    },
+    {
+      "id": "BR-AC",
+      "code": "AC",
+      "ibge": 12,
+      "name": "Acre",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Rio Branco",
+        "ibge": 1200401
+      }
+    },
+    {
+      "id": "BR-AM",
+      "code": "AM",
+      "ibge": 13,
+      "name": "Amazonas",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Manaus",
+        "ibge": 1302603
+      }
+    },
+    {
+      "id": "BR-RR",
+      "code": "RR",
+      "ibge": 14,
+      "name": "Roraima",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Boa Vista",
+        "ibge": 1400100
+      }
+    },
+    {
+      "id": "BR-PA",
+      "code": "PA",
+      "ibge": 15,
+      "name": "Pará",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Belém",
+        "ibge": 1501402
+      }
+    },
+    {
+      "id": "BR-AP",
+      "code": "AP",
+      "ibge": 16,
+      "name": "Amapá",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Macapá",
+        "ibge": 1600303
+      }
+    },
+    {
+      "id": "BR-TO",
+      "code": "TO",
+      "ibge": 17,
+      "name": "Tocantins",
+      "type": "state",
+      "region": "Norte",
+      "capital": {
+        "name": "Palmas",
+        "ibge": 1721000
+      }
+    },
+    {
+      "id": "BR-MA",
+      "code": "MA",
+      "ibge": 21,
+      "name": "Maranhão",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "São Luís",
+        "ibge": 2111300
+      }
+    },
+    {
+      "id": "BR-PI",
+      "code": "PI",
+      "ibge": 22,
+      "name": "Piauí",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Teresina",
+        "ibge": 2211001
+      }
+    },
+    {
+      "id": "BR-CE",
+      "code": "CE",
+      "ibge": 23,
+      "name": "Ceará",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Fortaleza",
+        "ibge": 2304400
+      }
+    },
+    {
+      "id": "BR-RN",
+      "code": "RN",
+      "ibge": 24,
+      "name": "Rio Grande do Norte",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Natal",
+        "ibge": 2408102
+      }
+    },
+    {
+      "id": "BR-PB",
+      "code": "PB",
+      "ibge": 25,
+      "name": "Paraíba",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "João Pessoa",
+        "ibge": 2507507
+      }
+    },
+    {
+      "id": "BR-PE",
+      "code": "PE",
+      "ibge": 26,
+      "name": "Pernambuco",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Recife",
+        "ibge": 2611606
+      }
+    },
+    {
+      "id": "BR-AL",
+      "code": "AL",
+      "ibge": 27,
+      "name": "Alagoas",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Maceió",
+        "ibge": 2704302
+      }
+    },
+    {
+      "id": "BR-SE",
+      "code": "SE",
+      "ibge": 28,
+      "name": "Sergipe",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Aracaju",
+        "ibge": 2800308
+      }
+    },
+    {
+      "id": "BR-BA",
+      "code": "BA",
+      "ibge": 29,
+      "name": "Bahia",
+      "type": "state",
+      "region": "Nordeste",
+      "capital": {
+        "name": "Salvador",
+        "ibge": 2927408
+      }
+    },
+    {
+      "id": "BR-MG",
+      "code": "MG",
+      "ibge": 31,
+      "name": "Minas Gerais",
+      "type": "state",
+      "region": "Sudeste",
+      "capital": {
+        "name": "Belo Horizonte",
+        "ibge": 3106200
+      }
+    },
+    {
+      "id": "BR-ES",
+      "code": "ES",
+      "ibge": 32,
+      "name": "Espírito Santo",
+      "type": "state",
+      "region": "Sudeste",
+      "capital": {
+        "name": "Vitória",
+        "ibge": 3205309
+      }
+    },
+    {
+      "id": "BR-RJ",
+      "code": "RJ",
+      "ibge": 33,
+      "name": "Rio de Janeiro",
+      "type": "state",
+      "region": "Sudeste",
+      "capital": {
+        "name": "Rio de Janeiro",
+        "ibge": 3304557
+      }
+    },
+    {
+      "id": "BR-SP",
+      "code": "SP",
+      "ibge": 35,
+      "name": "São Paulo",
+      "type": "state",
+      "region": "Sudeste",
+      "capital": {
+        "name": "São Paulo",
+        "ibge": 3550308
+      }
+    },
+    {
+      "id": "BR-PR",
+      "code": "PR",
+      "ibge": 41,
+      "name": "Paraná",
+      "type": "state",
+      "region": "Sul",
+      "capital": {
+        "name": "Curitiba",
+        "ibge": 4106902
+      }
+    },
+    {
+      "id": "BR-SC",
+      "code": "SC",
+      "ibge": 42,
+      "name": "Santa Catarina",
+      "type": "state",
+      "region": "Sul",
+      "capital": {
+        "name": "Florianópolis",
+        "ibge": 4205407
+      }
+    },
+    {
+      "id": "BR-RS",
+      "code": "RS",
+      "ibge": 43,
+      "name": "Rio Grande do Sul",
+      "type": "state",
+      "region": "Sul",
+      "capital": {
+        "name": "Porto Alegre",
+        "ibge": 4314902
+      }
+    },
+    {
+      "id": "BR-MS",
+      "code": "MS",
+      "ibge": 50,
+      "name": "Mato Grosso do Sul",
+      "type": "state",
+      "region": "Centro-Oeste",
+      "capital": {
+        "name": "Campo Grande",
+        "ibge": 5002704
+      }
+    },
+    {
+      "id": "BR-MT",
+      "code": "MT",
+      "ibge": 51,
+      "name": "Mato Grosso",
+      "type": "state",
+      "region": "Centro-Oeste",
+      "capital": {
+        "name": "Cuiabá",
+        "ibge": 5103403
+      }
+    },
+    {
+      "id": "BR-GO",
+      "code": "GO",
+      "ibge": 52,
+      "name": "Goiás",
+      "type": "state",
+      "region": "Centro-Oeste",
+      "capital": {
+        "name": "Goiânia",
+        "ibge": 5208707
+      }
+    },
+    {
+      "id": "BR-DF",
+      "code": "DF",
+      "ibge": 53,
+      "name": "Distrito Federal",
+      "type": "district",
+      "region": "Centro-Oeste",
+      "capital": {
+        "name": "Brasília",
+        "ibge": 5300108
+      }
+    }
+  ],
+  "places": []
+}
