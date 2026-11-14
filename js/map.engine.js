@@ -348,9 +348,9 @@ function polygonBorder(polygon, material) {
 
 const HIGHLIGHTED_BORDER_STATES = new Set(['selected', 'visited', 'visa-free', 'visa-free-hover']);
 
-// Linguagem de movimento do globo (ms). Durações de referência; o voo ajusta
-// pelo ângulo percorrido, dentro dos limites.
-export const MOTION = Object.freeze({ camera: 850, cameraMin: 320, cameraMax: 1400, city: 700, zoom: 380 });
+// Linguagem de movimento do globo (ms). Durações de referência (máximas): o voo
+// encurta os saltos curtos pelo ângulo percorrido.
+export const MOTION = Object.freeze({ camera: 850, city: 700, zoom: 380 });
 const easeInOutCubic = t => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
@@ -368,13 +368,19 @@ export class MapEngine {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.localClippingEnabled = true;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    // Resolução dinâmica: nítida parada, mais leve em movimento (giro, zoom, voo).
+    this.idlePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.motionPixelRatio = Math.min(window.devicePixelRatio || 1, 1);
+    this.renderer.setPixelRatio(this.idlePixelRatio);
+    this.interacting = false;
+    this.restoreResolutionTimer = 0;
+    this.landTweens = new Map(); // material → transição de cor
     this.renderer.setClearAlpha(0);
     this.renderer.domElement.className = 'globe__canvas';
     this.renderer.domElement.tabIndex = 0;
     this.stage.appendChild(this.renderer.domElement);
 
-    this.camera.position.copy(latLngToCartesian(18, -18, 3.05, GLOBE_YAW, GLOBE_ORIGIN));
+    this.camera.position.copy(latLngToCartesian(18, -18, this.#homeDistance(), GLOBE_YAW, GLOBE_ORIGIN));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.055;
@@ -444,13 +450,9 @@ export class MapEngine {
   }
 
   #createOcean() {
-    this.oceanMaterial = new THREE.MeshPhysicalMaterial({
-      roughness: 0.8,
-      metalness: 0,
-      clearcoat: 0.04,
-      clearcoatRoughness: 0.9,
-      ior: 1.33
-    });
+    // Material padrão: o oceano cobre a maior área da tela, e o clearcoat do
+    // material físico (4%, imperceptível) custava um cálculo extra por pixel.
+    this.oceanMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 });
     this.ocean = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 80, 56), this.oceanMaterial);
     this.ocean.position.copy(GLOBE_ORIGIN);
     this.ocean.rotation.y = GLOBE_YAW;
@@ -555,13 +557,28 @@ export class MapEngine {
     this.fillLight = new THREE.DirectionalLight(colorToken('--color-light-fill'), 0.72);
     this.fillLight.position.set(-4.2, 0.4, 3.1);
     this.scene.add(this.ambientLight, this.hemisphereLight, this.keyLight, this.fillLight);
+    // As luzes principal e de preenchimento acompanham a câmera: guarda a posição
+    // delas relativa à vista inicial e a reaplica a cada quadro, então qualquer
+    // região do globo recebe a mesma iluminação da abertura (antes Ásia e Oceania
+    // ficavam no lado escuro).
+    this.camera.lookAt(GLOBE_ORIGIN);
+    this.camera.updateMatrixWorld(true);
+    const toCamera = this.camera.matrixWorld.clone().invert();
+    this.keyLightOffset = this.keyLight.position.clone().applyMatrix4(toCamera);
+    this.fillLightOffset = this.fillLight.position.clone().applyMatrix4(toCamera);
+  }
+
+  #followCameraLights() {
+    this.keyLight.position.copy(this.keyLightOffset).applyMatrix4(this.camera.matrixWorld);
+    this.fillLight.position.copy(this.fillLightOffset).applyMatrix4(this.camera.matrixWorld);
   }
 
   async init() {
     this.resize();
     if (!this.renderStarted) {
       this.renderStarted = true;
-      this.controls.addEventListener('start', () => this.invalidate());
+      this.controls.addEventListener('start', () => { this.interacting = true; this.invalidate(); });
+      this.controls.addEventListener('end', () => { this.interacting = false; this.invalidate(); });
       this.controls.addEventListener('change', () => this.invalidate());
       this.invalidate();
     }
@@ -575,6 +592,9 @@ export class MapEngine {
     this.#buildGlobalBorders(topojson, topology);
     await this.#buildWorld(features);
     this.#buildSmallDestinationHotspots();
+    // Compila os shaders em paralelo (KHR_parallel_shader_compile) em vez de
+    // travar a página no primeiro quadro com os países.
+    if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera).catch(() => {});
     this.ready = true;
     this.setTheme();
     this.resize();
@@ -767,7 +787,15 @@ export class MapEngine {
         return;
       }
       const countryKey = this.pickCountry(clientX, clientY);
+      if (countryKey && this.#isExploring(countryKey)) {
+        // País já escolhido: o clique vai para as cidades (ou aproxima), não para o país.
+        this.#setHovered(null);
+        this.stage.classList.remove('globe__stage--interactive');
+        this.callbacks.onHover?.(null, clientX, clientY);
+        return;
+      }
       this.#setHovered(countryKey);
+      if (countryKey) this.adminLayer.prefetch(COUNTRIES[countryKey]?.alpha2);
       if (countryKey) {
         this.stage.classList.add('globe__stage--interactive');
         this.callbacks.onHover?.(countryKey, clientX, clientY);
@@ -814,13 +842,16 @@ export class MapEngine {
         this.callbacks.onCitySelect?.(place);
         return;
       }
+      const countryKey = this.pickCountry(event.clientX, event.clientY);
+      // País já escolhido: o clique nunca repete a seleção do país. Cada ponto
+      // dele pertence a uma cidade (mancha urbana ou região), já tratado acima.
+      if (countryKey && this.#isExploring(countryKey)) return;
       if (place?.kind === 'state') {
         // Estado: aproxima até ver as cidades dele.
         const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
         this.flyTo(place.lat, place.lng, Math.max(this.controls.minDistance, Math.min(distance * 0.82, 1.32)), 700);
         return;
       }
-      const countryKey = this.pickCountry(event.clientX, event.clientY);
       if (countryKey) this.callbacks.onSelect?.(countryKey);
     });
   }
@@ -946,9 +977,7 @@ export class MapEngine {
         : '--color-land-border';
 
     const fillColor = colorToken(colorName);
-    record.landMaterial.color.copy(fillColor);
-    record.landMaterial.emissive.copy(fillColor);
-    record.landMaterial.emissiveIntensity = state === 'selected'
+    this.#tweenLand(record.landMaterial, fillColor, state === 'hover' || state === 'visa-free-hover' ? 140 : 280, state === 'selected'
       ? 0.13
       : state === 'visa-free-hover'
         ? 0.09
@@ -958,7 +987,7 @@ export class MapEngine {
             ? 0.075
             : state === 'visited'
               ? 0.045
-              : 0.025;
+              : 0.025);
     record.landMaterial.opacity = state === 'visa-dimmed' ? 0.25 : state === 'dimmed' ? 0.52 : 1;
     record.landMaterial.transparent = state === 'visa-dimmed' || state === 'dimmed';
     const highlighted = HIGHLIGHTED_BORDER_STATES.has(state);
@@ -983,6 +1012,55 @@ export class MapEngine {
               : state === 'dimmed'
                 ? 0.28
                 : 0.76;
+  }
+
+  // Transição de cor/brilho de um material de terra (ease-out cúbico).
+  #tweenLand(material, color, duration, intensity) {
+    if (!this.ready || this.reducedMotionQuery.matches) {
+      material.color.copy(color);
+      material.emissive.copy(color);
+      material.emissiveIntensity = intensity;
+      this.landTweens.delete(material);
+      return;
+    }
+    const tween = this.landTweens.get(material);
+    if (tween ? tween.toColor.equals(color) && tween.toIntensity === intensity
+      : material.color.equals(color) && material.emissiveIntensity === intensity) return;
+    this.landTweens.set(material, {
+      fromColor: material.color.clone(), toColor: color.clone(),
+      fromIntensity: material.emissiveIntensity, toIntensity: intensity,
+      start: performance.now(), duration
+    });
+    this.invalidate();
+  }
+
+  #updateLandTweens(now) {
+    for (const [material, tween] of this.landTweens) {
+      const t = THREE.MathUtils.clamp((now - tween.start) / tween.duration, 0, 1);
+      const eased = 1 - (1 - t) ** 3;
+      material.color.copy(tween.fromColor).lerp(tween.toColor, eased);
+      material.emissive.copy(material.color);
+      material.emissiveIntensity = THREE.MathUtils.lerp(tween.fromIntensity, tween.toIntensity, eased);
+      if (t >= 1) this.landTweens.delete(material);
+    }
+    return this.landTweens.size > 0;
+  }
+
+  // Menos pixels enquanto a câmera se move; resolução cheia ~200 ms depois de parar.
+  #setMotionResolution(moving) {
+    if (moving) {
+      clearTimeout(this.restoreResolutionTimer);
+      this.restoreResolutionTimer = 0;
+      if (this.renderer.getPixelRatio() !== this.motionPixelRatio) this.renderer.setPixelRatio(this.motionPixelRatio);
+      return;
+    }
+    if (this.renderer.getPixelRatio() === this.idlePixelRatio || this.restoreResolutionTimer) return;
+    this.restoreResolutionTimer = setTimeout(() => {
+      this.restoreResolutionTimer = 0;
+      if (this.disposed) return;
+      this.renderer.setPixelRatio(this.idlePixelRatio);
+      this.invalidate();
+    }, 200);
   }
 
   #refreshCountryMaterials() {
@@ -1050,7 +1128,7 @@ export class MapEngine {
     this.activeContinent = null;
     this.clearSelection();
     this.#refreshCountryMaterials();
-    this.flyTo(18, -18, 3.05, 900);
+    this.flyTo(18, -18, this.#homeDistance(), 900);
   }
 
   /** Cidades de um país (ISO2), do mesmo arquivo usado no globo. */
@@ -1062,7 +1140,18 @@ export class MapEngine {
   pickPlace(clientX, clientY) {
     if (!this.ready) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
-    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top);
+    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top, () => this.#surfacePoint(clientX, clientY));
+  }
+
+  // Latitude/longitude do ponto da superfície sob o ponteiro (só o lado visível).
+  #surfacePoint(clientX, clientY) {
+    this.#pointerToNdc(clientX, clientY);
+    this.camera.updateMatrixWorld(true);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hit = this.raycaster.intersectObject(this.ocean, false)[0];
+    if (!hit) return null;
+    const { latitude, longitude } = cartesianToLatLng(hit.point, GLOBE_YAW, GLOBE_ORIGIN);
+    return { lat: latitude, lng: longitude };
   }
 
   // Destaca uma cidade e a centraliza sem mudar o zoom (ou aproximando um pouco).
@@ -1073,6 +1162,16 @@ export class MapEngine {
     this.flyTo(city.lat, city.lng, Math.min(distance, 1.3), MOTION.city);
   }
 
+  // O país já está escolhido: selecionado, ou é o país das cidades na tela
+  // depois de aproximar. Aí cliques e hover vão para as cidades.
+  #isExploring(countryKey) {
+    const alpha2 = COUNTRIES[countryKey]?.alpha2;
+    if (!alpha2 || alpha2 !== this.adminLayer.focusCode) return false;
+    // 2.08: a distância de quem acabou de selecionar um país (2.02); as vistas de
+    // continente ficam mais longe (≥ 2.15), então o primeiro clique ainda seleciona.
+    return countryKey === this.selectedCountry || this.camera.position.distanceTo(GLOBE_ORIGIN) <= 2.08;
+  }
+
   // Aproxima (factor < 1) ou afasta (factor > 1) mantendo o mesmo ponto no centro.
   zoom(factor) {
     if (this.routePreview) return;
@@ -1081,6 +1180,16 @@ export class MapEngine {
     // A escala vale para a altitude (distância até a superfície), como num mapa.
     const altitude = THREE.MathUtils.clamp((current - 1) * factor, this.controls.minDistance - 1, this.controls.maxDistance - 1);
     this.flyTo(latitude, longitude, 1 + altitude, MOTION.zoom);
+  }
+
+  // Distância da vista inicial: 3.05 em telas largas; em telas estreitas (celular
+  // em pé), o suficiente para o globo inteiro caber na largura, até o limite de zoom.
+  #homeDistance() {
+    const width = this.stage.clientWidth || window.innerWidth;
+    const height = this.stage.clientHeight || window.innerHeight;
+    const halfHorizontal = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * (width / Math.max(1, height)));
+    const fit = 1.08 / Math.sin(halfHorizontal);
+    return THREE.MathUtils.clamp(fit, 3.05, 4.6);
   }
 
   // Descarta a inércia que sobrou de um arraste. Sem isso, o giro guardado
@@ -1100,9 +1209,9 @@ export class MapEngine {
   /**
    * Voo de câmera até um ponto. Só um voo controla a câmera: um novo pedido
    * substitui o anterior a partir de onde a câmera está, sem parar (o novo voo
-   * já começa em movimento). A duração acompanha o ângulo percorrido e, entre
-   * pontos distantes vistos de perto, a câmera sobe um pouco no meio do caminho
-   * para manter o contexto do mapa.
+   * já começa em movimento). A duração acompanha o ângulo percorrido, sem passar do valor pedido (a prévia
+   * de rota depende disso), e nos voos longos a câmera sobe um pouco no meio do
+   * caminho para manter o contexto do mapa.
    */
   flyTo(latitude, longitude, distance = 2.05, duration = MOTION.camera) {
     this.invalidate();
@@ -1125,12 +1234,17 @@ export class MapEngine {
       .normalize();
     const angle = startDirection.angleTo(endDirection);
     const rotation = new THREE.Quaternion().setFromUnitVectors(startDirection, endDirection);
-    const close = Math.max(startDistance, distance) < 1.9;
+    // Duração proporcional à distância (saltos curtos são rápidos; nunca passa do
+    // valor pedido, do qual a prévia de rota depende) e um arco suave nos voos
+    // longos: a câmera sobe um pouco no meio do caminho, como num globo de mapas.
+    // Um voo que interrompe outro já começa em movimento (sem acelerar do zero).
+    const adaptive = THREE.MathUtils.clamp(380 + angle * 700, duration * 0.55, duration);
+    const arc = angle > 0.35 && distance < 3.2 ? Math.min(0.9, angle * 0.45) : 0;
     this.cameraFlight = {
       startedAt: null, // definido no primeiro quadro, no mesmo relógio do requestAnimationFrame
-      duration: THREE.MathUtils.clamp(duration * (0.75 + angle / 1.2), MOTION.cameraMin, MOTION.cameraMax),
+      duration: adaptive,
       ease: interrupted ? easeOutCubic : easeInOutCubic,
-      arc: close && angle > 0.12 ? Math.min(0.9, angle * 0.8) : 0,
+      arc,
       startDirection,
       startDistance,
       endDistance: distance,
@@ -1178,7 +1292,6 @@ export class MapEngine {
     this.oceanMaterial.emissive.copy(colorToken('--color-ocean-emissive'));
     this.oceanMaterial.emissiveIntensity = dark ? 0.1 : 0.06;
     this.oceanMaterial.roughness = dark ? 0.82 : 0.78;
-    this.oceanMaterial.clearcoat = dark ? 0.03 : 0.05;
     this.atmosphereMaterial.uniforms.atmosphereColor.value.copy(colorToken('--color-globe-atmosphere'));
     this.atmosphereMaterial.uniforms.atmosphereOpacity.value = dark ? 0.12 : 0.07;
     this.graticuleMaterial.color.copy(colorToken('--color-graticule'));
@@ -1313,6 +1426,8 @@ export class MapEngine {
     this.frameScheduled = false;
     if (this.disposed) return;
     let animating = this.#updateViewInset(timestamp);
+    let cameraMoving = Boolean(this.cameraFlight || this.routePreview || this.interacting);
+    if (this.#updateLandTweens(performance.now())) animating = true;
     if (this.cameraFlight) animating = true;
     this.#updateCameraFlight(timestamp);
     if (this.routePreview) animating = true;
@@ -1329,12 +1444,17 @@ export class MapEngine {
         preview.arrivalReported = true;
         this.callbacks.onRouteArrived?.();
       }
-    } else if (!this.cameraFlight && this.controls.update()) animating = true; // amortecimento ainda girando
+    } else if (!this.cameraFlight && this.controls.update()) { // amortecimento ainda girando
+      animating = true;
+      cameraMoving = true;
+    }
+    this.#setMotionResolution(cameraMoving);
     this.#updateHorizonClip();
     // Perto da superfície o giro por pixel precisa ser menor, como num mapa.
     const altitude = this.camera.position.length() - 1;
     this.controls.rotateSpeed = 0.52 * THREE.MathUtils.clamp(altitude / 1.6, 0.025, 1);
     this.camera.updateMatrixWorld();
+    this.#followCameraLights();
     if (this.routePreview) this.adminLayer.hide();
     else this.adminLayer.update();
     this.renderer.render(this.scene, this.camera);
@@ -1347,6 +1467,7 @@ export class MapEngine {
     this.disposed = true;
     this.onPointerMove?.cancel?.();
     this.resizeObserver?.disconnect();
+    clearTimeout(this.restoreResolutionTimer);
     cancelAnimationFrame(this.resizeFrame);
     this.controls.dispose();
     this.flightVisualization.dispose();

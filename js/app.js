@@ -1,5 +1,6 @@
 import { AirportRepository } from './airports.repository.js';
 import { createCityCard } from './city.card.js';
+import { attachIndicator } from './core/indicator.js';
 import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
 import { escapeHtml } from './core/html.js';
 import {
@@ -504,7 +505,8 @@ async function openSaved(item) {
   if (item.type === 'city' && !item.placeId) {
     // Cidade do globo: abre o cartão da cidade, como um clique no mapa.
     const city = await findSavedCity(item);
-    if (city) return selectCity(city);
+    // Vindo da lista de salvos, a câmera precisa ir até a cidade.
+    if (city) return selectCity(city, { fly: true });
     // Cidade não reencontrada com segurança: abre o país e mostra o ponto salvo.
     selectCountry(item.countryKey);
     if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, 1.7);
@@ -727,7 +729,8 @@ function renderCountry(countryKey) {
 
 // Cidade clicada no globo: cartão próprio; o painel do país fica como está.
 let cityCard = null;
-function selectCity(city) {
+// Clique no globo: a vista fica onde está (sem voo nem zoom).
+function selectCity(city, { fly = false } = {}) {
   if (!city) return;
   cityCard ??= createCityCard({
     root: document.getElementById('city-card'),
@@ -744,7 +747,7 @@ function selectCity(city) {
       }
     }
   });
-  state.map?.selectCity(city);
+  state.map?.selectCity(city, { fly });
   cityCard.show(city);
 }
 
@@ -1083,6 +1086,7 @@ async function initializeMap() {
       onProgress: message => { elements.globeStatus.lastElementChild.textContent = message; },
       onReady: () => {
         elements.globeStatus.classList.add('globe__status--hidden');
+        document.getElementById('globe')?.classList.add('globe--ready');
         updateFlightPreviewAvailability();
       }
     });
@@ -1094,6 +1098,7 @@ async function initializeMap() {
     elements.globeFallback.classList.remove('globe__fallback--visible');
   } catch (error) {
     console.error('Traveling map initialization failed:', error);
+    document.getElementById('globe')?.classList.add('globe--ready');
     elements.globeStatus.classList.add('globe__status--hidden');
     elements.globeFallback.classList.add('globe__fallback--visible');
     const detail = elements.globeFallback.querySelector('span');
@@ -1357,6 +1362,10 @@ function initialize() {
   renderVisitedCount();
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   bindUiEvents();
+  // Indicadores deslizantes: continentes (pílula) e abas (traço).
+  attachIndicator(document.querySelector('.continent-nav'), { active: '.continent-nav__button--active' });
+  attachIndicator(document.querySelector('.country-tabs'), { active: '.country-tabs__button--active', mode: 'underline' });
+  attachIndicator(document.getElementById('miles-tabs'), { active: '.miles-tab--active', mode: 'underline' });
   watchGlobeInset();
   watchHeaderLayout();
   state.milesEngine = milesPlaceholder;
