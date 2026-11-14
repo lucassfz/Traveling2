@@ -9,16 +9,23 @@ const PTAX_API = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/
 const SNAPSHOT_URL = new URL('../data/fx-snapshot.json', import.meta.url);
 const SESSION_KEY = 'traveling.fx.ptax-usd';
 const PTAX_LOOKBACK_DAYS = 7;
+// Moedas com PTAX diária na API Olinda; as demais só existem no boletim de fechamento.
+export const PTAX_CURRENCIES = Object.freeze(['AUD', 'CAD', 'CHF', 'DKK', 'EUR', 'GBP', 'JPY', 'NOK', 'SEK', 'USD']);
 
 const pad = value => String(value).padStart(2, '0');
 const isoDate = date => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 const ptaxDate = date => `${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}-${date.getUTCFullYear()}`;
 
 export function ptaxUsdUrl(now = new Date()) {
+  return ptaxUrl('USD', now);
+}
+
+export function ptaxUrl(code, now = new Date()) {
+  if (!PTAX_CURRENCIES.includes(code)) throw new Error(`Moeda sem PTAX diária: ${code}`);
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const start = new Date(end.getTime() - PTAX_LOOKBACK_DAYS * 86_400_000);
   return `${PTAX_API}CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)`
-    + `?@moeda='USD'&@dataInicial='${ptaxDate(start)}'&@dataFinalCotacao='${ptaxDate(end)}'`
+    + `?@moeda='${code}'&@dataInicial='${ptaxDate(start)}'&@dataFinalCotacao='${ptaxDate(end)}'`
     + '&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao,tipoBoletim';
 }
 
@@ -78,18 +85,20 @@ async function fetchWithTimeout(url, timeoutMs) {
   }
 }
 
-function readSession() {
+const sessionKey = code => code === 'USD' ? SESSION_KEY : `traveling.fx.ptax-${code.toLowerCase()}`;
+
+function readSession(code) {
   try {
-    const value = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+    const value = JSON.parse(sessionStorage.getItem(sessionKey(code)));
     return Number.isFinite(value?.sell) && value?.date ? value : null;
   } catch {
     return null;
   }
 }
 
-function writeSession(value) {
+function writeSession(code, value) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(value));
+    sessionStorage.setItem(sessionKey(code), JSON.stringify(value));
   } catch {
     // Sem armazenamento: só perde o cache da sessão.
   }
@@ -116,26 +125,39 @@ export function loadFxSnapshot() {
  * Cotação do dólar em reais para estimativas.
  * @returns {Promise<{ rate: number, date: string, kind: 'live' | 'verified', label: string, source: string } | null>}
  */
-export async function resolveUsdRate({ now = new Date(), timeoutMs = 6000 } = {}) {
-  const cached = readSession();
-  if (cached && cached.checkedOn === isoDate(now)) return ptaxResult(cached);
-  try {
-    const response = await fetchWithTimeout(ptaxUsdUrl(now), timeoutMs);
-    if (response.ok) {
-      const parsed = parsePtaxResponse(await response.json());
-      if (parsed) {
-        writeSession({ ...parsed, checkedOn: isoDate(now) });
-        return ptaxResult(parsed);
+export function resolveUsdRate(options) {
+  return resolveCurrencyRate('USD', options);
+}
+
+/**
+ * Reais por 1 unidade de `code` (taxa de venda). Moeda com PTAX diária: cotação
+ * do dia pela API Olinda; demais moedas, ou falha da API: boletim de fechamento
+ * versionado. Mesmo formato de resolveUsdRate, com `code`.
+ * @returns {Promise<{ code: string, rate: number, date: string, kind: 'live' | 'verified', label: string, source: string } | null>}
+ */
+export async function resolveCurrencyRate(code, { now = new Date(), timeoutMs = 6000 } = {}) {
+  if (!/^[A-Z]{3}$/.test(String(code ?? ''))) return null;
+  if (PTAX_CURRENCIES.includes(code)) {
+    const cached = readSession(code);
+    if (cached && cached.checkedOn === isoDate(now)) return ptaxResult(code, cached);
+    try {
+      const response = await fetchWithTimeout(ptaxUrl(code, now), timeoutMs);
+      if (response.ok) {
+        const parsed = parsePtaxResponse(await response.json());
+        if (parsed) {
+          writeSession(code, { ...parsed, checkedOn: isoDate(now) });
+          return ptaxResult(code, parsed);
+        }
       }
+    } catch {
+      // Segue para o boletim versionado.
     }
-  } catch {
-    // Segue para o boletim versionado.
   }
   try {
     const snapshot = await loadFxSnapshot();
-    const usd = snapshot?.rates?.USD;
-    if (Number.isFinite(usd?.sell) && snapshot.date) {
-      return { rate: usd.sell, date: snapshot.date, kind: 'verified', label: 'Câmbio de referência (BCB, fechamento)', source: snapshot.sourceUrl || PTAX_SOURCE_URL };
+    const rate = snapshot?.rates?.[code];
+    if (Number.isFinite(rate?.sell) && rate.sell > 0 && snapshot.date) {
+      return { code, rate: rate.sell, date: snapshot.date, kind: 'verified', label: 'Câmbio de referência (BCB, fechamento)', source: snapshot.sourceUrl || PTAX_SOURCE_URL };
     }
   } catch {
     // Sem nenhuma fonte: quem chama mostra "câmbio indisponível".
@@ -143,6 +165,6 @@ export async function resolveUsdRate({ now = new Date(), timeoutMs = 6000 } = {}
   return null;
 }
 
-function ptaxResult(value) {
-  return { rate: value.sell, date: value.date, kind: 'live', label: 'Cotação PTAX (BCB)', source: PTAX_SOURCE_URL };
+function ptaxResult(code, value) {
+  return { code, rate: value.sell, date: value.date, kind: 'live', label: 'Cotação PTAX (BCB)', source: PTAX_SOURCE_URL };
 }

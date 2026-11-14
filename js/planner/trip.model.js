@@ -29,6 +29,14 @@ export const BUDGET_CATEGORIES = Object.freeze([
   { id: 'other', label: 'Outros' }
 ]);
 
+// Categoria de hospedagem usada nas estimativas de gastos no destino.
+export const LODGING_LEVELS = Object.freeze({
+  hostel: 'Albergue (cama em quarto compartilhado)',
+  simple: 'Simples (quarto privativo)',
+  comfort: 'Conforto (hotel 3–4★)',
+  superior: 'Superior (hotel 4–5★)'
+});
+
 // estimate = valor sugerido ou chutado; quote = preço encontrado pelo usuário;
 // paid = já pago.
 export const LINE_STATUSES = Object.freeze({
@@ -88,21 +96,52 @@ function normalizeSource(source) {
   if (!kind) return null;
   const clean = { kind };
   for (const key of ['model', 'detail', 'fx', 'reviewedOn']) if (source[key]) clean[key] = text(source[key], 200);
+  // Entradas da estimativa (valores por pessoa, por trecho ou por semana), para
+  // recalcular a linha quando datas, viajantes, hospedagem ou câmbio mudam.
+  if (source.basis && typeof source.basis === 'object') {
+    const basis = {};
+    for (const [key, value] of Object.entries(source.basis).slice(0, 12)) {
+      if (!/^[a-z][a-zA-Z]{0,23}$/.test(key)) continue;
+      if (typeof value === 'number' && Number.isFinite(value)) basis[key] = value;
+      else if (typeof value === 'string' && value.trim()) basis[key] = text(value, 80);
+    }
+    if (Object.keys(basis).length) clean.basis = basis;
+  }
   return clean;
+}
+
+// Moeda original de um gasto (ISO 4217). Real não é guardado: é o padrão.
+function lineCurrency(value) {
+  const code = String(value ?? '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) && code !== 'BRL' ? code : null;
 }
 
 export function normalizeLine(raw, { idFactory = randomId } = {}) {
   if (!raw || typeof raw !== 'object') return null;
-  const value = amount(raw.amountBRL);
+  // Gasto em moeda estrangeira: `amount` (na moeda) é a fonte; `amountBRL` é a
+  // última conversão, refeita pelo Planner sempre a partir de `amount`.
+  const currency = lineCurrency(raw.currency);
+  const original = currency ? amount(raw.amount) : null;
+  const foreign = currency && original !== null;
+  const value = amount(raw.amountBRL) ?? (foreign ? 0 : null);
   if (value === null) return null;
+  const fxRate = Number(raw.fx?.rate);
+  const fx = foreign && Number.isFinite(fxRate) && fxRate > 0 && isoDate(raw.fx?.date) ? { rate: fxRate, date: raw.fx.date } : null;
   return {
     id: /^[a-z]_[a-z0-9]{4,20}$/i.test(raw.id ?? '') ? raw.id : idFactory('l'),
     category: CATEGORY_IDS.has(raw.category) ? raw.category : 'other',
     note: text(raw.note),
     amountBRL: value,
     status: Object.hasOwn(LINE_STATUSES, raw.status) ? raw.status : 'estimate',
+    ...(foreign ? { currency, amount: original } : {}),
+    ...(fx ? { fx } : {}),
     ...(normalizeSource(raw.source) ? { source: normalizeSource(raw.source) } : {})
   };
+}
+
+// Linha calculada pelo Traveling: valor e descrição não são digitáveis.
+export function isEstimateLine(line) {
+  return line?.source?.kind === 'traveling-estimate';
 }
 
 function normalizeMiles(raw) {
@@ -145,6 +184,7 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     countryKey,
     origin: airportCode(raw.origin),
     cabin: ['economy', 'premium', 'business'].includes(raw.cabin) ? raw.cabin : 'economy',
+    lodging: Object.hasOwn(LODGING_LEVELS, raw.lodging) ? raw.lodging : 'simple',
     startDate,
     endDate,
     travelers: clampTravelers(raw.travelers),
@@ -192,7 +232,17 @@ export function addLine(trip, line, options) {
 }
 
 export function updateLine(trip, lineId, changes, options) {
-  return updateTrip(trip, { lines: trip.lines.map(line => line.id === lineId ? { ...line, ...changes, id: line.id } : line) }, options);
+  return updateTrip(trip, { lines: trip.lines.map(line => {
+    if (line.id !== lineId) return line;
+    const next = { ...line, ...changes, id: line.id };
+    // Voltar para reais: o valor digitado passa a ser o próprio valor em reais.
+    if (Object.hasOwn(changes, 'currency') && !lineCurrency(changes.currency)) {
+      delete next.currency;
+      delete next.amount;
+      delete next.fx;
+    }
+    return next;
+  }) }, options);
 }
 
 export function removeLine(trip, lineId, options) {
@@ -203,6 +253,12 @@ export function removeLine(trip, lineId, options) {
 export function tripDays(trip) {
   if (!trip?.startDate || !trip?.endDate) return null;
   return Math.round((Date.parse(`${trip.endDate}T00:00:00Z`) - Date.parse(`${trip.startDate}T00:00:00Z`)) / DAY_MS) + 1;
+}
+
+// Noites de hospedagem (dias − 1). null sem as duas datas.
+export function tripNights(trip) {
+  const days = tripDays(trip);
+  return days === null ? null : Math.max(0, days - 1);
 }
 
 // Mês (0–11) da data de ida, para estimativas sazonais e checklist.

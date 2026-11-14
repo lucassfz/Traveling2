@@ -2664,6 +2664,13 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-line__amount { text-align: right; font-variant-numeric: tabular-nums; }
 .planner-line__remove { width: 36px; height: 36px; }
 .planner-line__source { grid-column: 1 / -1; margin-top: -2px; }
+.planner-line__money { display: flex; gap: 4px; min-width: 0; }
+.planner-line__money .planner-line__amount { flex: 1 1 auto; min-width: 0; }
+.planner-line__money .planner-line__currency { flex: 0 0 auto; width: auto; padding-right: 4px; }
+/* Valores calculados pelo Traveling: leitura, sem aparência de campo digitável. */
+.planner-line .form-field__control[readonly],
+.planner-line .form-field__control:disabled { background: transparent; border-color: transparent; color: var(--color-text-secondary); cursor: default; box-shadow: none; }
+.planner-line .planner-line__amount[readonly] { color: var(--color-text); font-weight: 600; }
 .planner-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .planner-chip {
   height: 34px;
@@ -2685,12 +2692,26 @@ body.route-mode .app-header__brand { pointer-events: none; }
 .planner-details > summary::after { content: '+'; float: right; color: var(--color-text-muted); font-weight: 400; }
 .planner-details[open] > summary::after { content: '−'; }
 .planner-details > :not(summary) { margin: 0 var(--space-4) var(--space-4); }
-.planner-miles-result { display: grid; gap: var(--space-2); font-size: .86rem; line-height: 1.5; color: var(--color-text-secondary); }
-.planner-miles-result p { margin: 0; }
-.planner-miles-result strong { color: var(--color-text); }
 #planner-awards:empty { display: none; }
-#planner-awards { display: grid; gap: 2px; }
-#planner-awards .planner-hint { font-variant-numeric: tabular-nums; }
+#planner-awards { display: grid; gap: var(--space-2); font-variant-numeric: tabular-nums; }
+#planner-awards p { margin: 0; }
+.planner-award-headline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-2); font-size: .95rem; color: var(--color-text-secondary); }
+.planner-award-headline strong { color: var(--color-text); font-size: 1.05rem; }
+.planner-award-headline__vs { color: var(--color-text-muted); font-size: .8rem; text-transform: uppercase; }
+.planner-award-verdict { font-size: .88rem; line-height: 1.5; color: var(--color-text-secondary); }
+.planner-award-verdict strong { color: var(--color-text); }
+.planner-awards { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.planner-award { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); }
+.planner-award--best { border-color: var(--color-accent); background: var(--color-accent-soft); }
+.planner-award__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--space-2); }
+.planner-award__head small { flex-basis: 100%; color: var(--color-text-muted); font-size: .78rem; }
+.planner-award__badge { padding: 1px 8px; border-radius: 999px; background: var(--color-accent); color: var(--color-surface); font-size: .72rem; font-weight: 600; }
+.planner-award__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.planner-award__facts dt { color: var(--color-text-muted); font-size: .72rem; }
+.planner-award__facts dd { margin: 0; font-size: .86rem; font-weight: 600; color: var(--color-text); }
+.planner-award__gain { color: var(--color-success); }
+.planner-award__loss { color: var(--color-danger); }
+.planner-award__note { color: var(--color-text-muted); font-size: .76rem; line-height: 1.45; }
 
 /* Etapa 5 */
 .planner-prep__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
@@ -2755,7 +2776,8 @@ body.route-mode .app-header__brand { pointer-events: none; }
   .planner-line, .planner-line--fixed { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px; }
   .planner-line__note { grid-column: 1 / -1; grid-row: 1; }
   .planner-line__category { grid-row: 2; }
-  .planner-line__amount { grid-row: 2; }
+  .planner-line__money { grid-row: 2; }
+  .planner-award__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .planner-line__remove { grid-row: 2; }
   .planner-line__status { grid-column: 1 / -1; grid-row: 3; }
   .planner-line--fixed .planner-line__status { grid-column: auto; grid-row: 2; }

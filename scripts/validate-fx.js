@@ -1,7 +1,7 @@
 // Auditoria offline do câmbio (js/fx.service.js e data/fx-snapshot.json).
 import assert from 'node:assert/strict';
 import { COUNTRIES } from '../js/countries.dataset.js';
-import { localPerBrl, loadFxSnapshot, parseClosingCsv, parsePtaxResponse, ptaxUsdUrl } from '../js/fx.service.js';
+import { PTAX_CURRENCIES, localPerBrl, loadFxSnapshot, parseClosingCsv, parsePtaxResponse, ptaxUrl, ptaxUsdUrl } from '../js/fx.service.js';
 
 // PTAX: só o último boletim de Fechamento conta, mesmo com intermediários depois.
 const ptax = parsePtaxResponse({ value: [
@@ -19,6 +19,10 @@ assert.equal(parsePtaxResponse({ value: [{ cotacaoVenda: -1, dataHoraCotacao: '2
 const url = ptaxUsdUrl(new Date(Date.UTC(2026, 10, 15)));
 assert.ok(url.includes("@dataInicial='11-08-2026'") && url.includes("@dataFinalCotacao='11-15-2026'"), url);
 assert.ok(url.startsWith('https://olinda.bcb.gov.br/'));
+assert.ok(ptaxUrl('EUR', new Date(Date.UTC(2026, 10, 15))).includes("@moeda='EUR'"), 'PTAX diária de outras moedas');
+assert.equal(ptaxUrl('USD', new Date(Date.UTC(2026, 10, 15))), url);
+assert.throws(() => ptaxUrl('CLP'), /sem PTAX/, 'moeda fora da PTAX diária usa o boletim');
+assert.ok(PTAX_CURRENCIES.includes('EUR') && PTAX_CURRENCIES.includes('JPY'));
 
 // Boletim de fechamento (CSV).
 const csv = '12/11/2026;040;A;CRC;0,01226000;0,01262000;444,82;458,00\r\n12/11/2026;220;A;USD;5,61370000;5,61430000;1,00;1,00\r\n\r\n';
