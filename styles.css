@@ -2234,8 +2234,11 @@ select optgroup {
   --tooltip-y: 0px;
   position: fixed;
   z-index: 400;
-  left: var(--tooltip-x);
-  top: var(--tooltip-y);
+  /* Posição por transform (compositor), sem recalcular layout a cada movimento. */
+  left: 0;
+  top: 0;
+  transform: translate3d(var(--tooltip-x), var(--tooltip-y), 0);
+  will-change: transform;
   display: none;
   align-items: center;
   gap: 9px;
@@ -2289,8 +2292,8 @@ select optgroup {
 }
 
 @keyframes tooltipIn {
-  from { opacity: 0; transform: translate3d(-3px, 3px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+  from { opacity: 0; translate: -3px 3px; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 @media (max-width: 1279px) {
@@ -3189,3 +3192,192 @@ body.route-mode .city-card { visibility: hidden; }
 .planner-city__name small { color: var(--color-text-secondary); font-size: .76rem; }
 .discovery-cities { display: grid; gap: 6px; }
 .discovery-cities:empty { display: none; }
+
+/* =====================================================================
+   Movimento (2026-11). Um só sistema: curvas, durações e entradas em
+   cascata. Só transform e opacity (compositor), nada que force layout.
+   Painéis fechados ficam invisíveis para o compositor depois da saída, então
+   o vidro deles não custa nada fora da tela. Tudo respeita reduzir movimento.
+   ===================================================================== */
+:root {
+  --ease-out-expo: cubic-bezier(.16, 1, .3, 1);
+  --ease-out-back: cubic-bezier(.34, 1.36, .64, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-xs: 140ms;
+  --dur-sm: 220ms;
+  --dur-md: 380ms;
+  --dur-lg: 560ms;
+  --stagger: 38ms;
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translate3d(0, 8px, 0) scale(.98); }
+}
+
+/* Painéis laterais: deslizam e esmaecem; fechados saem do compositor. */
+.country-panel,
+.miles-hub {
+  transition:
+    transform var(--dur-lg) var(--ease-out-expo),
+    opacity var(--dur-md) var(--ease-out-expo),
+    visibility 0s linear var(--dur-lg);
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+}
+.country-panel--open,
+.miles-hub--open {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform var(--dur-lg) var(--ease-out-expo),
+    opacity var(--dur-sm) var(--ease-out-expo),
+    visibility 0s linear 0s;
+}
+
+/* Vidro dos painéis grandes: mais denso e desfoque menor. Eles cobrem muito
+   do globo, que se move a cada quadro; desfoque grande ali é o maior custo de GPU. */
+.country-panel,
+.miles-hub,
+.discovery-panel,
+.flight-preview-panel {
+  --glass-tint-strong: color-mix(in srgb, var(--color-overlay) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+/* Conteúdo entra em cascata ao abrir (primeiros itens; o resto entra junto). */
+.country-panel--open .country-panel__identity,
+.country-panel--open .country-tabs,
+.country-panel--open .country-tab--active > *,
+.miles-hub--open .miles-hub__header,
+.miles-hub--open .miles-tabs,
+.miles-hub--open .miles-panel:not([hidden]) > *,
+.miles-hub--open .wizard > *,
+.miles-hub--open .planner-welcome > *,
+.miles-hub--open .planner-home > *,
+.discovery-panel:not([hidden]) .discovery-filters > *,
+.discovery-list > li {
+  animation: rise-in var(--dur-md) var(--ease-out-expo) both;
+}
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(1) { animation-delay: calc(var(--stagger) * 1); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(2) { animation-delay: calc(var(--stagger) * 2); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(3) { animation-delay: calc(var(--stagger) * 3); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(4) { animation-delay: calc(var(--stagger) * 4); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(5) { animation-delay: calc(var(--stagger) * 5); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(6) { animation-delay: calc(var(--stagger) * 6); }
+:is(.country-tab--active, .miles-panel, .wizard, .planner-welcome, .planner-home, .discovery-filters, .discovery-list) > :nth-child(n + 7) { animation-delay: calc(var(--stagger) * 7); }
+
+/* Etapas do Planner e abas: troca com esmaecimento curto. */
+.wizard__step { animation: fade-in var(--dur-sm) ease-out both; }
+.country-tab--active { animation: fade-in var(--dur-sm) ease-out both; }
+
+/* Cartões flutuantes. */
+.city-card { animation: pop-in var(--dur-md) var(--ease-out-expo) both; }
+.city-card--leaving { animation: pop-out var(--dur-sm) var(--ease-in-out) both; pointer-events: none; }
+.discovery-panel { animation: pop-in var(--dur-md) var(--ease-out-expo) both; }
+.discovery-card { transition: border-color var(--dur-sm) ease, background-color var(--dur-sm) ease, box-shadow var(--dur-sm) ease; }
+.discovery-card__detail { animation: rise-in var(--dur-md) var(--ease-out-expo) both; }
+
+/* Botões: elevação sutil no hover, compressão no toque. */
+.primary-button,
+.secondary-button,
+.choice,
+.discovery-chip,
+.miles-chip,
+.planner-idea,
+.planner-trip-card {
+  transition:
+    transform var(--dur-xs) var(--ease-out-expo),
+    background-color var(--dur-sm) ease,
+    border-color var(--dur-sm) ease,
+    box-shadow var(--dur-sm) ease,
+    color var(--dur-sm) ease,
+    filter var(--dur-sm) ease;
+}
+@media (hover: hover) {
+  .primary-button:hover:not(:disabled),
+  .secondary-button:hover:not(:disabled),
+  .planner-idea:hover,
+  .planner-trip-card:hover { transform: translate3d(0, -1px, 0); }
+}
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.choice:active,
+.discovery-chip:active,
+.miles-chip:active,
+.planner-idea:active,
+.planner-trip-card:active { transform: scale(.97); transition-duration: 80ms; }
+.choice--on,
+.discovery-chip[aria-pressed='true'],
+.miles-chip[aria-pressed='true'] { animation: chip-on var(--dur-sm) var(--ease-out-back); }
+@keyframes chip-on { from { transform: scale(.96); } to { transform: none; } }
+
+/* Indicador deslizante (js/core/indicator.js) sob abas e continentes. */
+.slide-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  width: var(--indicator-width, 0);
+  height: var(--indicator-height, 0);
+  border-radius: var(--radius-pill);
+  background: var(--color-text);
+  transform: translate3d(var(--indicator-x, 0), var(--indicator-y, 0), 0);
+  transition:
+    transform var(--dur-md) var(--ease-out-expo),
+    width var(--dur-md) var(--ease-out-expo),
+    opacity var(--dur-sm) ease;
+  pointer-events: none;
+}
+.slide-indicator--hidden { opacity: 0; }
+/* :where() = especificidade zero: quem já é sticky/fixed continua sendo (também serve de referência). */
+:where(.has-indicator) { position: relative; }
+.has-indicator { isolation: isolate; }
+.has-indicator > :not(.slide-indicator) { position: relative; z-index: 1; }
+/* Continentes: a pílula ativa desliza; o botão ativo deixa de pintar o próprio fundo. */
+.continent-nav.has-indicator .continent-nav__button--active { background: transparent; color: var(--color-background); }
+/* Abas: um traço desliza sob a aba ativa. */
+.country-tabs.has-indicator .slide-indicator,
+.miles-tabs.has-indicator .slide-indicator { height: 2px; border-radius: 2px; background: var(--color-accent); }
+.country-tabs.has-indicator .country-tabs__button::after { display: none; }
+.miles-tabs.has-indicator .miles-tab--active { border-bottom-color: transparent; }
+.miles-tabs.has-indicator .miles-tab--active::after { display: none; }
+
+/* Globo: aparece com um leve zoom quando a geometria está pronta. */
+.globe__canvas { transition: opacity var(--dur-lg) ease, transform 900ms var(--ease-out-expo); }
+.globe:not(.globe--ready) .globe__canvas { opacity: .35; transform: scale(.985); }
+
+/* Dica de uso e controles: entram depois do globo. */
+/* O dock centraliza com transform; a entrada anima a propriedade translate, que se soma a ele. */
+@keyframes dock-in { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+.dock { animation: dock-in var(--dur-lg) var(--ease-out-expo) .15s both; }
+.globe-zoom { animation: fade-in var(--dur-lg) ease .3s both; }
+
+/* Tooltip do país: só a opacidade transiciona; a posição segue o cursor sem atraso. */
+.country-tooltip { transition: opacity var(--dur-xs) ease; }
+
+/* Rolagem suave e barras discretas nos painéis. */
+.country-panel__body,
+.miles-hub,
+.discovery-panel { scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--color-text) 18%, transparent) transparent; }
+
+/* Seleção de texto na cor de destaque. */
+::selection { background: color-mix(in srgb, var(--color-accent) 35%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .country-panel, .miles-hub,
+  .country-panel--open, .miles-hub--open { transition-duration: .01ms; }
+  .globe:not(.globe--ready) .globe__canvas { opacity: 1; transform: none; }
+  .slide-indicator { transition: none; }
+}

@@ -1,5 +1,6 @@
 import { AirportRepository } from './airports.repository.js';
 import { createCityCard } from './city.card.js';
+import { attachIndicator } from './core/indicator.js';
 import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
 import { escapeHtml } from './core/html.js';
 import {
@@ -582,7 +583,8 @@ function renderCountry(countryKey) {
 
 // Cidade clicada no globo: cartão próprio; o painel do país fica como está.
 let cityCard = null;
-function selectCity(city) {
+// Clique no globo: a vista fica onde está (sem voo nem zoom).
+function selectCity(city, { fly = false } = {}) {
   if (!city) return;
   cityCard ??= createCityCard({
     root: document.getElementById('city-card'),
@@ -592,7 +594,7 @@ function selectCity(city) {
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => state.map?.selectCity(null)
   });
-  state.map?.selectCity(city);
+  state.map?.selectCity(city, { fly });
   cityCard.show(city);
 }
 
@@ -951,6 +953,7 @@ async function initializeMap() {
       onProgress: message => { elements.globeStatus.lastElementChild.textContent = message; },
       onReady: () => {
         elements.globeStatus.classList.add('globe__status--hidden');
+        document.getElementById('globe')?.classList.add('globe--ready');
         updateFlightPreviewAvailability();
       }
     });
@@ -962,6 +965,7 @@ async function initializeMap() {
     elements.globeFallback.classList.remove('globe__fallback--visible');
   } catch (error) {
     console.error('Traveling map initialization failed:', error);
+    document.getElementById('globe')?.classList.add('globe--ready');
     elements.globeStatus.classList.add('globe__status--hidden');
     elements.globeFallback.classList.add('globe__fallback--visible');
     const detail = elements.globeFallback.querySelector('span');
@@ -1211,6 +1215,10 @@ function initialize() {
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   updateAirportSuggestions();
   bindUiEvents();
+  // Indicadores deslizantes: continentes (pílula) e abas (traço).
+  attachIndicator(document.querySelector('.continent-nav'), { active: '.continent-nav__button--active' });
+  attachIndicator(document.querySelector('.country-tabs'), { active: '.country-tabs__button--active', mode: 'underline' });
+  attachIndicator(document.getElementById('miles-tabs'), { active: '.miles-tab--active', mode: 'underline' });
   watchGlobeInset();
   state.milesEngine = milesPlaceholder;
   renderTripsCount();

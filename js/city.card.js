@@ -49,8 +49,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     const facts = [
       ['População', formatPopulation(city.population)],
       ['Hora local', time],
-      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`],
-      ['Área urbana', city.hasOutline ? 'Contorno destacado no mapa' : null]
+      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`]
     ].filter(([, value]) => value);
     root.innerHTML = `
       <div class="city-card__head">
@@ -84,8 +83,13 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     if (action === 'plan' && countryKey) { const city = current; hide(); onPlan(countryKey, city); }
   });
 
+  let leaving = 0;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
   function show(city) {
     current = city;
+    clearTimeout(leaving);
+    root.classList.remove('city-card--leaving');
     render();
     root.hidden = false;
     clearInterval(clock);
@@ -99,12 +103,20 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
   }
 
   function hide(notify = false) {
-    if (root.hidden) return;
-    root.hidden = true;
+    if (root.hidden || !current) return;
     current = null;
+    // Sai com animação curta; reduzir movimento esconde na hora.
+    if (reducedMotion.matches) root.hidden = true;
+    else {
+      root.classList.add('city-card--leaving');
+      leaving = setTimeout(() => {
+        root.hidden = true;
+        root.classList.remove('city-card--leaving');
+      }, 200);
+    }
     clearInterval(clock);
     if (notify) onClose?.();
   }
 
-  return { show, hide, get isOpen() { return !root.hidden; } };
+  return { show, hide, get isOpen() { return Boolean(current); } };
 }
