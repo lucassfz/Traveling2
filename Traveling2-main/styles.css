@@ -752,15 +752,6 @@ select:focus-visible {
   outline: none;
 }
 
-/* O tema claro usa superfícies opacas: não há blur nem sombra em cada cartão. */
-[data-theme='light'] .search__results,
-[data-theme='light'] .continent-nav,
-[data-theme='light'] .country-panel,
-[data-theme='light'] .miles-hub,
-[data-theme='light'] .country-tooltip,
-[data-theme='light'] .flight-preview-panel {
-  backdrop-filter: none;
-}
 
 .globe__stage--interactive .globe__canvas {
   cursor: pointer;
@@ -2991,4 +2982,190 @@ body.route-mode .globe-zoom, body.route-mode .globe-hint { visibility: hidden; }
 @media (max-width: 600px) {
   .globe-zoom { right: 10px; bottom: 84px; }
   .globe-hint { bottom: 84px; font-size: .72rem; white-space: normal; width: max-content; max-width: calc(100vw - 90px); text-align: center; }
+}
+
+/* =====================================================================
+   Liquid glass (2026-11). Mesmas cores dos temas; muda só a matéria:
+   superfícies translúcidas com desfoque e saturação, borda de luz no topo,
+   reflexo diagonal sutil e sombra profunda. Painéis grandes usam um vidro
+   mais denso para manter a leitura. Sem transparência quando o sistema pede.
+   ===================================================================== */
+:root {
+  --glass-tint: rgba(255, 255, 255, .56);
+  --glass-tint-strong: rgba(250, 251, 252, .80);
+  --glass-edge: rgba(255, 255, 255, .75);
+  --glass-hairline: rgba(15, 23, 42, .09);
+  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, .12) 38%, rgba(255, 255, 255, 0) 62%);
+  --glass-blur: blur(26px) saturate(185%);
+  --glass-blur-soft: blur(16px) saturate(170%);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 0 0 1px var(--glass-hairline), 0 22px 50px -24px rgba(15, 23, 42, .32);
+  --glass-shadow-soft: 0 1px 0 rgba(255, 255, 255, .85) inset, 0 0 0 1px var(--glass-hairline), 0 10px 26px -14px rgba(15, 23, 42, .24);
+  --glass-fill: rgba(255, 255, 255, .5);
+  --glass-fill-hover: rgba(255, 255, 255, .78);
+}
+
+[data-theme='dark'] {
+  --glass-tint: rgba(16, 21, 33, .52);
+  --glass-tint-strong: rgba(11, 15, 24, .74);
+  --glass-edge: rgba(255, 255, 255, .14);
+  --glass-hairline: rgba(255, 255, 255, .07);
+  --glass-sheen: linear-gradient(135deg, rgba(255, 255, 255, .085) 0%, rgba(255, 255, 255, .02) 36%, rgba(255, 255, 255, 0) 60%);
+  --glass-blur: blur(28px) saturate(170%);
+  --glass-blur-soft: blur(18px) saturate(160%);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, .10) inset, 0 0 0 1px var(--glass-hairline), 0 28px 70px -28px rgba(0, 0, 0, .85);
+  --glass-shadow-soft: 0 1px 0 rgba(255, 255, 255, .09) inset, 0 0 0 1px var(--glass-hairline), 0 14px 34px -18px rgba(0, 0, 0, .7);
+  --glass-fill: rgba(255, 255, 255, .035);
+  --glass-fill-hover: rgba(255, 255, 255, .075);
+}
+
+/* Barras flutuantes e controles do globo */
+.app-header,
+.dock,
+.globe-zoom,
+.globe-hint,
+.globe__status,
+.globe__fallback,
+.country-tooltip,
+.search__results {
+  border-color: var(--glass-edge);
+  background: var(--glass-sheen), var(--glass-tint);
+  box-shadow: var(--glass-shadow-soft);
+  backdrop-filter: var(--glass-blur-soft);
+  -webkit-backdrop-filter: var(--glass-blur-soft);
+}
+.app-header { border-width: 0 0 1px; border-color: var(--glass-hairline); box-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 12px 30px -24px rgba(0, 0, 0, .6); }
+.dock { padding: 6px; }
+.continent-nav { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* Painéis: vidro denso, cantos arredondados e afastados das bordas da tela */
+.country-panel,
+.miles-hub,
+.discovery-panel,
+.flight-preview-panel,
+.city-card {
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-sheen), var(--glass-tint-strong);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+@media (min-width: 761px) {
+  .country-panel { top: calc(var(--header-height) + 10px); right: 10px; bottom: 10px; border-radius: 26px; overflow: hidden; }
+  .miles-hub { top: calc(var(--header-height) + 10px); left: 10px; bottom: 10px; border-radius: 26px; }
+  .discovery-panel { border-radius: 26px; }
+}
+
+/* Cartões e blocos dentro dos painéis: vidro leve */
+.planner-card,
+.planner-recap,
+.planner-destination-card,
+.planner-trip-card,
+.planner-idea,
+.miles-block,
+.miles-card,
+.discovery-card,
+.choice,
+.month-choice,
+.miles-detail {
+  border-color: var(--glass-hairline);
+  background-color: var(--glass-fill);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset;
+}
+.planner-trip-card:hover,
+.planner-idea:hover,
+.discovery-card__head:hover,
+.choice:hover,
+.month-choice:hover:not(:disabled) { background-color: var(--glass-fill-hover); }
+.discovery-card--open { background-color: var(--glass-fill-hover); }
+
+/* Botões: pílula de vidro com brilho no topo */
+.primary-button {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--color-text), color-mix(in srgb, var(--color-text) 86%, var(--color-background)));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset, 0 8px 22px -12px rgba(0, 0, 0, .55);
+}
+.primary-button:hover:not(:disabled) { filter: brightness(1.06); }
+.secondary-button,
+.icon-button,
+.visit-button {
+  border-color: var(--glass-edge);
+  background: var(--glass-fill);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset;
+}
+.secondary-button:hover,
+.icon-button:hover,
+.visit-button:hover { background: var(--glass-fill-hover); }
+.discovery-chip[aria-pressed='true'],
+.miles-chip[aria-pressed='true'],
+.choice--on,
+.month-choice.choice--on { box-shadow: 0 1px 0 rgba(255, 255, 255, .12) inset, 0 0 0 1px var(--color-accent), 0 6px 18px -10px var(--color-accent); }
+.discovery-chip, .miles-chip { background-color: var(--glass-fill); border-color: var(--glass-hairline); }
+.discovery-chip[aria-pressed='true'], .miles-chip[aria-pressed='true'] { background-color: var(--color-accent-soft); border-color: var(--color-accent); }
+
+/* Cartão de cidade (clique numa cidade do globo) */
+.city-card {
+  position: absolute;
+  left: 16px;
+  bottom: 96px;
+  z-index: 4;
+  width: min(340px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  color: var(--color-text);
+  animation: discovery-appear 200ms ease-out;
+}
+.city-card[hidden] { display: none; }
+.city-card__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.city-card__flag { width: 40px; height: 30px; margin-top: 4px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--glass-hairline); }
+.city-card__titles { display: grid; gap: 2px; min-width: 0; }
+.city-card__name { margin: 0; font-family: var(--font-display); font-size: 1.5rem; line-height: 1.1; overflow-wrap: anywhere; }
+.city-card__name:focus { outline: none; }
+.city-card__titles small { color: var(--color-text-secondary); font-size: .8rem; }
+.city-card__close { width: 32px; height: 32px; }
+.city-card__facts { display: grid; margin: 0; border-radius: 14px; overflow: hidden; box-shadow: 0 0 0 1px var(--glass-hairline); }
+.city-card__facts div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; background: var(--glass-fill); font-size: .8rem; }
+.city-card__facts div + div { border-top: 1px solid var(--glass-hairline); }
+.city-card__facts dt { color: var(--color-text-muted); }
+.city-card__facts dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.city-card__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.city-card__actions .primary-button { grid-column: 1 / -1; }
+.city-card__actions .secondary-button:only-child { grid-column: 1 / -1; }
+.city-card__source { margin: 0; color: var(--color-text-muted); font-size: .68rem; }
+body.route-mode .city-card { visibility: hidden; }
+@media (max-width: 600px) {
+  .city-card { left: 8px; right: 8px; bottom: 80px; width: auto; }
+}
+
+/* Cidades: hover e seleção no globo */
+.globe-label--hover { color: var(--color-accent-strong); }
+.globe-label--hover::before { background: var(--color-accent); }
+.globe-label--selected { z-index: 2; color: var(--color-accent-strong); font-weight: 700; font-size: 13px; }
+.globe-label--selected::before {
+  width: 8px;
+  height: 8px;
+  top: 2px;
+  left: -1px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent), 0 0 12px var(--color-accent);
+}
+
+/* Acessibilidade e desempenho: sem vidro quando o sistema pede menos transparência */
+@media (prefers-reduced-transparency: reduce) {
+  .app-header, .dock, .globe-zoom, .globe-hint, .globe__status, .globe__fallback, .country-tooltip, .search__results,
+  .country-panel, .miles-hub, .discovery-panel, .flight-preview-panel, .city-card {
+    background: var(--color-overlay);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Rótulos sobre o país selecionado: texto com a cor do fundo e halo da cor de destaque. */
+.globe-label--on-selected { color: var(--color-background); text-shadow: 0 0 3px var(--color-land-selected), 0 0 6px var(--color-land-selected); }
+.globe-label--on-selected.globe-label--state { color: color-mix(in srgb, var(--color-background) 88%, var(--color-land-selected)); text-shadow: 0 0 2px var(--color-land-selected), 0 0 2px var(--color-land-selected); }
+.globe-label--on-selected::before { background: var(--color-background); box-shadow: 0 0 0 1.5px var(--color-land-selected); }
+
+@media (max-width: 600px) {
+  .globe-hint { top: 12px; bottom: auto; }
 }
