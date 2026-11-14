@@ -17,7 +17,7 @@ function markSeen() {
 }
 
 /**
- * Small state machine for the SVG flight opener.
+ * Small state machine for the brand reveal (wordmark + hairline).
  * It does not wait for remote map assets: the dashboard remains usable if the
  * world-atlas request is slow or fails after the cinematic reveal.
  */
@@ -45,10 +45,7 @@ export class SplashEngine {
     markSeen();
     this.state = 'flying';
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (!prefersReducedMotion) {
-      this.root.querySelector('#splash-flight')?.beginElement?.();
-    }
-    const duration = prefersReducedMotion ? 180 : 2640;
+    const duration = prefersReducedMotion ? 180 : 1100;
     this.finishTimer = window.setTimeout(() => this.exit(), duration);
   }
 

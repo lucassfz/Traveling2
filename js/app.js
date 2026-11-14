@@ -38,11 +38,10 @@ const elements = {
   searchInput: document.getElementById('country-search-input'),
   searchResults: document.getElementById('country-search-results'),
   continentButtons: [...document.querySelectorAll('[data-continent]')],
-  navigationTrail: document.getElementById('navigation-trail'),
+  searchToggle: document.getElementById('search-toggle'),
   tooltip: document.getElementById('country-tooltip'),
   panel: document.getElementById('country-panel'),
   panelClose: document.getElementById('country-panel-close'),
-  path: document.getElementById('country-path'),
   visitButton: document.getElementById('visit-button'),
   countryFlag: document.getElementById('country-flag'),
   countryRegion: document.getElementById('country-region'),
@@ -109,8 +108,6 @@ const state = {
   tab: 'overview',
   visited: new Set(readJsonStorage(STORAGE_KEYS.visited, [])),
   checklist: readJsonStorage(STORAGE_KEYS.checklist, {}),
-  history: [],
-  historyActiveIndex: null,
   isVisaFreeBRFilterActive: false,
   // { rate, date, kind, label, source } de js/fx.service.js, ou null.
   brlPerUsd: null,
@@ -158,8 +155,8 @@ function savePersistentState() {
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   writeStorage(STORAGE_KEYS.theme, theme);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#05070c' : '#f4f6f7');
   const isDark = theme === 'dark';
-  elements.themeButton.textContent = isDark ? '☀️' : '🌙';
   elements.themeButton.setAttribute('aria-label', isDark ? 'Ativar modo claro' : 'Ativar modo escuro');
   state.map?.setTheme();
   state.starfield?.setTheme(theme);
@@ -203,6 +200,14 @@ function setSearchOpen(open) {
   elements.searchResults.classList.toggle('search__results--open', open);
 }
 
+// Depois de escolher um país, a busca sai do caminho (e recolhe no celular).
+function dismissSearch() {
+  elements.searchInput.value = '';
+  setSearchOpen(false);
+  elements.searchInput.blur();
+  document.body.classList.remove('search-open');
+}
+
 function renderSearchResults(query) {
   if (query.trim().length < 2) {
     elements.searchResults.innerHTML = '';
@@ -232,28 +237,6 @@ function renderContinentState() {
   for (const button of elements.continentButtons) {
     button.classList.toggle('continent-nav__button--active', button.dataset.continent === state.continent);
   }
-}
-
-function addHistory(entry) {
-  const key = `${entry.type}:${entry.key}`;
-  state.history = state.history.filter(item => `${item.type}:${item.key}` !== key);
-  state.history.push(entry);
-  if (state.history.length > 7) state.history.shift();
-  state.historyActiveIndex = state.history.length - 1;
-  renderHistory();
-}
-
-function renderHistory() {
-  elements.navigationTrail.innerHTML = state.history.length ? `<span class="navigation-trail__label">Recentes</span>${state.history.map((entry, index) => `
-    <button
-      class="navigation-trail__button ${index === state.historyActiveIndex ? 'navigation-trail__button--active' : ''}"
-      type="button"
-      data-history-index="${index}"
-      aria-label="Ir para ${escapeHtml(entry.label)}"
-      ${index === state.historyActiveIndex ? 'aria-current="location"' : ''}
-      title="Ir para ${escapeHtml(entry.label)}"
-    ></button>
-  `).join('')}` : '';
 }
 
 function switchTab(tabName) {
@@ -567,7 +550,6 @@ function renderCountry(countryKey) {
     : `<span class="country-panel__flag-fallback">${escapeHtml(country.alpha2 || '🌍')}</span>`;
   elements.countryRegion.textContent = country.region || CONTINENT_LABELS[country.continent];
   elements.countryName.textContent = country.namePt;
-  elements.path.textContent = `Mundo › ${country.region || CONTINENT_LABELS[country.continent]} › ${country.namePt}`;
   elements.visitButton.classList.toggle('visit-button--active', state.visited.has(countryKey));
   elements.visitButton.textContent = state.visited.has(countryKey) ? '✓ Visitado' : 'Marcar visitado';
 
@@ -589,7 +571,7 @@ function renderCountry(countryKey) {
   renderContinentState();
 }
 
-function selectCountry(countryKey, { recordHistory = true } = {}) {
+function selectCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
   closeFlightPreview(false);
@@ -598,7 +580,6 @@ function selectCountry(countryKey, { recordHistory = true } = {}) {
   if (window.innerWidth < 1200 && isPlannerOpen()) setPlannerOpen(false);
   state.map?.selectCountry(countryKey);
   renderCountry(countryKey);
-  if (recordHistory) addHistory({ type: 'country', key: countryKey, label: country.namePt });
 }
 
 function discoverDestination() {
@@ -615,12 +596,10 @@ function closeCountryPanel(restoreFocus = false) {
   clearMedia();
   state.map?.clearSelection();
   state.countryKey = null;
-  state.historyActiveIndex = null;
-  renderHistory();
   if (restoreFocus) elements.searchInput.focus({ preventScroll: true });
 }
 
-function selectContinent(continent, { recordHistory = true } = {}) {
+function selectContinent(continent) {
   closeFlightPreview(false);
   state.discovery?.close();
   state.continent = continent;
@@ -631,7 +610,6 @@ function selectContinent(continent, { recordHistory = true } = {}) {
   state.map?.clearSelection();
   state.map?.setContinent(continent);
   renderContinentState();
-  if (recordHistory) addHistory({ type: 'continent', key: continent, label: CONTINENT_LABELS[continent] || continent });
 }
 
 function home() {
@@ -639,8 +617,6 @@ function home() {
   state.discovery?.close();
   state.countryKey = null;
   state.continent = null;
-  state.history = [];
-  state.historyActiveIndex = null;
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
@@ -650,7 +626,6 @@ function home() {
     renderVisaFreeFilter();
   }
   renderContinentState();
-  renderHistory();
 }
 
 function toggleVisited() {
@@ -759,6 +734,26 @@ function bindUiEvents() {
   });
 
   elements.searchInput.addEventListener('input', () => renderSearchResults(elements.searchInput.value));
+  // Celular: a busca fica recolhida num ícone e abre sobre o cabeçalho.
+  elements.searchToggle.addEventListener('click', () => {
+    document.body.classList.add('search-open');
+    elements.searchInput.focus();
+  });
+  elements.searchInput.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (!elements.search.contains(document.activeElement)) document.body.classList.remove('search-open');
+    }, 120);
+  });
+  // "/" ou Ctrl/Cmd+K focam a busca de qualquer lugar (exceto ao digitar).
+  document.addEventListener('keydown', event => {
+    const typing = event.target.closest?.('input, textarea, select, [contenteditable="true"]');
+    const shortcut = (event.key === '/' && !typing) || (event.key.toLowerCase() === 'k' && (event.ctrlKey || event.metaKey));
+    if (!shortcut || document.body.classList.contains('route-mode')) return;
+    event.preventDefault();
+    document.body.classList.add('search-open');
+    elements.searchInput.focus();
+    elements.searchInput.select();
+  });
   elements.searchInput.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       setSearchOpen(false);
@@ -767,8 +762,7 @@ function bindUiEvents() {
     if (event.key === 'Enter') {
       const [first] = searchCountries(elements.searchInput.value, 1);
       if (first) {
-        elements.searchInput.value = '';
-        setSearchOpen(false);
+        dismissSearch();
         selectCountry(first);
       }
     }
@@ -780,8 +774,7 @@ function bindUiEvents() {
   elements.searchResults.addEventListener('click', event => {
     const option = event.target.closest('[data-country-key]');
     if (!option) return;
-    elements.searchInput.value = '';
-    setSearchOpen(false);
+    dismissSearch();
     selectCountry(option.dataset.countryKey);
   });
   elements.searchResults.addEventListener('keydown', event => {
@@ -802,23 +795,6 @@ function bindUiEvents() {
   for (const button of elements.continentButtons) {
     button.addEventListener('click', () => selectContinent(button.dataset.continent));
   }
-
-  elements.navigationTrail.addEventListener('click', event => {
-    const button = event.target.closest('[data-history-index]');
-    if (!button) return;
-    const index = Number(button.dataset.historyIndex);
-    const entry = state.history[index];
-    if (!entry) return;
-    state.historyActiveIndex = index;
-    for (const dot of elements.navigationTrail.querySelectorAll('[data-history-index]')) {
-      const active = Number(dot.dataset.historyIndex) === index;
-      dot.classList.toggle('navigation-trail__button--active', active);
-      if (active) dot.setAttribute('aria-current', 'location');
-      else dot.removeAttribute('aria-current');
-    }
-    if (entry.type === 'country') selectCountry(entry.key, { recordHistory: false });
-    else selectContinent(entry.key, { recordHistory: false });
-  });
 
   elements.panelClose.addEventListener('click', () => closeCountryPanel(true));
   elements.visitButton.addEventListener('click', toggleVisited);
@@ -1052,14 +1028,19 @@ function ensurePlanner() {
     import('./planner/planner.ui.js'),
     import('./planner/flight.section.js'),
     import('./planner/prep.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSection }, { createPrepSection }]) => {
+  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }]) => {
     state.planner = new PlannerUI({
       element: elements.plannerContent,
       store: tripStore,
       countries: COUNTRIES,
+      searchCountries,
       onShowCountry: countryKey => showCountryFromPlanner(countryKey),
+      onDiscover: discoverDestination,
+      // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
+      getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
+      createTrip: countryKey => createTrip({ countryKey, step: 2 }),
       sections: [
-        createFlightSection({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES }),
+        ...createFlightSections({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES }),
         createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
       ]
     });
@@ -1105,18 +1086,23 @@ function setPlannerOpen(open, restoreFocus = false) {
 function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
   const existing = tripStore.findByCountry(countryKey);
-  if (existing && prefill.profileId && !existing.profileId) tripStore.save(updateTrip(existing, { profileId: prefill.profileId }));
-  else if (existing) tripStore.setActive(existing.id);
-  else tripStore.save(createTrip({ countryKey, ...prefill }));
-  if (isPlannerOpen()) ensurePlanner().then(planner => planner.render()).catch(() => {});
-  else setPlannerOpen(true);
+  let trip;
+  if (existing && prefill.profileId && !existing.profileId) trip = tripStore.save(updateTrip(existing, { profileId: prefill.profileId }));
+  else if (existing) trip = existing;
+  // O destino já está escolhido: a viagem nova começa na etapa das datas.
+  else trip = tripStore.save(createTrip({ countryKey, ...prefill, step: 2 }));
+  ensurePlanner().then(planner => {
+    planner.openTrip(trip.id);
+    if (isPlannerOpen()) planner.render();
+    else setPlannerOpen(true);
+  }).catch(() => setPlannerOpen(true));
 }
 
 function renderTripsCount() {
   const count = tripStore.trips.length;
   elements.tripsCount.hidden = count === 0;
   elements.tripsCount.textContent = String(count);
-  elements.tripsLauncher.setAttribute('aria-label', count ? `Minhas viagens (${count})` : 'Minhas viagens');
+  elements.tripsLauncher.setAttribute('aria-label', count ? `Planner (${count} ${count === 1 ? 'viagem' : 'viagens'})` : 'Planner');
 }
 
 // Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
