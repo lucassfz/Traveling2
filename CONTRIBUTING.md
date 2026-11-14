@@ -39,3 +39,7 @@ Requer Node.js 20 ou mais recente.
 O workflow `Airport data` regenera `data/airports.json` sempre que o arquivo ou o
 gerador mudam e falha se o resultado for diferente do arquivo versionado. Para
 atualizar a base, rode `npm run build:airports` e versione o arquivo gerado.
+
+## Cache do site
+
+O GitHub Pages guarda os arquivos por cerca de 10 minutos. Ao mudar `styles.css` ou `js/app.js`, atualize a versão `?v=` nos dois links do `index.html` (por exemplo `?v=2026.11.20`), para o navegador não juntar o HTML novo com um CSS antigo.

@@ -321,16 +321,16 @@ function renderMedia(countryKey, country) {
 }
 
 function renderBasics(country) {
+  // Só dados que ajudam a decidir a viagem; o fuso, com nota, ocupa a linha toda.
   const cards = [
     ['Capital', country.capital || '—'],
     ['Moeda', country.currency || '—'],
     ['Idioma', country.lang || '—'],
-    ['Fuso', country.timezoneLabel || '—', brasiliaTimezoneNote(country)],
     ['Voltagem', country.voltage || 'Confirmar'],
-    ['Código', country.alpha2 || '—']
+    ['Fuso', country.timezoneLabel || '—', brasiliaTimezoneNote(country), true]
   ];
-  elements.basics.innerHTML = cards.map(([label, value, note]) => `
-    <article class="info-card">
+  elements.basics.innerHTML = cards.map(([label, value, note, wide]) => `
+    <article class="info-card${wide ? ' info-card--wide' : ''}">
       <div class="info-card__value">${escapeHtml(value)}</div>
       ${note ? `<div class="info-card__note">${escapeHtml(note)}</div>` : ''}
       <div class="info-card__label">${escapeHtml(label)}</div>
@@ -1102,7 +1102,7 @@ function renderTripsCount() {
   const count = tripStore.trips.length;
   elements.tripsCount.hidden = count === 0;
   elements.tripsCount.textContent = String(count);
-  elements.tripsLauncher.setAttribute('aria-label', count ? `Planner (${count} ${count === 1 ? 'viagem' : 'viagens'})` : 'Planner');
+  elements.tripsLauncher.setAttribute('aria-label', count ? `Viagens (${count} ${count === 1 ? 'salva' : 'salvas'})` : 'Viagens');
 }
 
 // Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
