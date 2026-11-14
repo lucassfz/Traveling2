@@ -6,13 +6,25 @@
   <meta name="description" content="Traveling — globo 3D interativo com guias de países, rotas e estimativas de milhas.">
   <meta name="theme-color" content="#05070c">
   <title>Traveling — Explore o mundo</title>
+  <script>
+    // Aplica o tema salvo antes da primeira pintura, para a abertura e a
+    // página não piscarem no tema errado. app.js continua dono da lógica.
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        document.documentElement.dataset.theme = savedTheme;
+        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#eef1f3');
+      }
+    } catch (error) { /* armazenamento bloqueado: segue o padrão escuro */ }
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2215%22 fill=%22%2305070c%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229.5%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.6%22/%3E%3Cpath d=%22M6.5 16h19M16 6.5c3.2 3.4 3.2 15.6 0 19M16 6.5c-3.2 3.4-3.2 15.6 0 19%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.2%22/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
-  <link rel="stylesheet" href="styles.css">
+  <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
+  <link rel="stylesheet" href="styles.css?v=2026.11.14d">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -66,8 +78,8 @@
       <button class="header-action header-action--primary" id="discover-button" type="button" aria-label="Descobrir destino">
         <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span class="header-action__label">Descobrir</span>
       </button>
-      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Planner" title="Planner de viagem">
-        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Planner</span>
+      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Viagens" title="Planejar viagem">
+        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Viagens</span>
         <span class="header-action__badge" id="trips-count" hidden>0</span>
       </button>
       <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
@@ -128,11 +140,11 @@
     <div class="miles-hub__content" id="miles-content"></div>
   </aside>
 
-  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planner de viagem" inert>
+  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planejamento de viagem" inert>
     <header class="miles-hub__header">
       <div>
         <span class="eyebrow">Planejamento de viagem</span>
-        <h2 class="miles-hub__title">Planner</h2>
+        <h2 class="miles-hub__title">Minhas viagens</h2>
       </div>
       <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </header>
@@ -172,6 +184,7 @@
       <section class="country-tab country-tab--active" id="tab-overview" data-tab-panel="overview" role="tabpanel">
         <div class="media-strip" id="country-media" aria-label="Fotos do destino"></div>
         <div class="info-grid" id="country-basics"></div>
+        <section class="content-section geo-nav" id="country-regions" aria-label="Estados e cidades" hidden></section>
         <div id="currency-converter" aria-live="polite"></div>
         <section class="content-section">
           <div class="section-heading">Melhor época</div>
@@ -292,6 +305,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=2026.11.14d"></script>
 </body>
 </html>
