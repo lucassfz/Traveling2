@@ -17,6 +17,8 @@ import { provenanceLabel } from './provenance.js';
 import { loadFxSnapshot, localPerBrl } from './fx.service.js';
 import { createFlightsTab } from './drawer/flights.tab.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
+import { createTripStore } from './planner/trip.store.js';
+import { createTrip } from './planner/trip.model.js';
 
 const MONTHS = Object.freeze(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']);
 const elements = {
@@ -46,6 +48,7 @@ const elements = {
   countryRegion: document.getElementById('country-region'),
   countryName: document.getElementById('country-name'),
   countryExploreButton: document.getElementById('country-explore-button'),
+  countryPlanButton: document.getElementById('country-plan-button'),
   countryExploreStatus: document.getElementById('country-explore-status'),
   tabButtons: [...document.querySelectorAll('.country-tabs__button')],
   tabPanels: [...document.querySelectorAll('[data-tab-panel]')],
@@ -91,6 +94,11 @@ const elements = {
   milesLauncher: document.getElementById('miles-launcher'),
   milesHub: document.getElementById('miles-hub'),
   milesClose: document.getElementById('miles-close-button'),
+  tripsLauncher: document.getElementById('trips-launcher'),
+  tripsCount: document.getElementById('trips-count'),
+  plannerPanel: document.getElementById('planner-panel'),
+  plannerContent: document.getElementById('planner-content'),
+  plannerClose: document.getElementById('planner-close-button'),
   milesTabs: document.getElementById('miles-tabs'),
   milesContent: document.getElementById('miles-content')
 };
@@ -111,6 +119,7 @@ const state = {
   splash: null,
   starfield: null,
   milesEngine: null,
+  planner: null,
   destinationAirport: null,
   originAirport: null,
   originRequestId: 0,
@@ -126,6 +135,7 @@ const state = {
 };
 
 const airportRepository = new AirportRepository();
+const tripStore = createTripStore({ countries: COUNTRIES });
 const {
   resolveDestinationAirport,
   primeDestinationAirport,
@@ -585,12 +595,14 @@ function selectCountry(countryKey, { recordHistory = true } = {}) {
   closeFlightPreview(false);
   state.discovery?.close();
   if (elements.milesHub.classList.contains('miles-hub--open')) setMilesOpen(false);
+  if (window.innerWidth < 1200 && isPlannerOpen()) setPlannerOpen(false);
   state.map?.selectCountry(countryKey);
   renderCountry(countryKey);
   if (recordHistory) addHistory({ type: 'country', key: countryKey, label: country.namePt });
 }
 
 function discoverDestination() {
+  setPlannerOpen(false);
   closeCountryPanel();
   setMilesOpen(false);
   ensureDiscovery().then(discovery => discovery.open()).catch(() => {});
@@ -712,6 +724,7 @@ function showTooltip(countryKey, clientX, clientY) {
 function setMilesOpen(open, restoreFocus = false) {
   if (open) {
     state.discovery?.close();
+    setPlannerOpen(false);
     ensureMilesEngine().catch(() => {});
   }
   if (open && window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
@@ -808,6 +821,9 @@ function bindUiEvents() {
   elements.panelClose.addEventListener('click', () => closeCountryPanel(true));
   elements.visitButton.addEventListener('click', toggleVisited);
   elements.countryExploreButton.addEventListener('click', exploreDestination);
+  elements.countryPlanButton.addEventListener('click', () => planTrip(state.countryKey));
+  elements.tripsLauncher.addEventListener('click', () => setPlannerOpen(!isPlannerOpen()));
+  elements.plannerClose.addEventListener('click', () => setPlannerOpen(false, true));
   for (const button of elements.tabButtons) button.addEventListener('click', () => switchTab(button.dataset.tab));
   elements.panel.querySelector('.country-tabs').addEventListener('keydown', event => {
     const current = elements.tabButtons.indexOf(event.target);
@@ -896,6 +912,8 @@ function bindUiEvents() {
     }
     if (elements.milesHub.classList.contains('miles-hub--open')) {
       setMilesOpen(false, true);
+    } else if (isPlannerOpen()) {
+      setPlannerOpen(false, true);
     } else if (elements.panel.classList.contains('country-panel--open')) closeCountryPanel(true);
   });
 }
@@ -1020,6 +1038,67 @@ function ensureMilesEngine() {
   return milesEnginePromise;
 }
 
+// Planejador (Planner v0). O armazenamento é carregado na abertura do app
+// (para o contador do botão); a interface só quando o painel abre.
+let plannerPromise = null;
+function ensurePlanner() {
+  plannerPromise ??= import('./planner/planner.ui.js').then(({ PlannerUI }) => {
+    state.planner = new PlannerUI({
+      element: elements.plannerContent,
+      store: tripStore,
+      countries: COUNTRIES,
+      onShowCountry: countryKey => {
+        if (window.innerWidth < 1200) setPlannerOpen(false);
+        selectCountry(countryKey);
+      }
+    });
+    return state.planner;
+  }).catch(error => {
+    plannerPromise = null;
+    throw error;
+  });
+  return plannerPromise;
+}
+
+function isPlannerOpen() {
+  return elements.plannerPanel.classList.contains('miles-hub--open');
+}
+
+function setPlannerOpen(open, restoreFocus = false) {
+  if (open === isPlannerOpen()) return;
+  if (open) {
+    state.discovery?.close();
+    setMilesOpen(false);
+    if (window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
+  }
+  elements.plannerPanel.classList.toggle('miles-hub--open', open);
+  elements.plannerPanel.inert = !open;
+  elements.tripsLauncher.setAttribute('aria-expanded', String(open));
+  if (open) {
+    elements.plannerClose.focus();
+    ensurePlanner().then(planner => planner.render()).catch(() => {
+      elements.plannerContent.innerHTML = '<p class="planner-empty">Não foi possível abrir o planejamento. Verifique a conexão e tente de novo.</p>';
+    });
+  } else if (restoreFocus) elements.tripsLauncher.focus();
+}
+
+// Abre (ou cria) a viagem do país e mostra o planejamento.
+function planTrip(countryKey, prefill = {}) {
+  if (!countryKey || !COUNTRIES[countryKey]) return;
+  const existing = tripStore.findByCountry(countryKey);
+  if (existing) tripStore.setActive(existing.id);
+  else tripStore.save(createTrip({ countryKey, ...prefill }));
+  if (isPlannerOpen()) ensurePlanner().then(planner => planner.render()).catch(() => {});
+  else setPlannerOpen(true);
+}
+
+function renderTripsCount() {
+  const count = tripStore.trips.length;
+  elements.tripsCount.hidden = count === 0;
+  elements.tripsCount.textContent = String(count);
+  elements.tripsLauncher.setAttribute('aria-label', count ? `Minhas viagens (${count})` : 'Minhas viagens');
+}
+
 // Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
 // executar a interface) os módulos sob demanda, para abrirem sem espera.
 function prefetchDeferredModules() {
@@ -1047,6 +1126,8 @@ function initialize() {
   bindUiEvents();
   watchGlobeInset();
   state.milesEngine = milesPlaceholder;
+  renderTripsCount();
+  tripStore.subscribe(renderTripsCount);
   markInterfaceReady();
   prefetchDeferredModules();
   fetchExchangeRate();
@@ -1061,6 +1142,7 @@ function initialize() {
     state.starfield?.destroy();
     state.milesEngine?.destroy();
     state.discovery?.destroy();
+    state.planner?.destroy();
   }, { once: true });
 }
 

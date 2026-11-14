@@ -117,6 +117,12 @@
     <span class="miles-launcher__label">Milhas</span>
   </button>
 
+  <button class="miles-launcher trips-launcher" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Minhas viagens">
+    <span class="miles-launcher__icon" aria-hidden="true">🧳</span>
+    <span class="miles-launcher__label">Viagens</span>
+    <span class="trips-launcher__count" id="trips-count" hidden>0</span>
+  </button>
+
   <aside class="miles-hub" id="miles-hub" aria-label="Milhas e aeroportos" inert>
     <header class="miles-hub__header">
       <div>
@@ -128,6 +134,18 @@
     </header>
     <div class="miles-tabs" id="miles-tabs" role="tablist" aria-label="Seções de Milhas e Aeroportos"></div>
     <div class="miles-hub__content" id="miles-content"></div>
+  </aside>
+
+  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planejamento de viagem" inert>
+    <header class="miles-hub__header">
+      <div>
+        <span class="eyebrow">Planejamento</span>
+        <h2 class="miles-hub__title">Minhas viagens</h2>
+        <p class="miles-hub__subtitle">Datas, orçamento e preparação, salvos neste navegador.</p>
+      </div>
+      <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento">✕</button>
+    </header>
+    <div class="planner" id="planner-content"><p class="planner-empty">Carregando…</p></div>
   </aside>
 
   <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
@@ -142,7 +160,10 @@
       <div>
         <div class="country-panel__region" id="country-region">—</div>
         <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
-        <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>✈ Explorar destino</button>
+        <div class="country-actions">
+          <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>✈ Explorar destino</button>
+          <button class="secondary-button country-plan-button" id="country-plan-button" type="button">＋ Planejar viagem</button>
+        </div>
         <p class="country-explore-status" id="country-explore-status" role="status" aria-live="polite"></p>
       </div>
     </div>
