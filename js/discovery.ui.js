@@ -2,6 +2,8 @@ import { BUDGETS, CLIMATES, DISCOVERY_MONTHS, INTERESTS, TRIP_REFERENCE } from '
 import { formatTripRange, noMatchAdvice, rankDestinations } from './destination.discovery.js';
 import { flagImageUrl } from './country.exploration.js';
 import { provenanceLabel } from './provenance.js';
+import { haversineKm } from './geospatial.js';
+import { loadCities, topCities } from './geo/cities.js';
 
 // Descobrir: um único painel. As preferências ficam no topo, em botões, e a
 // lista de destinos que combinam se atualiza a cada toque. Tocar num destino
@@ -27,8 +29,14 @@ function rankWithoutInterests(countries, preferences) {
 }
 
 export class DiscoveryUI {
-  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose }) {
-    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose });
+  /**
+   * @param {(code: string) => Promise<object|null>} [resolveAirport] Aeroporto (lat/lng) do roteiro, para achar as cidades da região.
+   * @param {(city: object) => void} [onCity] Destaca a cidade escolhida no globo.
+   */
+  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport = async () => null, onCity = () => {} }) {
+    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport, onCity });
+    this.regionCities = new Map(); // id do perfil → cidades da região (ou 'error')
+    this.city = null;
     this.preferences = { interests: [], climate: 'any', budget: 'any', month: new Date().getMonth(), visaFree: false };
     // `step` e `index` são lidos pelo app (rota do destino atual).
     this.step = 'result';
@@ -121,10 +129,11 @@ export class DiscoveryUI {
             <div class="discovery-card__season">${this.#seasonBar(match.profile)}<small>${SEASON_LABELS[match.profile.seasonSuitability[this.preferences.month]]} época em ${DISCOVERY_MONTHS[this.preferences.month]}</small></div>
             <ul class="discovery-reasons">${match.reasons.slice(0, 2).map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>
             <p class="discovery-note">${escape(match.profile.note)}</p>
+            <div class="discovery-cities" data-cities-for="${escape(match.profile.id)}">${this.#citiesHtml(match)}</div>
             <div class="discovery-result-actions">
               <button class="primary-button" type="button" data-action="explore">Explorar ${escape(match.country.namePt)}</button>
               <button class="secondary-button" type="button" data-action="route">✈ Ver rota</button>
-              ${this.onPlan ? '<button class="secondary-button" type="button" data-action="plan">＋ Planejar</button>' : ''}
+              ${this.onPlan ? `<button class="secondary-button" type="button" data-action="plan">＋ Planejar${this.city ? ` ${escape(this.city.name)}` : ''}</button>` : ''}
             </div>
             <p class="discovery-feedback" role="status"></p>
           </div>` : ''}
@@ -162,7 +171,41 @@ export class DiscoveryUI {
     } else this.element.scrollTop = scroll;
   }
 
+  // Cidades da região do roteiro: até 250 km do aeroporto de entrada, maiores
+  // primeiro; sem aeroporto conhecido, as maiores do país.
+  #regionCities(match) {
+    const key = match.profile.id;
+    if (!this.regionCities.has(key)) {
+      this.regionCities.set(key, null);
+      Promise.all([loadCities(match.country.alpha2), this.resolveAirport(match.profile.airport).catch(() => null)])
+        .then(([cities, airport]) => {
+          const near = airport ? cities
+            .map(city => ({ city, km: haversineKm(airport.lat, airport.lng, city.lat, city.lng) }))
+            .filter(item => item.km <= 250)
+            .sort((a, b) => b.city.population - a.city.population)
+            .map(item => item.city) : [];
+          this.regionCities.set(key, (near.length >= 3 ? near : topCities(cities, 8)).slice(0, 8));
+        })
+        .catch(() => this.regionCities.set(key, 'error'))
+        .finally(() => {
+          const slot = this.element.querySelector(`[data-cities-for="${CSS.escape(key)}"]`);
+          if (slot) slot.innerHTML = this.#citiesHtml(match);
+        });
+    }
+    return this.regionCities.get(key);
+  }
+
+  #citiesHtml(match) {
+    const cities = this.#regionCities(match);
+    if (cities === 'error') return '';
+    if (!cities) return '<small>Carregando cidades…</small>';
+    if (!cities.length) return '';
+    return `<span class="discovery-filter__label">Cidades da região</span>
+      <div class="discovery-chips">${cities.map(city => `<button type="button" class="discovery-chip" data-city="${escape(city.id)}" aria-pressed="${city.id === this.city?.id}">${escape(city.name)}</button>`).join('')}</div>`;
+  }
+
   #select(index) {
+    if (index !== this.index) this.city = null;
     this.index = index;
     this.render(false);
     const match = this.matches[index];
@@ -174,7 +217,17 @@ export class DiscoveryUI {
   async click(event) {
     const button = event.target.closest('button');
     if (!button || button.disabled || !this.element.contains(button)) return;
-    const { interest, climate, month, budget, pick, action } = button.dataset;
+    const { interest, climate, month, budget, pick, action, city: cityId } = button.dataset;
+    if (cityId) {
+      const match = this.matches[this.index];
+      const list = match ? this.regionCities.get(match.profile.id) : null;
+      const city = Array.isArray(list) ? list.find(item => item.id === cityId) : null;
+      this.city = city && city.id !== this.city?.id ? city : null;
+      this.render(false);
+      if (this.city) this.onCity(this.city);
+      else if (match) this.onHighlight(match);
+      return;
+    }
     const prefs = this.preferences;
     if (interest || climate || month !== undefined || budget || action === 'visa') {
       if (interest) prefs.interests = prefs.interests.includes(interest) ? prefs.interests.filter(value => value !== interest) : [...prefs.interests, interest].slice(0, MAX_INTERESTS);
@@ -206,7 +259,7 @@ export class DiscoveryUI {
     if (action === 'explore') { this.onExplore(match, prefs); return; }
     if (action === 'plan' && this.onPlan) {
       const budgetCeiling = BUDGETS.find(band => band.id === prefs.budget)?.ceiling ?? Infinity;
-      this.onPlan(match, { ...prefs, budgetCeiling });
+      this.onPlan(match, { ...prefs, budgetCeiling, city: this.city });
       return;
     }
     if (action === 'route') {
