@@ -8,6 +8,8 @@
 // - Natural Earth 10m admin-1 (domínio público), commit fixo abaixo. Só as
 //   linhas INTERNAS entre divisões do mesmo país são guardadas: o litoral e a
 //   fronteira nacional já vêm do world-atlas do globo.
+// - Natural Earth 10m urban areas (LandScan nomeadas + manchas menores):
+//   contorno urbano de cada cidade em data/admin/urban/<ISO2>.json.
 // - GeoNames cities15000 (CC BY 4.0): cidades com 15 mil habitantes ou mais.
 //   O arquivo muda diariamente; a data da extração fica registrada no índice.
 //
@@ -21,6 +23,11 @@ const ADMIN1_URL = `https://raw.githubusercontent.com/nvkelso/natural-earth-vect
 const CITIES_URL = 'https://download.geonames.org/export/dump/cities15000.zip';
 const ADMIN1_CODES_URL = 'https://download.geonames.org/export/dump/admin1CodesASCII.txt';
 const OUTPUT_DIR = new URL('../data/admin/', import.meta.url);
+const URBAN_DIR = new URL('../data/admin/urban/', import.meta.url);
+const URBAN_URLS = ['ne_10m_urban_areas_landscan', 'ne_10m_urban_areas']
+  .map(name => `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/${NE_COMMIT}/geojson/${name}.geojson`);
+// ~600 m: contorno urbano legível no zoom máximo (≈500 km de altitude).
+const URBAN_TOLERANCE = 0.006;
 // ~0.8 km: suficiente para o zoom máximo do globo, mantendo arquivos pequenos.
 const SIMPLIFY_TOLERANCE = 0.008;
 const PRECISION = 1000;
@@ -180,13 +187,23 @@ function expandBox(box, lng, lat) {
 
 // Nome em português quando ele é um nome próprio completo; senão o original.
 // (O Natural Earth tem alguns name_pt truncados, como "do Tibete".)
+// Correções pontuais de name_pt do Natural Earth (truncado ou ambíguo).
+const NAME_FIXES = new Map([
+  ['BR|Distrito Federal', 'Distrito Federal'],
+  ['US|District of Columbia', 'Distrito de Colúmbia'],
+  ['MX|Distrito Federal', 'Cidade do México']
+]);
+
 function divisionName(properties) {
+  const fixed = NAME_FIXES.get(`${properties.iso_a2}|${properties.name}`);
+  if (fixed) return fixed;
   return [properties.name_pt, properties.name]
     .map(value => (typeof value === 'string' ? value.trim() : ''))
     .find(value => value && /^[\p{Lu}\d]/u.test(value)) ?? null;
 }
 
-// "BR.27" → "Sao Paulo" (nome do estado/província no GeoNames).
+// "BR.27" → "São Paulo" (nome do estado/província no GeoNames), usado só
+// quando a cidade não cai dentro de nenhum polígono do Natural Earth.
 function parseAdmin1Codes(text) {
   const names = new Map();
   for (const line of text.split('\n')) {
@@ -204,7 +221,11 @@ function indexIn(list, value) {
   return position;
 }
 
-function parseCities(text, admin1Names) {
+// Bairros, distritos e lugares históricos aparecem no cities15000 como
+// "cidades" (Berlin tem dezenas de PPLX). Ficam de fora.
+const DROPPED_FEATURE_CODES = new Set(['PPLX', 'PPLH', 'PPLQ', 'PPLW', 'PPLCH', 'PPLR']);
+
+function parseCities(text) {
   // Colunas do GeoNames: 1 name, 4 lat, 5 lng, 7 feature code, 8 país,
   // 10 admin1, 14 população, 17 fuso horário.
   const byCountry = new Map();
@@ -215,23 +236,99 @@ function parseCities(text, admin1Names) {
     const lat = Number(cells[4]);
     const lng = Number(cells[5]);
     const population = Number(cells[14]) || 0;
-    if (!/^[A-Z]{2}$/.test(country) || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    // 0 capital nacional, 1 sede de estado/província, 2 demais cidades.
     const code = cells[7];
+    if (!/^[A-Z]{2}$/.test(country) || !Number.isFinite(lat) || !Number.isFinite(lng) || DROPPED_FEATURE_CODES.has(code)) continue;
+    // 0 capital nacional, 1 sede de estado/província, 2 demais cidades.
     const rank = code === 'PPLC' ? 0 : code === 'PPLA' ? 1 : 2;
-    if (!byCountry.has(country)) byCountry.set(country, { list: [], zones: [], regions: [] });
-    const entry = byCountry.get(country);
-    entry.list.push([cells[1], round(lat), round(lng), population, rank,
-      indexIn(entry.zones, cells[17]), indexIn(entry.regions, admin1Names.get(`${country}.${cells[10]}`))]);
+    if (!byCountry.has(country)) byCountry.set(country, []);
+    byCountry.get(country).push({ name: cells[1], lat, lng, population, rank, zone: cells[17], admin1: `${country}.${cells[10]}` });
   }
-  for (const { list } of byCountry.values()) list.sort((a, b) => a[4] - b[4] || b[3] - a[3]);
   return byCountry;
 }
 
+// ---------- Ponto em polígono (anel externo; buracos ignorados) ----------
+
+function ringBox(ring) {
+  const box = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [lng, lat] of ring) expandBox(box, lng, lat);
+  return box;
+}
+
+function inRing(ring, lng, lat) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+const inBox = (box, lng, lat) => lng >= box[0] && lng <= box[2] && lat >= box[1] && lat <= box[3];
+
+// Estado da cidade pelo polígono do Natural Earth, para o nome bater com o mapa.
+function regionLocator(features) {
+  const shapes = features.flatMap(feature => {
+    const name = divisionName(feature.properties);
+    return name ? polygonsOf(feature.geometry).map(polygon => {
+      const box = ringBox(polygon[0]);
+      return { name, ring: polygon[0], box, area: (box[2] - box[0]) * (box[3] - box[1]) };
+    }) : [];
+  }).sort((a, b) => a.area - b.area);
+  // O menor polígono que contém o ponto: enclaves (Berlim dentro de Brandemburgo,
+  // Distrito Federal dentro de Goiás) são buracos que o anel externo ignora.
+  return (lng, lat) => shapes.find(shape => inBox(shape.box, lng, lat) && inRing(shape.ring, lng, lat))?.name ?? null;
+}
+
+// Áreas urbanas: grade de 1° para achar candidatos rápido. A ordem das fontes é
+// a prioridade (manchas nomeadas do LandScan primeiro, depois as menores).
+function urbanIndex(collections) {
+  const units = [];
+  const grid = new Map();
+  for (const collection of collections) {
+    for (const feature of collection.features) {
+      const rings = polygonsOf(feature.geometry).map(polygon => polygon[0]).filter(ring => ring.length >= 4);
+      if (!rings.length) continue;
+      const id = units.push({ rings, boxes: rings.map(ringBox) }) - 1;
+      for (const box of units[id].boxes) {
+        for (let x = Math.floor(box[0]); x <= Math.floor(box[2]); x += 1) {
+          for (let y = Math.floor(box[1]); y <= Math.floor(box[3]); y += 1) {
+            const key = `${x},${y}`;
+            if (!grid.has(key)) grid.set(key, []);
+            const list = grid.get(key);
+            if (list.at(-1) !== id) list.push(id);
+          }
+        }
+      }
+    }
+  }
+  const find = (lng, lat) => {
+    for (const id of grid.get(`${Math.floor(lng)},${Math.floor(lat)}`) ?? []) {
+      const unit = units[id];
+      if (unit.rings.some((ring, index) => inBox(unit.boxes[index], lng, lat) && inRing(ring, lng, lat))) return id;
+    }
+    return null;
+  };
+  return { units, find };
+}
+
+function closedFlatRing(ring) {
+  const simplified = simplify(ring, URBAN_TOLERANCE);
+  const flat = flatLine(simplified);
+  return flat && flat.length >= 8 ? flat : null;
+}
+
 async function main() {
-  console.log('Baixando Natural Earth admin-1 (~40 MB) e GeoNames cities15000…');
-  const [admin1, citiesZip, admin1Codes] = await Promise.all([download(ADMIN1_URL), download(CITIES_URL, 'buffer'), download(ADMIN1_CODES_URL, 'buffer')]);
-  const cities = parseCities(unzipSingle(citiesZip), parseAdmin1Codes(admin1Codes.toString('utf8')));
+  console.log('Baixando Natural Earth (admin-1 e áreas urbanas) e GeoNames…');
+  const [admin1, citiesZip, admin1Codes, ...urbanSources] = await Promise.all([
+    download(ADMIN1_URL),
+    download(CITIES_URL, 'buffer'),
+    download(ADMIN1_CODES_URL, 'buffer'),
+    ...URBAN_URLS.map(url => download(url))
+  ]);
+  const cities = parseCities(unzipSingle(citiesZip));
+  const geonamesRegions = parseAdmin1Codes(admin1Codes.toString('utf8'));
+  const urban = urbanIndex(urbanSources);
 
   const byCountry = new Map();
   for (const feature of admin1.features) {
@@ -242,14 +339,18 @@ async function main() {
     byCountry.get(code).push(feature);
   }
 
-  await mkdir(OUTPUT_DIR, { recursive: true });
-  for (const file of await readdir(OUTPUT_DIR)) {
-    if (file.endsWith('.json')) await rm(new URL(file, OUTPUT_DIR));
+  await mkdir(URBAN_DIR, { recursive: true });
+  for (const dir of [OUTPUT_DIR, URBAN_DIR]) {
+    for (const file of await readdir(dir)) if (file.endsWith('.json')) await rm(new URL(file, dir));
   }
 
   const index = {};
+  const usedUrban = new Set();
   const codes = new Set([...byCountry.keys(), ...cities.keys()]);
   let totalBytes = 0;
+  let urbanBytes = 0;
+  let outlined = 0;
+  let cityCount = 0;
   for (const code of [...codes].sort()) {
     const features = byCountry.get(code) ?? [];
     const box = [Infinity, Infinity, -Infinity, -Infinity];
@@ -258,9 +359,37 @@ async function main() {
         for (const [lng, lat] of polygon[0]) expandBox(box, lng, lat);
       }
     }
-    const { list: places, zones, regions } = cities.get(code) ?? { list: [], zones: [], regions: [] };
-    for (const [, lat, lng] of places) expandBox(box, lng, lat);
+    const raw = cities.get(code) ?? [];
+    for (const city of raw) expandBox(box, city.lng, city.lat);
     if (!Number.isFinite(box[0])) continue;
+
+    // Ordem final: capitais e sedes primeiro, depois por população.
+    raw.sort((a, b) => a.rank - b.rank || b.population - a.population);
+    const locate = regionLocator(features);
+    const zones = [];
+    const regions = [];
+    const places = raw.map(city => [
+      city.name, round(city.lat), round(city.lng), city.population, city.rank,
+      indexIn(zones, city.zone),
+      indexIn(regions, locate(city.lng, city.lat) ?? geonamesRegions.get(city.admin1)),
+      0
+    ]);
+
+    // Contorno urbano: cada mancha pertence à maior cidade dentro dela.
+    const outlines = [];
+    raw.map((city, position) => ({ city, position }))
+      .sort((a, b) => b.city.population - a.city.population)
+      .forEach(({ city, position }) => {
+        const id = urban.find(city.lng, city.lat);
+        if (id === null || usedUrban.has(id)) return;
+        const rings = urban.units[id].rings.map(closedFlatRing).filter(Boolean);
+        if (!rings.length) return;
+        usedUrban.add(id);
+        places[position][7] = 1;
+        outlines.push([position, ...rings]);
+      });
+    outlined += outlines.length;
+    cityCount += places.length;
 
     // Um país com uma só divisão (microestados) não tem divisa interna nem rótulo útil.
     const divisions = features.length > 1 ? features.map(feature => {
@@ -273,27 +402,33 @@ async function main() {
       ? innerLines(features).map(line => flatLine(simplify(line, SIMPLIFY_TOLERANCE))).filter(Boolean)
       : [];
 
-    const data = { country: code, divisions, lines, cities: places, zones, regions };
-    const json = JSON.stringify(data);
+    const json = JSON.stringify({ country: code, divisions, lines, cities: places, zones, regions });
     totalBytes += json.length;
     await writeFile(new URL(`${code}.json`, OUTPUT_DIR), `${json}\n`);
+    if (outlines.length) {
+      const urbanJson = JSON.stringify({ country: code, outlines });
+      urbanBytes += urbanJson.length;
+      await writeFile(new URL(`${code}.json`, URBAN_DIR), `${urbanJson}\n`);
+    }
     index[code] = box.map(round);
   }
 
   const retrievedAt = new Date().toISOString().slice(0, 10);
   const indexFile = {
-    schema: 1,
+    schema: 2,
     sources: [
-      { id: 'natural-earth-admin1', name: 'Natural Earth — Admin 1 states/provinces 1:10m', url: `https://github.com/nvkelso/natural-earth-vector/tree/${NE_COMMIT}`, license: 'Domínio público', covers: ['divisions', 'lines'] },
-      { id: 'geonames-cities15000', name: 'GeoNames — cities15000 e admin1CodesASCII', url: 'https://download.geonames.org/export/dump/', license: 'CC BY 4.0', retrievedAt, covers: ['cities', 'zones', 'regions'] }
+      { id: 'natural-earth-admin1', name: 'Natural Earth — Admin 1 states/provinces 1:10m', url: `https://github.com/nvkelso/natural-earth-vector/tree/${NE_COMMIT}`, license: 'Domínio público', covers: ['divisions', 'lines', 'regions'] },
+      { id: 'natural-earth-urban', name: 'Natural Earth — Urban areas (LandScan) e Urban areas 1:10m', url: `https://github.com/nvkelso/natural-earth-vector/tree/${NE_COMMIT}`, license: 'Domínio público', covers: ['urban'] },
+      { id: 'geonames-cities15000', name: 'GeoNames — cities15000 e admin1CodesASCII', url: 'https://download.geonames.org/export/dump/', license: 'CC BY 4.0', retrievedAt, covers: ['cities', 'zones'] }
     ],
     // Linhas: [lng, lat, lng, lat, …]; divisões: [nome, lat, lng, tipo];
     // cidades: [nome, lat, lng, população, 0 capital | 1 sede regional | 2 cidade,
-    // índice em zones (fuso IANA) ou -1, índice em regions (estado GeoNames) ou -1].
+    //   índice em zones (fuso IANA) ou -1, índice em regions ou -1, 1 se há contorno em urban/<ISO2>.json].
+    // urban/<ISO2>.json: outlines: [[índice da cidade, anel, anel…]] com anéis [lng, lat, …].
     countries: index
   };
   await writeFile(new URL('index.json', OUTPUT_DIR), `${JSON.stringify(indexFile)}\n`);
-  console.log(`${Object.keys(index).length} países, ${(totalBytes / 1024 / 1024).toFixed(2)} MB no total.`);
+  console.log(`${Object.keys(index).length} países, ${cityCount} cidades (${outlined} com contorno urbano). ${(totalBytes / 1024 / 1024).toFixed(2)} MB + ${(urbanBytes / 1024 / 1024).toFixed(2)} MB de contornos.`);
 }
 
 main().catch(error => {

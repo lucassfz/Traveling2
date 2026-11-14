@@ -11,6 +11,7 @@ import {
 } from './trip.model.js';
 import { parseBrazilianNumber } from '../miles.tools.js';
 import { formatBRL } from './money.js';
+import { loadCities, searchCities, topCities } from '../geo/cities.js';
 
 export { formatBRL };
 
@@ -38,7 +39,7 @@ const HINTS = {
 const SHORT_LODGING = { hostel: 'Albergue', simple: 'Simples', comfort: 'Conforto', superior: 'Superior' };
 
 const STEP_LEADS = {
-  destination: 'Escolha o país da viagem. Você pode trocar depois.',
+  destination: 'Escolha o país e, se quiser, a cidade. Você pode trocar depois.',
   dates: 'Toque nas opções. Não precisa ter datas exatas agora.',
   flight: 'Escolha como prefere voar. A estimativa abaixo acompanha suas escolhas.',
   budget: 'Escolha o jeito de viajar. Dá para mudar quando quiser.',
@@ -88,6 +89,8 @@ export class PlannerUI {
     this.confirmingDelete = false;
     this.changingDestination = false;
     this.showExactDates = false;
+    this.changingCity = false;
+    this.cityLists = new Map(); // ISO2 → cidades, null (carregando) ou 'error'
     this.handleChange = event => this.#change(event);
     this.handleClick = event => this.#click(event);
     this.handleInput = event => this.#input(event);
@@ -188,7 +191,7 @@ export class PlannerUI {
           <button class="planner-trip-card" type="button" data-planner-open="${escapeHtml(trip.id)}">
             ${this.#flag(country, 'planner-trip-card__flag')}
             <span class="planner-trip-card__body">
-              <strong>${escapeHtml(country?.namePt || trip.countryKey)}</strong>
+              <strong>${trip.city ? `${escapeHtml(trip.city.name)}, ` : ''}${escapeHtml(country?.namePt || trip.countryKey)}</strong>
               <small>${escapeHtml(whenLabel(trip))} · ${escapeHtml(people(trip.travelers))}</small>
               <span class="planner-progress" aria-hidden="true"><span style="width:${(progress.completed / progress.total * 100).toFixed(0)}%"></span></span>
             </span>
@@ -258,7 +261,7 @@ export class PlannerUI {
   #tripMeta(trip) {
     const days = tripDays(trip);
     const when = whenLabel(trip);
-    return `${escapeHtml(when)}${days && trip.startDate ? ` · ${days} dias` : ''} · ${escapeHtml(people(trip.travelers))}`;
+    return `${trip.city ? `${escapeHtml(trip.city.name)} · ` : ''}${escapeHtml(when)}${days && trip.startDate ? ` · ${days} dias` : ''} · ${escapeHtml(people(trip.travelers))}`;
   }
 
   #stepper(trip, current) {
@@ -312,7 +315,70 @@ export class PlannerUI {
       <div class="planner-actions">
         <button class="secondary-button" type="button" data-planner-action="show-country">Ver guia do país</button>
         <button class="secondary-button" type="button" data-planner-action="change-destination">Trocar destino</button>
-      </div>`;
+      </div>
+      <div class="planner-question planner-city" data-live="city">${this.#cityPicker(trip)}</div>`;
+  }
+
+  // ---------- Etapa 1: cidade dentro do país ----------
+
+  #cities(trip) {
+    const alpha2 = this.countries[trip?.countryKey]?.alpha2;
+    if (!alpha2) return 'error';
+    if (!this.cityLists.has(alpha2)) {
+      this.cityLists.set(alpha2, null);
+      loadCities(alpha2)
+        .then(list => this.cityLists.set(alpha2, list))
+        .catch(() => this.cityLists.set(alpha2, 'error'))
+        .finally(() => this.#refreshCity());
+    }
+    return this.cityLists.get(alpha2);
+  }
+
+  #cityPicker(trip) {
+    const country = this.countries[trip.countryKey];
+    const title = `<h4 class="planner-question__title">Qual cidade em ${escapeHtml(country?.namePt || 'destino')}?</h4>`;
+    if (trip.city && !this.changingCity) {
+      return `${title}
+        <div class="planner-city__chosen">
+          <span class="planner-city__pin" aria-hidden="true"></span>
+          <span class="planner-city__name"><strong>${escapeHtml(trip.city.name)}</strong><small>${escapeHtml(trip.city.region || country?.namePt || '')}</small></span>
+          <button class="planner-text-action" type="button" data-planner-action="change-city">Trocar cidade</button>
+        </div>`;
+    }
+    const cities = this.#cities(trip);
+    if (cities === 'error') return `${title}<p class="planner-hint">Não foi possível carregar as cidades agora. Você pode seguir sem escolher.</p>`;
+    if (!cities) return `${title}<p class="planner-hint">Carregando cidades…</p>`;
+    if (!cities.length) return `${title}<p class="planner-hint">Ainda não há cidades para este destino.</p>`;
+    return `${title}
+      <p class="planner-hint">Opcional. A cidade define o aeroporto de chegada na estimativa de voo.</p>
+      <label class="sr-only" for="planner-city-search">Buscar cidade</label>
+      <input class="form-field__control" id="planner-city-search" type="search" placeholder="Buscar cidade…" autocomplete="off" spellcheck="false" data-planner-city-search>
+      <div class="choice-grid choice-grid--2" id="planner-city-results">${this.#cityChoices(topCities(cities, 8))}</div>
+      ${trip.city ? '<button class="planner-text-action" type="button" data-planner-action="keep-city">Manter a cidade atual</button>' : ''}`;
+  }
+
+  #cityChoices(list) {
+    return list.map(city => `
+      <button class="choice" type="button" data-planner-city="${escapeHtml(city.id)}">
+        <span class="choice__title">${escapeHtml(city.name)}</span>
+        <span class="choice__hint">${escapeHtml([city.rank === 0 ? 'Capital' : null, city.region].filter(Boolean).join(' · '))}</span>
+      </button>`).join('') || '<p class="planner-hint">Nenhuma cidade encontrada.</p>';
+  }
+
+  #refreshCity() {
+    const slot = this.element.querySelector('[data-live="city"]');
+    const trip = this.trip;
+    if (slot && trip && this.view === 'trip') slot.innerHTML = this.#cityPicker(trip);
+  }
+
+  #chooseCity(id) {
+    const trip = this.trip;
+    const list = this.#cities(trip);
+    const city = Array.isArray(list) ? list.find(item => item.id === id) : null;
+    if (!city) return;
+    this.changingCity = false;
+    this.update({ city: { id: city.id, name: city.name, lat: city.lat, lng: city.lng, region: city.region } });
+    this.#refreshCity();
   }
 
   #destinationPicker() {
@@ -360,7 +426,8 @@ export class PlannerUI {
     const current = this.view === 'trip' ? this.trip : null;
     if (current && this.changingDestination) {
       const lines = current.lines.filter(line => line.source?.kind !== 'traveling-estimate');
-      this.store.save(updateTrip(current, { countryKey, lines, entryReviewed: false, profileId: null, step: 2 }));
+      this.store.save(updateTrip(current, { countryKey, city: null, lines, entryReviewed: false, profileId: null, step: 1 }));
+      this.changingCity = false;
     } else {
       const existing = this.store.findByCountry(countryKey);
       if (existing) this.store.setActive(existing.id);
@@ -480,9 +547,10 @@ export class PlannerUI {
     const country = this.countries[trip.countryKey];
     const origin = ORIGIN_AIRPORTS.find(([code]) => code === trip.origin)?.[1] ?? trip.origin;
     return [
+      ['Cidade', trip.city ? [trip.city.name, trip.city.region].filter(Boolean).join(' · ') : 'A definir'],
       ['Quando', whenLabel(trip)],
       ['Quem', `${trip.group ? `${TRAVEL_GROUPS[trip.group]} · ` : ''}${people(trip.travelers)}`],
-      ['Voo', `${origin} → ${country?.capital || country?.namePt || ''} · ${CABIN_LABELS[trip.cabin]}`],
+      ['Voo', `${origin} → ${trip.city?.name || country?.capital || country?.namePt || ''} · ${CABIN_LABELS[trip.cabin]}`],
       ['Pagamento', trip.payWith ? PAY_OPTIONS[trip.payWith] : '—'],
       ['Estilo', trip.style ? TRAVEL_STYLES[trip.style] : '—'],
       ['Hospedagem', LODGING_LEVELS[trip.lodging]],
@@ -570,9 +638,22 @@ export class PlannerUI {
 
   #input(event) {
     if (event.target.matches('[data-planner-search]')) this.#renderSearch(event.target.value);
+    if (event.target.matches('[data-planner-city-search]')) {
+      const list = this.#cities(this.trip);
+      const results = this.element.querySelector('#planner-city-results');
+      if (Array.isArray(list) && results) {
+        const query = event.target.value;
+        results.innerHTML = this.#cityChoices(query.trim().length >= 2 ? searchCities(list, query, 10) : topCities(list, 8));
+      }
+    }
   }
 
   #keydown(event) {
+    if (event.target.matches('[data-planner-city-search]') && event.key === 'Enter') {
+      event.preventDefault();
+      this.element.querySelector('#planner-city-results [data-planner-city]')?.click();
+      return;
+    }
     if (event.target.matches('[data-planner-search]') && event.key === 'Enter') {
       event.preventDefault();
       const [first] = this.searchCountries(event.target.value, 1);
@@ -627,6 +708,8 @@ export class PlannerUI {
     }
     const stepButton = event.target.closest('[data-planner-step]');
     if (stepButton && !stepButton.disabled) return this.#goTo(Number(stepButton.dataset.plannerStep));
+    const cityButton = event.target.closest('[data-planner-city]');
+    if (cityButton && this.element.contains(cityButton)) return this.#chooseCity(cityButton.dataset.plannerCity);
     const choiceButton = event.target.closest('[data-choice-field]');
     if (choiceButton && this.element.contains(choiceButton)) return this.#choose(choiceButton);
     const button = event.target.closest('[data-planner-action]');
@@ -651,6 +734,11 @@ export class PlannerUI {
       this.changingDestination = action === 'change-destination';
       this.render();
       if (this.changingDestination) this.element.querySelector('#planner-destination-search')?.focus();
+    }
+    if (action === 'change-city' || action === 'keep-city') {
+      this.changingCity = action === 'change-city';
+      this.#refreshCity();
+      if (this.changingCity) this.element.querySelector('#planner-city-search')?.focus();
     }
     if (action === 'toggle-dates') {
       const exact = this.showExactDates || Boolean(trip.startDate);

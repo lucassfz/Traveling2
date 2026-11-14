@@ -31,7 +31,7 @@ function coordinate(value, positive, negative) {
  * @param {HTMLElement} deps.root
  * @param {object} deps.countries        COUNTRIES
  * @param {(countryKey: string) => void} deps.onShowCountry
- * @param {(countryKey: string) => void} deps.onPlan
+ * @param {(countryKey: string, city: object) => void} deps.onPlan
  * @param {(city: object) => void} deps.onZoom
  * @param {() => void} deps.onClose
  */
@@ -49,7 +49,8 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     const facts = [
       ['População', formatPopulation(city.population)],
       ['Hora local', time],
-      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`]
+      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`],
+      ['Área urbana', city.hasOutline ? 'Contorno destacado no mapa' : null]
     ].filter(([, value]) => value);
     root.innerHTML = `
       <div class="city-card__head">
@@ -67,7 +68,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
       <div class="city-card__actions">
         <button class="secondary-button" type="button" data-city-action="zoom">Aproximar</button>
         ${countryKey ? `<button class="secondary-button" type="button" data-city-action="country">Guia de ${escapeHtml(country.namePt)}</button>
-        <button class="primary-button" type="button" data-city-action="plan">Planejar viagem</button>` : ''}
+        <button class="primary-button" type="button" data-city-action="plan">Planejar viagem para ${escapeHtml(city.name)}</button>` : ''}
       </div>
       <p class="city-card__source">Dados: GeoNames (CC BY 4.0)</p>`;
     root.dataset.countryKey = countryKey ?? '';
@@ -80,7 +81,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     if (action === 'close') hide(true);
     if (action === 'zoom') onZoom(current);
     if (action === 'country' && countryKey) { hide(); onShowCountry(countryKey); }
-    if (action === 'plan' && countryKey) { hide(); onPlan(countryKey); }
+    if (action === 'plan' && countryKey) { const city = current; hide(); onPlan(countryKey, city); }
   });
 
   function show(city) {

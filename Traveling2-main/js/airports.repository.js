@@ -205,6 +205,26 @@ export class AirportRepository {
       .map(item => item.airport);
   }
 
+  /**
+   * Aeroporto de chegada para uma cidade: um aeroporto principal (lista
+   * revisada) até 150 km; senão o mais próximo com código ICAO padrão (quatro
+   * letras, evita pistas privadas como "0CO2") até 100 km; senão null.
+   */
+  async findGateway(lat, lng) {
+    const byDistance = list => list
+      .filter(airport => airport.iata && Number.isFinite(airport.lat))
+      .map(airport => ({ airport, distance: haversineKm(lat, lng, airport.lat, airport.lng) }))
+      .sort((a, b) => a.distance - b.distance)[0] ?? null;
+    const core = byDistance(CORE_AIRPORTS);
+    if (core && core.distance <= 150) return { ...core.airport, distanceToTargetKm: core.distance };
+    let pool = this.#all;
+    if (!pool) {
+      try { pool = await this.loadAll(); } catch { pool = CORE_AIRPORTS; }
+    }
+    const nearest = byDistance(pool.filter(airport => /^[A-Z]{4}$/.test(airport.icao ?? '')));
+    return nearest && nearest.distance <= 100 ? { ...nearest.airport, distanceToTargetKm: nearest.distance } : null;
+  }
+
   async findNearest(lat, lng) {
     let pool = this.#all;
     if (!pool) {

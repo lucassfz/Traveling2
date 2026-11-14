@@ -588,7 +588,7 @@ function selectCity(city) {
     root: document.getElementById('city-card'),
     countries: COUNTRIES,
     onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
-    onPlan: countryKey => { state.map?.selectCity(null); planTrip(countryKey); },
+    onPlan: (countryKey, city) => { state.map?.selectCity(null); planTrip(countryKey, { city }); },
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => state.map?.selectCity(null)
   });
@@ -1029,8 +1029,11 @@ function ensureDiscovery() {
         isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'
           && state.discovery.matches[state.discovery.index]?.profile.id === match.profile.id
       }),
+      resolveAirport: code => airportRepository.resolve(code),
+      onCity: city => state.map?.selectCity(city),
       onPlan: (match, preferences) => planTrip(match.countryKey, {
         profileId: match.profile.id,
+        city: preferences.city ?? null,
         budgetBRL: Number.isFinite(preferences.budgetCeiling) ? preferences.budgetCeiling : null
       }),
       onClose: () => closeFlightPreview(false)
@@ -1107,9 +1110,13 @@ function ensurePlanner() {
       onDiscover: discoverDestination,
       // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
       getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
-      createTrip: countryKey => createTrip({ countryKey, step: 2 }),
+      // Começa na etapa 1: depois do país, a pessoa escolhe a cidade.
+      createTrip: countryKey => createTrip({ countryKey, step: 1 }),
       sections: [
-        ...createFlightSections({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES }),
+        ...createFlightSections({
+          airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
+          resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng)
+        }),
         createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
       ]
     });
@@ -1156,10 +1163,15 @@ function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
   const existing = tripStore.findByCountry(countryKey);
   let trip;
-  if (existing && prefill.profileId && !existing.profileId) trip = tripStore.save(updateTrip(existing, { profileId: prefill.profileId }));
-  else if (existing) trip = existing;
-  // O destino já está escolhido: a viagem nova começa na etapa das datas.
-  else trip = tripStore.save(createTrip({ countryKey, ...prefill, step: 2 }));
+  const city = prefill.city ? { id: prefill.city.id, name: prefill.city.name, lat: prefill.city.lat, lng: prefill.city.lng, region: prefill.city.region } : null;
+  if (existing) {
+    const changes = {};
+    if (prefill.profileId && !existing.profileId) changes.profileId = prefill.profileId;
+    if (city) changes.city = city;
+    trip = Object.keys(changes).length ? tripStore.save(updateTrip(existing, changes)) : existing;
+  }
+  // País e cidade escolhidos: começa nas datas. Só o país: começa na escolha da cidade.
+  else trip = tripStore.save(createTrip({ countryKey, ...prefill, city, step: city ? 2 : 1 }));
   ensurePlanner().then(planner => {
     planner.openTrip(trip.id);
     if (isPlannerOpen()) planner.render();

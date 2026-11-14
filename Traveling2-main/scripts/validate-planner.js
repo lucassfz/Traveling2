@@ -290,5 +290,14 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(tripMonth(exact), 8, 'datas exatas têm prioridade sobre o mês');
   assert.equal(tripDays(exact), 5, 'datas exatas têm prioridade sobre a duração');
   assert.ok(TRIP_DURATIONS.every(item => Number.isInteger(item.days) && item.label));
+  // Cidade do destino: só formato válido e do mesmo país.
+  const { normalizeCity } = await import('../js/planner/trip.model.js');
+  assert.equal(normalizeCity({ id: 'BR-1', name: 'São Paulo', lat: -23.5471, lng: -46.6361, region: 'São Paulo' }).lat, -23.547);
+  assert.equal(normalizeCity({ id: 'x', name: 'A', lat: 0, lng: 0 }), null);
+  assert.equal(normalizeCity({ id: 'BR-1', name: 'A', lat: 120, lng: 0 }), null);
+  const withCity = normalizeTrip({ countryKey: 'Japan', city: { id: 'JP-3', name: 'Kyoto', lat: 35.02, lng: 135.75 } }, { countries: COUNTRIES, idFactory });
+  assert.equal(withCity.city.name, 'Kyoto');
+  assert.equal(normalizeTrip({ countryKey: 'Japan', city: { id: 'BR-3', name: 'Recife', lat: -8, lng: -35 } }, { countries: COUNTRIES, idFactory }).city, null, 'cidade de outro país é descartada');
+  assert.equal(createTrip({ countryKey: 'Japan', city: { id: 'JP-3', name: 'Kyoto', lat: 35.02, lng: 135.75 }, idFactory }).city.id, 'JP-3');
   console.log('Planner: escolhas por toque verificadas.');
 }

@@ -687,62 +687,19 @@ select:focus-visible {
   z-index: 1;
 }
 
-.globe-label {
-  position: absolute;
-  left: 0;
-  top: 0;
-  white-space: nowrap;
-  font-family: var(--font-sans);
-  line-height: 1;
-  text-shadow: 0 0 3px var(--color-background), 0 0 6px var(--color-background);
-}
 
-.globe-label--state {
-  margin: -5px 0 0;
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-  text-shadow: 0 0 2px var(--color-background), 0 0 2px var(--color-background);
-  translate: -50% 0;
-}
 
-.globe-label--city {
-  margin-top: -6px;
-  padding-left: 9px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--color-text);
-  translate: -4px 0;
-}
 
-.globe-label--city::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 3px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  box-shadow: 0 0 0 1.5px var(--color-background);
-}
 
-.globe-label--seat { font-weight: 600; }
 
-.globe-label--capital {
-  font-weight: 700;
-  font-size: 12.5px;
-}
 
-.globe-label--capital::before {
-  width: 6px;
-  height: 6px;
-  top: 3px;
-  background: var(--color-background);
-  box-shadow: 0 0 0 2px var(--color-accent);
-}
+
+
+
+
+
+
+
 
 .globe__canvas {
   width: 100%;
@@ -3139,17 +3096,10 @@ body.route-mode .city-card { visibility: hidden; }
 }
 
 /* Cidades: hover e seleção no globo */
-.globe-label--hover { color: var(--color-accent-strong); }
-.globe-label--hover::before { background: var(--color-accent); }
-.globe-label--selected { z-index: 2; color: var(--color-accent-strong); font-weight: 700; font-size: 13px; }
-.globe-label--selected::before {
-  width: 8px;
-  height: 8px;
-  top: 2px;
-  left: -1px;
-  background: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent), 0 0 12px var(--color-accent);
-}
+
+
+
+
 
 /* Acessibilidade e desempenho: sem vidro quando o sistema pede menos transparência */
 @media (prefers-reduced-transparency: reduce) {
@@ -3162,10 +3112,80 @@ body.route-mode .city-card { visibility: hidden; }
 }
 
 /* Rótulos sobre o país selecionado: texto com a cor do fundo e halo da cor de destaque. */
-.globe-label--on-selected { color: var(--color-background); text-shadow: 0 0 3px var(--color-land-selected), 0 0 6px var(--color-land-selected); }
-.globe-label--on-selected.globe-label--state { color: color-mix(in srgb, var(--color-background) 88%, var(--color-land-selected)); text-shadow: 0 0 2px var(--color-land-selected), 0 0 2px var(--color-land-selected); }
-.globe-label--on-selected::before { background: var(--color-background); box-shadow: 0 0 0 1.5px var(--color-land-selected); }
+
+
+
 
 @media (max-width: 600px) {
   .globe-hint { top: 12px; bottom: auto; }
 }
+
+/* Rótulos do globo (js/map.admin.layer.js). Cada rótulo é uma âncora de tamanho
+   zero exatamente no ponto da cidade: a marca fica centrada no ponto e o nome,
+   centrado na horizontal, logo acima dele. Estados: nome centrado no ponto. */
+.globe-label { position: absolute; left: 0; top: 0; width: 0; height: 0; font-family: var(--font-sans); line-height: 1; white-space: nowrap; }
+.globe-label__text {
+  position: absolute;
+  left: 0;
+  bottom: 5px;
+  translate: -50% 0;
+  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--color-text);
+  text-shadow: 0 0 3px var(--color-background), 0 0 6px var(--color-background);
+}
+.globe-label__mark { position: absolute; left: 0; top: 0; display: none; translate: -50% -50%; border-radius: 50%; }
+.globe-label--seat .globe-label__text { font-weight: 600; }
+.globe-label--capital .globe-label__text { font-weight: 700; font-size: 12.5px; bottom: 7px; }
+.globe-label--capital .globe-label__mark { display: block; width: 7px; height: 7px; background: var(--color-background); box-shadow: 0 0 0 2px var(--color-accent); }
+.globe-label--state .globe-label__text {
+  bottom: auto;
+  top: 0;
+  translate: -50% -50%;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-shadow: 0 0 2px var(--color-background), 0 0 2px var(--color-background);
+}
+.globe-label--hover .globe-label__text { color: var(--color-accent-strong); }
+.globe-label--hover .globe-label__mark { display: block; width: 7px; height: 7px; background: var(--color-accent); }
+.globe-label--selected { z-index: 2; }
+.globe-label--selected .globe-label__text { color: var(--color-accent-strong); font-weight: 700; font-size: 13px; bottom: 8px; }
+.globe-label--selected .globe-label__mark {
+  display: block;
+  width: 9px;
+  height: 9px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent), 0 0 12px var(--color-accent);
+}
+/* Sobre o país selecionado (preenchimento de destaque): cores invertidas. */
+.globe-label--on-selected .globe-label__text { color: var(--color-background); text-shadow: 0 0 3px var(--color-land-selected), 0 0 6px var(--color-land-selected); }
+.globe-label--on-selected.globe-label--state .globe-label__text { color: color-mix(in srgb, var(--color-background) 88%, var(--color-land-selected)); text-shadow: 0 0 2px var(--color-land-selected), 0 0 2px var(--color-land-selected); }
+
+/* Cidade no Planner (etapa 1) e na Descoberta */
+.planner-city { margin-top: var(--space-5); }
+.planner-city .form-field__control { margin-bottom: var(--space-2); }
+.planner-city__chosen {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+}
+.planner-city__pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+.planner-city__name { display: grid; gap: 2px; min-width: 0; }
+.planner-city__name strong { font-size: .95rem; }
+.planner-city__name small { color: var(--color-text-secondary); font-size: .76rem; }
+.discovery-cities { display: grid; gap: 6px; }
+.discovery-cities:empty { display: none; }

@@ -425,7 +425,12 @@ export class MapEngine {
       camera: this.camera,
       stage: this.stage,
       clipPlane: this.horizonClipPlane,
-      invalidate: () => this.invalidate()
+      invalidate: () => this.invalidate(),
+      // País (ISO2) num ponto do globo: decide o "país em foco" da camada de zoom.
+      countryAt: (latitude, longitude) => {
+        const countryKey = this.#findCountryByGeo(latitude, longitude);
+        return countryKey ? COUNTRIES[countryKey]?.alpha2 ?? null : null;
+      }
     });
     this.#bindPointerEvents();
     this.#bindResize();
@@ -1040,6 +1045,11 @@ export class MapEngine {
     this.clearSelection();
     this.#refreshCountryMaterials();
     this.flyTo(18, -18, 3.05, 900);
+  }
+
+  /** Cidades de um país (ISO2), do mesmo arquivo usado no globo. */
+  citiesOf(alpha2) {
+    return this.adminLayer.citiesOf(alpha2);
   }
 
   // Cidade ou estado sob o ponteiro (só quando a camada de zoom os mostra).

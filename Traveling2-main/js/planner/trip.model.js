@@ -190,6 +190,21 @@ function normalizeMiles(raw) {
   return Object.keys(miles).length ? miles : null;
 }
 
+// Cidade escolhida no país (data/admin): só o necessário para mostrar e estimar o voo.
+export function normalizeCity(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const lat = Number(raw.lat);
+  const lng = Number(raw.lng);
+  if (!/^[A-Z]{2}-\d{1,6}$/.test(raw.id ?? '') || !text(raw.name) || !(Math.abs(lat) <= 90) || !(Math.abs(lng) <= 180)) return null;
+  return {
+    id: raw.id,
+    name: text(raw.name, 80),
+    lat: Math.round(lat * 1000) / 1000,
+    lng: Math.round(lng * 1000) / 1000,
+    ...(text(raw.region, 80) ? { region: text(raw.region, 80) } : {})
+  };
+}
+
 /**
  * Limpa um objeto vindo do armazenamento (ou de qualquer lugar). Devolve null
  * quando não dá para recuperar uma viagem com destino.
@@ -217,6 +232,12 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     createdAt: isoDate(raw.createdAt) ?? todayIso(),
     updatedAt: isoDate(raw.updatedAt) ?? isoDate(raw.createdAt) ?? todayIso(),
     countryKey,
+    // A cidade precisa ser do mesmo país (o id começa pelo ISO2 do destino).
+    city: (() => {
+      const city = normalizeCity(raw.city);
+      const alpha2 = countries?.[countryKey]?.alpha2;
+      return city && (!alpha2 || city.id.startsWith(`${alpha2}-`)) ? city : null;
+    })(),
     origin: airportCode(raw.origin),
     cabin: ['economy', 'premium', 'business'].includes(raw.cabin) ? raw.cabin : 'economy',
     lodging: Object.hasOwn(LODGING_LEVELS, raw.lodging) ? raw.lodging : 'simple',
@@ -240,9 +261,9 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
   };
 }
 
-export function createTrip({ countryKey, origin = 'GRU', startDate = null, endDate = null, travelers = 1, budgetBRL = null, profileId = null, step = 1, now = new Date(), idFactory = randomId } = {}) {
+export function createTrip({ countryKey, city = null, origin = 'GRU', startDate = null, endDate = null, travelers = 1, budgetBRL = null, profileId = null, step = 1, now = new Date(), idFactory = randomId } = {}) {
   const today = todayIso(now);
-  return normalizeTrip({ countryKey, origin, startDate, endDate, travelers, budgetBRL, profileId, step, lines: [], createdAt: today, updatedAt: today }, { idFactory });
+  return normalizeTrip({ countryKey, city, origin, startDate, endDate, travelers, budgetBRL, profileId, step, lines: [], createdAt: today, updatedAt: today }, { idFactory });
 }
 
 // Aplica mudanças e devolve uma viagem nova, normalizada e com updatedAt.

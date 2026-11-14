@@ -16,15 +16,16 @@ export const CABINS = Object.freeze({ economy: 'Econômica', premium: 'Premium E
  * @param {object} deps
  * @param {object} deps.airportRepository
  * @param {(countryKey: string) => Promise<object|null>} deps.resolveDestinationAirport
+ * @param {(lat: number, lng: number) => Promise<object|null>} [deps.resolveCityAirport] Aeroporto de chegada de uma cidade.
  * @param {() => object|null} deps.getFx     Câmbio do dólar ({ rate, date, kind, label, source }).
  * @param {() => object} [deps.getRates]     Tabela de currency.rateTable().
  * @returns {object[]} Seções do passo a passo: { id, step, render, bind, refresh }.
  */
-export function createFlightSections({ airportRepository, resolveDestinationAirport, getFx, getRates = () => ({}) }) {
+export function createFlightSections({ airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, getFx, getRates = () => ({}) }) {
   let route = null;
 
   const usdRate = () => rateFor('USD', getRates()) ?? (getFx()?.rate > 0 ? getFx() : null);
-  const routeKey = trip => [trip.id, trip.origin, trip.countryKey, trip.cabin, tripMonth(trip) ?? new Date().getMonth()].join('|');
+  const routeKey = trip => [trip.id, trip.origin, trip.countryKey, trip.city?.id ?? '', trip.cabin, tripMonth(trip) ?? new Date().getMonth()].join('|');
   const codes = value => `${value.origin.iata || value.origin.icao} ⇄ ${value.destination.iata || value.destination.icao}`;
 
   async function loadRoute(trip) {
@@ -33,7 +34,9 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
     route = { key, status: 'loading' };
     const [origin, destination] = await Promise.all([
       airportRepository.resolve(trip.origin),
-      resolveDestinationAirport(trip.countryKey)
+      // Com cidade escolhida: aeroporto que atende a cidade; senão o do país.
+      (trip.city ? resolveCityAirport(trip.city.lat, trip.city.lng) : Promise.resolve(null))
+        .then(airport => airport ?? resolveDestinationAirport(trip.countryKey))
     ]);
     if (route.key !== key) return route;
     if (!origin || !destination) route = { key, status: 'error', message: 'Ainda não há estimativa de voo para este destino.' };
@@ -66,7 +69,7 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
       <div class="planner-fare">
         <span class="planner-fare__label">Passagem ida e volta, por pessoa</span>
         <strong class="planner-fare__value">${formatBRL(suggestion.perLegLow * 2)} – ${formatBRL(suggestion.perLegHigh * 2)}</strong>
-        <small>${escapeHtml(codes(route))} · ${escapeHtml(CABINS[trip.cabin])}</small>
+        <small>${escapeHtml(codes(route))} · ${escapeHtml(CABINS[trip.cabin])}${trip.city ? ` · aeroporto que atende ${escapeHtml(trip.city.name)}` : ''}</small>
       </div>
       ${miles}
       ${provenanceLabel('estimate', { detail: 'por distância, mês e cabine; não é cotação. Confira preço e disponibilidade na companhia ou no programa' })}`;
