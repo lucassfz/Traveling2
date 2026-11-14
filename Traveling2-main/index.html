@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Traveling — globo 3D interativo com guias de países, rotas e estimativas de milhas.">
+  <meta name="theme-color" content="#05070c">
+  <title>Traveling — Explore o mundo</title>
+  <script>
+    // Aplica o tema salvo antes da primeira pintura, para a abertura e a
+    // página não piscarem no tema errado. app.js continua dono da lógica.
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        document.documentElement.dataset.theme = savedTheme;
+        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#eef1f3');
+      }
+    } catch (error) { /* armazenamento bloqueado: segue o padrão escuro */ }
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2215%22 fill=%22%2305070c%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229.5%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.6%22/%3E%3Cpath d=%22M6.5 16h19M16 6.5c3.2 3.4 3.2 15.6 0 19M16 6.5c-3.2 3.4-3.2 15.6 0 19%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.2%22/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
+  <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
+  <link rel="stylesheet" href="styles.css?v=2026.11.14d">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7-5.6-1.9L10.1 9z"/><path d="M19 3v3M17.5 4.5h3"/></symbol>
+    <symbol id="i-suitcase" viewBox="0 0 24 24"><rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M8 7v13M16 7v13"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 15.5v-1.7l-7.5-4.6V4.5a1.5 1.5 0 0 0-3 0v4.7L3 13.8v1.7l7.5-2.3v4.6l-2 1.5v1.2l3.5-1 3.5 1v-1.2l-2-1.5v-4.6z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.1 5.6.8-4 4 .9 5.6-5-2.6-5 2.6.9-5.6-4-4 5.6-.8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.6c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></symbol>
+  </svg>
+
+  <div class="splash-screen" id="splash-screen" role="status" aria-label="Abrindo Traveling">
+    <div class="splash-screen__mark" aria-hidden="true">
+      <span class="splash-screen__wordmark">Traveling</span>
+      <span class="splash-screen__line"></span>
+    </div>
+  </div>
+
+  <header class="app-header">
+    <button class="app-header__brand" id="home-button" type="button" aria-label="Voltar à visão global">
+      <svg class="icon app-header__brand-mark" aria-hidden="true"><use href="#i-globe"/></svg>
+      <span class="app-header__brand-word">Traveling</span>
+    </button>
+
+    <div class="search" id="country-search">
+      <label class="sr-only" for="country-search-input">Buscar país</label>
+      <svg class="icon search__icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input
+        class="search__input"
+        id="country-search-input"
+        type="search"
+        placeholder="Buscar país"
+        autocomplete="off"
+        spellcheck="false"
+        aria-autocomplete="list"
+        aria-controls="country-search-results"
+        aria-keyshortcuts="/ Control+K"
+      >
+      <kbd class="search__kbd" aria-hidden="true">/</kbd>
+      <div class="search__results" id="country-search-results" role="listbox" aria-label="Sugestões de países"></div>
+    </div>
+
+    <div class="app-header__actions">
+      <button class="header-action header-action--search" id="search-toggle" type="button" aria-label="Buscar país" aria-controls="country-search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      </button>
+      <button class="header-action header-action--primary" id="discover-button" type="button" aria-label="Descobrir destino">
+        <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span class="header-action__label">Descobrir</span>
+      </button>
+      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Viagens" title="Planejar viagem">
+        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Viagens</span>
+        <span class="header-action__badge" id="trips-count" hidden>0</span>
+      </button>
+      <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
+        <svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg><span class="header-action__label">Milhas</span>
+      </button>
+      <button class="header-action header-action--theme" id="theme-button" type="button" aria-label="Ativar modo claro">
+        <svg class="icon icon--sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        <svg class="icon icon--moon" aria-hidden="true"><use href="#i-moon"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="globe" id="globe">
+    <canvas class="starfield" id="starfield-canvas" aria-hidden="true"></canvas>
+    <div class="globe__stage" id="globe-stage" aria-label="Globo 3D interativo"></div>
+    <div class="globe__visual-overlay" aria-hidden="true"></div>
+    <div class="globe__status" id="globe-status">
+      <span class="globe__spinner" aria-hidden="true"></span>
+      <span>Construindo países em 3D…</span>
+    </div>
+    <div class="globe__fallback" id="globe-fallback" role="status">
+      <strong>Globo 3D indisponível</strong>
+      <span>Use a busca para abrir os guias de países.</span>
+    </div>
+  </main>
+
+  <div class="dock">
+    <div class="dock__stat" title="Destinos marcados como visitados">
+      <svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>
+      <span class="sr-only">Visitados:</span>
+      <strong id="visited-count">0</strong><span class="dock__stat-total" id="visited-total">/ 0</span>
+    </div>
+    <nav class="continent-nav" aria-label="Selecionar continente">
+      <button class="continent-nav__button" type="button" data-continent="EU">Europa</button>
+      <button class="continent-nav__button" type="button" data-continent="NA">Am. Norte</button>
+      <button class="continent-nav__button" type="button" data-continent="SA">Am. Sul</button>
+      <button class="continent-nav__button" type="button" data-continent="AF">África</button>
+      <button class="continent-nav__button" type="button" data-continent="AS">Ásia</button>
+      <button class="continent-nav__button" type="button" data-continent="OC">Oceania</button>
+    </nav>
+    <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="visa-filter__label">Sem visto</span>
+      <strong class="visa-filter__count" id="visa-free-count">0</strong>
+    </button>
+  </div>
+
+  <aside class="miles-hub" id="miles-hub" aria-label="Milhas e aeroportos" inert>
+    <header class="miles-hub__header">
+      <div>
+        <span class="eyebrow">Guia de viagem</span>
+        <h2 class="miles-hub__title">Milhas &amp; Aeroportos</h2>
+        <p class="miles-hub__subtitle">Compare resgates, cartões, salas e aeroportos da sua viagem.</p>
+      </div>
+      <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar Milhas e Aeroportos"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="miles-tabs" id="miles-tabs" role="tablist" aria-label="Seções de Milhas e Aeroportos"></div>
+    <div class="miles-hub__content" id="miles-content"></div>
+  </aside>
+
+  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planejamento de viagem" inert>
+    <header class="miles-hub__header">
+      <div>
+        <span class="eyebrow">Planejamento de viagem</span>
+        <h2 class="miles-hub__title">Minhas viagens</h2>
+      </div>
+      <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="planner" id="planner-content"><p class="planner-empty">Carregando…</p></div>
+  </aside>
+
+  <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
+    <header class="country-panel__toolbar">
+      <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      <span class="country-panel__spacer"></span>
+      <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
+    </header>
+
+    <div class="country-panel__identity">
+      <span class="country-panel__flag" id="country-flag" role="img" aria-label="Bandeira do país">🌍</span>
+      <div>
+        <div class="country-panel__region" id="country-region">—</div>
+        <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
+        <div class="country-actions">
+          <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>Explorar destino</button>
+          <button class="secondary-button country-plan-button" id="country-plan-button" type="button">Planejar viagem</button>
+        </div>
+        <p class="country-explore-status" id="country-explore-status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div class="country-tabs" role="tablist" aria-label="Seções do guia">
+      <button class="country-tabs__button country-tabs__button--active" type="button" role="tab" data-tab="overview" aria-selected="true">Visão geral</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="entry" aria-selected="false">Entrada</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="culture" aria-selected="false">Cultura</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="flights" aria-selected="false">Voos</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="checklist" aria-selected="false">Checklist</button>
+      <button class="country-tabs__button" type="button" role="tab" data-tab="history" aria-selected="false">História</button>
+    </div>
+
+    <div class="country-panel__content">
+      <section class="country-tab country-tab--active" id="tab-overview" data-tab-panel="overview" role="tabpanel">
+        <div class="media-strip" id="country-media" aria-label="Fotos do destino"></div>
+        <div class="info-grid" id="country-basics"></div>
+        <section class="content-section geo-nav" id="country-regions" aria-label="Estados e cidades" hidden></section>
+        <div id="currency-converter" aria-live="polite"></div>
+        <section class="content-section">
+          <div class="section-heading">Melhor época</div>
+          <div class="month-chart" id="month-chart"></div>
+          <p class="body-copy" id="best-time-copy"></p>
+        </section>
+      </section>
+
+      <section class="country-tab" id="tab-entry" data-tab-panel="entry" role="tabpanel">
+        <div class="stack" id="entry-content"></div>
+        <p class="entry-reminder">Regras de entrada e saúde podem mudar. Confirme-as antes de viajar.</p>
+      </section>
+
+      <section class="country-tab" id="tab-culture" data-tab-panel="culture" role="tabpanel">
+        <div class="content-section">
+          <div class="section-heading">Sabores</div>
+          <div class="stack" id="food-content"></div>
+        </div>
+        <div class="content-section">
+          <div class="section-heading">Etiqueta</div>
+          <div class="stack" id="etiquette-content"></div>
+        </div>
+        <div class="tag-list" id="vibe-content"></div>
+      </section>
+
+      <section class="country-tab" id="tab-flights" data-tab-panel="flights" role="tabpanel">
+        <div class="route-builder">
+          <div class="route-builder__airports">
+            <div><span class="eyebrow">Origem</span><strong id="route-origin-code">GRU</strong><small id="route-origin-city">São Paulo</small><button class="route-builder__change" id="change-origin-button" type="button">Alterar origem</button></div>
+            <div class="route-builder__line" aria-hidden="true"><span>✈</span></div>
+            <div><span class="eyebrow">Destino</span><strong id="route-destination-code">—</strong><small id="route-destination-city">—</small></div>
+          </div>
+          <p class="route-builder__destination-note" id="route-destination-note"></p>
+          <div class="flight-preview-action">
+            <button class="secondary-button" id="flight-preview-button" type="button" disabled>Visualizar voo no globo</button>
+            <p id="flight-preview-status" role="status" aria-live="polite">Aguarde o carregamento do globo e do aeroporto de destino.</p>
+          </div>
+
+          <div class="form-grid">
+            <label class="form-field form-field--wide">
+              <span class="form-field__label">Aeroporto de origem <span class="form-field__hint">IATA ou ICAO</span></span>
+              <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" value="GRU" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off" aria-describedby="flight-preview-status">
+              <datalist id="airport-suggestions"></datalist>
+            </label>
+            <label class="form-field">
+              <span class="form-field__label">Cabine</span>
+              <select class="form-field__control" id="cabin-select">
+                <option value="economy">Econômica</option>
+                <option value="premium">Premium Economy</option>
+                <option value="business">Executiva</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span class="form-field__label">Mês</span>
+              <select class="form-field__control" id="travel-month-select"></select>
+            </label>
+          </div>
+
+          <button class="primary-button" id="calculate-route-button" type="button">Calcular rota</button>
+          <div class="route-result" id="route-result" aria-live="polite"></div>
+          <div class="route-airport-actions" id="route-airport-actions" hidden></div>
+        </div>
+      </section>
+
+      <section class="country-tab" id="tab-checklist" data-tab-panel="checklist" role="tabpanel">
+        <div class="checklist__header">
+          <div><strong>Pronto para viajar?</strong><span id="checklist-progress-text" aria-live="polite">0 de 0 itens</span></div>
+          <div class="checklist__meter" id="checklist-progress-meter" role="progressbar" aria-label="Preparação da viagem" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><span id="checklist-progress-fill"></span></div>
+        </div>
+        <label class="checklist__month" id="checklist-month-wrap" hidden>Mês da viagem <select id="checklist-month-select" aria-label="Mês da viagem"></select></label>
+        <div class="checklist" id="checklist-content"></div>
+        <div class="checklist__actions">
+          <button class="secondary-button" id="checklist-complete-button" type="button">Marcar tudo</button>
+          <button class="secondary-button" id="checklist-clear-button" type="button">Limpar</button>
+        </div>
+      </section>
+      <section class="country-tab" id="tab-history" data-tab-panel="history" role="tabpanel">
+        <div class="content-section"><div class="section-heading">Panorama histórico</div><div class="history-list" id="country-history"></div></div>
+      </section>
+    </div>
+  </aside>
+
+  <div class="country-tooltip" id="country-tooltip" role="tooltip"></div>
+
+  <aside class="discovery-panel" id="discovery-panel" aria-labelledby="discovery-title" hidden inert></aside>
+
+  <section class="flight-preview-panel" id="flight-preview-panel" aria-label="Visualização da rota" hidden inert>
+    <div class="flight-preview-panel__header">
+      <span class="eyebrow">Rota de referência</span>
+      <button class="icon-button" id="flight-preview-close" type="button" aria-label="Fechar visualização da rota"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <strong id="flight-preview-title"></strong>
+    <span id="flight-preview-codes"></span>
+    <small>● Origem · ○ Destino</small>
+    <p id="flight-preview-details"></p>
+    <p class="provenance provenance--estimate"><span class="provenance__kind">Estimativa Traveling</span><span class="provenance__part">distância em linha geodésica; tempo de viagem estimado, não um voo direto ou horário de companhia aérea</span></p>
+    <button class="route-preview-airports" id="flight-preview-airports" type="button">Ver benefícios dos aeroportos</button>
+  </section>
+
+  <script>
+  window.__travelingBoot = { interactive: false };
+  window.setTimeout(function () {
+    if (window.__travelingBoot && window.__travelingBoot.interactive) return;
+    var splash = document.getElementById('splash-screen');
+    var fallback = document.getElementById('globe-fallback');
+    var status = document.getElementById('globe-status');
+    if (status) status.classList.add('globe__status--hidden');
+    if (fallback) fallback.classList.add('globe__fallback--visible');
+    if (splash) splash.classList.add('splash-screen--exit');
+  }, 8000);
+  </script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="js/app.js?v=2026.11.14d"></script>
+</body>
+</html>

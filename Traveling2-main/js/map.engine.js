@@ -1,0 +1,1273 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import {
+  cartesianToGeographic,
+  createRafThrottle,
+  geometryToPolygons,
+  geographicToCartesian,
+  normalizeLongitude,
+  prepareGeometry,
+  preparedGeometryContains,
+  unwrapRing
+} from './geospatial.js';
+import {
+  COUNTRIES,
+  CONTINENT_LABELS
+} from './countries.dataset.js';
+import { atlasFeatureParts } from './map.topology.js';
+import { routePoint } from './flight.route.js';
+import { FlightVisualization } from './flight.visualization.js';
+
+// Versões exatas: uma faixa (@2, @3) pode mudar a geometria ou a API sem aviso.
+const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
+const TOPOJSON_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
+const GLOBE_RADIUS = 1;
+const LAND_RADIUS = 1.007;
+const BORDER_RADIUS = 1.012;
+// Keep the navigation grid almost flush with the ocean. Country meshes are
+// lifted above it, so grid lines cannot bleed through their triangulated area.
+const GRATICULE_RADIUS = 1.0005;
+const PICK_SURFACE_TOLERANCE = 0.02;
+const MAX_RING_CLOSURE_DEGREES = 24;
+const HORIZON_CLIP_EPSILON = Math.sin(THREE.MathUtils.degToRad(0.1));
+const GLOBE_YAW = 0;
+const GLOBE_ORIGIN = new THREE.Vector3(0, 0, 0);
+
+const CONTINENT_COLOR_TOKENS = Object.freeze({
+  EU: '--color-continent-europe',
+  NA: '--color-continent-north-america',
+  SA: '--color-continent-south-america',
+  AF: '--color-continent-africa',
+  AS: '--color-continent-asia',
+  OC: '--color-continent-oceania'
+});
+
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { mode: 'cors', cache: 'force-cache', signal: controller.signal });
+    if (!response.ok) throw new Error(`Falha ao carregar geometria mundial (${response.status}).`);
+    return await response.json();
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('Tempo limite ao carregar a geometria mundial.');
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function latLngToCartesian(latitude, longitude, radius = 1, yaw = 0, origin = new THREE.Vector3()) {
+  const raw = geographicToCartesian(latitude, longitude, radius);
+  const vector = new THREE.Vector3(raw.x, raw.y, raw.z);
+  if (yaw !== 0) vector.applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
+  return vector.add(origin);
+}
+
+function cartesianToLatLng(worldPoint, yaw = 0, origin = new THREE.Vector3()) {
+  const local = worldPoint.clone().sub(origin);
+  if (yaw !== 0) local.applyAxisAngle(THREE.Object3D.DEFAULT_UP, -yaw);
+  return cartesianToGeographic(local);
+}
+
+const CONTINENT_CAMERA = Object.freeze({
+  EU: { lat: 52, lng: 16, distance: 2.15 },
+  NA: { lat: 43, lng: -98, distance: 2.35 },
+  SA: { lat: -15, lng: -60, distance: 2.25 },
+  AF: { lat: 7, lng: 20, distance: 2.35 },
+  AS: { lat: 33, lng: 92, distance: 2.5 },
+  OC: { lat: -24, lng: 138, distance: 2.25 }
+});
+
+function cssToken(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function colorToken(name) {
+  return new THREE.Color(cssToken(name));
+}
+
+function ringCenterLongitude(ring) {
+  return ring.reduce((sum, [lng]) => sum + lng, 0) / Math.max(1, ring.length);
+}
+
+function densifyRing(ring, maximumStepDegrees = 4.5, closeRing = true) {
+  const points = [];
+  const edgeCount = closeRing ? ring.length : Math.max(0, ring.length - 1);
+  for (let index = 0; index < edgeCount; index += 1) {
+    const start = ring[index];
+    const end = ring[(index + 1) % ring.length];
+    points.push(start);
+    const midLatitude = THREE.MathUtils.degToRad((start[1] + end[1]) / 2);
+    const dx = (end[0] - start[0]) * Math.cos(midLatitude);
+    const dy = end[1] - start[1];
+    const divisions = Math.min(24, Math.max(1, Math.ceil(Math.hypot(dx, dy) / maximumStepDegrees)));
+    for (let step = 1; step < divisions; step += 1) {
+      const amount = step / divisions;
+      points.push([
+        start[0] + (end[0] - start[0]) * amount,
+        start[1] + (end[1] - start[1]) * amount
+      ]);
+    }
+  }
+  return points;
+}
+
+function planarDistance(a, b) {
+  const latitude = THREE.MathUtils.degToRad((a[1] + b[1]) / 2);
+  return Math.hypot((a[0] - b[0]) * Math.cos(latitude), a[1] - b[1]);
+}
+
+function hasStableRingClosure(ring) {
+  if (ring.length < 3) return false;
+  return planarDistance(ring[0], ring.at(-1)) <= MAX_RING_CLOSURE_DEGREES;
+}
+
+function sanitizeRing(rawRing, anchor = null) {
+  const unwrapped = unwrapRing(rawRing, anchor);
+  const sanitized = [];
+
+  for (const point of unwrapped) {
+    const longitude = Number(point?.[0]);
+    const latitude = Number(point?.[1]);
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) continue;
+    if (sanitized.length && planarDistance(sanitized.at(-1), [longitude, latitude]) < 1e-6) continue;
+    sanitized.push([longitude, latitude]);
+  }
+
+  return sanitized.length >= 3 && hasStableRingClosure(sanitized) ? sanitized : null;
+}
+
+function sanitizePolygon(polygon) {
+  if (!polygon?.[0]?.length) return null;
+  const outer = sanitizeRing(polygon[0]);
+  if (!outer) return null;
+  const anchor = ringCenterLongitude(outer);
+  const holes = polygon.slice(1)
+    .map(ring => sanitizeRing(ring, anchor))
+    .filter(Boolean);
+  return [outer, ...holes];
+}
+
+function sanitizeOpenLine(rawLine) {
+  if (!Array.isArray(rawLine) || rawLine.length < 2) return [];
+  const first = rawLine.find(point => Number.isFinite(Number(point?.[0])) && Number.isFinite(Number(point?.[1])));
+  if (!first) return [];
+  const line = [[Number(first[0]), Number(first[1])]];
+
+  for (const point of rawLine.slice(rawLine.indexOf(first) + 1)) {
+    const rawLongitude = Number(point?.[0]);
+    const latitude = Number(point?.[1]);
+    if (!Number.isFinite(rawLongitude) || !Number.isFinite(latitude)) continue;
+    let longitude = rawLongitude;
+    const previousLongitude = line.at(-1)[0];
+    while (longitude - previousLongitude > 180) longitude -= 360;
+    while (longitude - previousLongitude < -180) longitude += 360;
+    if (planarDistance(line.at(-1), [longitude, latitude]) < 1e-6) continue;
+    line.push([longitude, latitude]);
+  }
+
+  return line;
+}
+
+function collectTopologyArcIndexes(value, indexes) {
+  if (typeof value === 'number') {
+    indexes.add(value < 0 ? ~value : value);
+    return;
+  }
+  if (Array.isArray(value)) value.forEach(item => collectTopologyArcIndexes(item, indexes));
+}
+
+function decodeTopologyArc(topology, index) {
+  const arc = topology.arcs?.[index];
+  if (!Array.isArray(arc)) return [];
+  const scale = topology.transform?.scale ?? [1, 1];
+  const translate = topology.transform?.translate ?? [0, 0];
+  let x = 0;
+  let y = 0;
+  return arc.map(([dx, dy]) => {
+    x += dx;
+    y += dy;
+    return [x * scale[0] + translate[0], y * scale[1] + translate[1]];
+  });
+}
+
+function subdivideTriangle(a, b, c, output, depth = 0, maxDepth = 6) {
+  const edges = [
+    { pair: 'ab', distance: planarDistance(a, b) },
+    { pair: 'bc', distance: planarDistance(b, c) },
+    { pair: 'ca', distance: planarDistance(c, a) }
+  ].sort((left, right) => right.distance - left.distance);
+
+  // Small spherical triangles stay outside the ocean/graticule surface after
+  // projection. Larger planar triangles sag into the globe and expose a
+  // straight grid segment through a country.
+  if (edges[0].distance < 4 || depth >= maxDepth) {
+    output.push([a, b, c]);
+    return;
+  }
+
+  if (edges[0].pair === 'ab') {
+    const midpoint = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    subdivideTriangle(a, midpoint, c, output, depth + 1, maxDepth);
+    subdivideTriangle(midpoint, b, c, output, depth + 1, maxDepth);
+  } else if (edges[0].pair === 'bc') {
+    const midpoint = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2];
+    subdivideTriangle(a, b, midpoint, output, depth + 1, maxDepth);
+    subdivideTriangle(a, midpoint, c, output, depth + 1, maxDepth);
+  } else {
+    const midpoint = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2];
+    subdivideTriangle(a, b, midpoint, output, depth + 1, maxDepth);
+    subdivideTriangle(midpoint, b, c, output, depth + 1, maxDepth);
+  }
+}
+
+function sphericalGeometryFromShape(shape, maxDepth = 6) {
+  const planarGeometry = new THREE.ShapeGeometry(shape, 1);
+  const positions = planarGeometry.getAttribute('position');
+  const index = planarGeometry.index;
+  const triangleCount = index ? index.count : positions.count;
+  const triangles = [];
+  const read = vertexIndex => [positions.getX(vertexIndex), positions.getY(vertexIndex)];
+
+  for (let cursor = 0; cursor < triangleCount; cursor += 3) {
+    const a = read(index ? index.getX(cursor) : cursor);
+    const b = read(index ? index.getX(cursor + 1) : cursor + 1);
+    const c = read(index ? index.getX(cursor + 2) : cursor + 2);
+    subdivideTriangle(a, b, c, triangles, 0, maxDepth);
+  }
+  planarGeometry.dispose();
+
+  const outputPositions = [];
+  const outputNormals = [];
+  for (const triangle of triangles) {
+    const sphericalPoints = triangle.map(([longitude, latitude]) => (
+      latLngToCartesian(latitude, longitude, LAND_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
+    ));
+    const [a, b, c] = sphericalPoints;
+    const radialNormal = a.clone().add(b).add(c).sub(GLOBE_ORIGIN).normalize();
+    const faceNormal = b.clone().sub(a).cross(c.clone().sub(a));
+
+    // Discard zero-area triangles originating in repeated/degenerate source
+    // coordinates before they can produce a visible vertical stitch.
+    if (faceNormal.lengthSq() < 1e-12 || radialNormal.lengthSq() < 1e-12) continue;
+
+    // ShapeGeometry is planar. Reorienting each transformed triangle makes
+    // face culling reliable on the sphere and prevents rear hemisphere faces
+    // from leaking through the front surface as dark stitching artifacts.
+    if (faceNormal.dot(radialNormal) < 0) [sphericalPoints[1], sphericalPoints[2]] = [sphericalPoints[2], sphericalPoints[1]];
+
+    for (const point of sphericalPoints) {
+      const normal = point.clone().sub(GLOBE_ORIGIN).normalize();
+      outputPositions.push(point.x, point.y, point.z);
+      outputNormals.push(normal.x, normal.y, normal.z);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(outputPositions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(outputNormals, 3));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function polygonToMesh(polygon, material, countryKey, continent) {
+  if (!polygon?.[0]?.length) return null;
+  const outer = polygon[0];
+  const anchor = ringCenterLongitude(outer);
+  const shape = new THREE.Shape();
+  outer.forEach(([longitude, latitude], index) => {
+    if (index === 0) shape.moveTo(longitude, latitude);
+    else shape.lineTo(longitude, latitude);
+  });
+
+  for (const holeCoordinates of polygon.slice(1)) {
+    const hole = holeCoordinates;
+    const path = new THREE.Path();
+    hole.forEach(([longitude, latitude], index) => {
+      if (index === 0) path.moveTo(longitude, latitude);
+      else path.lineTo(longitude, latitude);
+    });
+    shape.holes.push(path);
+  }
+
+  // The broad Russian mainland needs two extra splits to keep long planar
+  // triangulation diagonals above the spherical ocean surface.
+  const geometry = sphericalGeometryFromShape(shape, countryKey === 'Russia' ? 8 : 6);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.userData.countryKey = countryKey;
+  mesh.userData.continent = continent;
+  mesh.renderOrder = 2;
+  mesh.updateMatrixWorld(true);
+  return mesh;
+}
+
+// Countries crossing ±180° (Russia, Fiji) are cut along the antimeridian in the
+// atlas. That cut is a polygon edge, not a real border, so it is never drawn.
+function isAntimeridianCut(a, b) {
+  const onAntimeridian = point => Math.abs(Math.abs(normalizeLongitude(point[0])) - 180) < 1e-3;
+  return onAntimeridian(a) && onAntimeridian(b);
+}
+
+// Highlight outline for one country (selected, visited, visa-free). Built on
+// demand; the shared base borders come from #buildGlobalBorders.
+function polygonBorder(polygon, material) {
+  const group = new THREE.Group();
+  for (const ring of polygon) {
+    if (ring.length < 2) continue;
+    const edgeCount = hasStableRingClosure(ring) ? ring.length : ring.length - 1;
+    const runs = [];
+    let run = [ring[0]];
+    for (let index = 0; index < edgeCount; index += 1) {
+      const start = ring[index];
+      const end = ring[(index + 1) % ring.length];
+      if (isAntimeridianCut(start, end)) {
+        if (run.length > 1) runs.push(run);
+        run = [end];
+      } else run.push(end);
+    }
+    if (run.length > 1) runs.push(run);
+
+    for (const points of runs) {
+      const samples = densifyRing(points, 4.5, false);
+      samples.push(points.at(-1));
+      const vertices = samples.map(([longitude, latitude]) => (
+        latLngToCartesian(latitude, longitude, BORDER_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
+      ));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vertices), material);
+      // Drawn after the shared borders (renderOrder 4) at the same radius.
+      line.renderOrder = 4.5;
+      group.add(line);
+    }
+  }
+  return group;
+}
+
+const HIGHLIGHTED_BORDER_STATES = new Set(['selected', 'visited', 'visa-free', 'visa-free-hover']);
+
+export class MapEngine {
+  constructor(stageElement, callbacks = {}) {
+    this.stage = stageElement;
+    this.callbacks = callbacks;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 100);
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.localClippingEnabled = true;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    this.renderer.setClearAlpha(0);
+    this.renderer.domElement.className = 'globe__canvas';
+    this.renderer.domElement.tabIndex = 0;
+    this.stage.appendChild(this.renderer.domElement);
+
+    this.camera.position.copy(latLngToCartesian(18, -18, 3.05, GLOBE_YAW, GLOBE_ORIGIN));
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.055;
+    this.controls.enablePan = false;
+    this.controls.minDistance = 1.16;
+    this.controls.maxDistance = 4.8;
+    this.controls.rotateSpeed = 0.52;
+    this.controls.zoomSpeed = 0.72;
+    this.controls.target.copy(GLOBE_ORIGIN);
+
+    this.raycaster = new THREE.Raycaster();
+    this.pointer = new THREE.Vector2(2, 2);
+    this.raycastMeshes = [];
+    this.countryRecords = new Map();
+    this.preparedGeometries = new Map();
+    this.selectedCountry = null;
+    this.hoveredCountry = null;
+    this.activeContinent = null;
+    this.visitedCountries = new Set();
+    this.visaFreeFilterActive = false;
+    this.visaFreeCountries = new Set();
+    this.cameraFlight = null;
+    this.routePreview = null;
+    this.ready = false;
+    this.hotspotRecords = new Map();
+    this.hotspotHitMeshes = [];
+    this.disposed = false;
+    // Largura (px) coberta por um painel à direita do globo. O centro de
+    // projeção é deslocado para a área visível; o alvo da órbita continua sendo
+    // o centro do globo, então rotação, recorte do horizonte e picking não mudam.
+    this.viewInsetTarget = 0;
+    this.viewInsetCurrent = 0;
+    this.viewSize = { width: 1, height: 1 };
+    this.reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // Equivalent to an orthographic clipAngle(89.9): anything on the rear
+    // hemisphere is clipped before land/border fragments reach the framebuffer.
+    this.horizonClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HORIZON_CLIP_EPSILON);
+
+    this.worldGroup = new THREE.Group();
+    this.borderGroup = new THREE.Group();
+    this.globalBorderGroup = new THREE.Group();
+    this.borderGroup.add(this.globalBorderGroup);
+    this.scene.add(this.worldGroup, this.borderGroup);
+
+    this.#createOcean();
+    this.#createAtmosphere();
+    this.#createGraticule();
+    this.#createLights();
+    this.flightVisualization = new FlightVisualization(this.scene, this.horizonClipPlane);
+    this.#bindPointerEvents();
+    this.#bindResize();
+    this.setTheme();
+  }
+
+  #createOcean() {
+    this.oceanMaterial = new THREE.MeshPhysicalMaterial({
+      roughness: 0.8,
+      metalness: 0,
+      clearcoat: 0.04,
+      clearcoatRoughness: 0.9,
+      ior: 1.33
+    });
+    this.ocean = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 80, 56), this.oceanMaterial);
+    this.ocean.position.copy(GLOBE_ORIGIN);
+    this.ocean.rotation.y = GLOBE_YAW;
+    this.ocean.renderOrder = 0;
+    this.scene.add(this.ocean);
+  }
+
+  #createAtmosphere() {
+    // A tiny Fresnel shell defines the circumference without turning the globe
+    // into a neon object. It is independent from the land meshes and never
+    // participates in picking, so map interaction remains unchanged.
+    this.atmosphereMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        atmosphereColor: { value: colorToken('--color-globe-atmosphere') },
+        atmosphereOpacity: { value: 0.11 }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        void main() {
+          vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal);
+          vViewDirection = normalize(-viewPosition.xyz);
+          gl_Position = projectionMatrix * viewPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 atmosphereColor;
+        uniform float atmosphereOpacity;
+        varying vec3 vNormal;
+        varying vec3 vViewDirection;
+        void main() {
+          float facing = max(dot(normalize(vNormal), normalize(vViewDirection)), 0.0);
+          float rim = pow(1.0 - facing, 2.65);
+          gl_FragColor = vec4(atmosphereColor, rim * atmosphereOpacity);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.FrontSide
+    });
+    this.atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(GLOBE_RADIUS * 1.022, 80, 56),
+      this.atmosphereMaterial
+    );
+    this.atmosphere.position.copy(GLOBE_ORIGIN);
+    this.atmosphere.renderOrder = 5;
+    this.scene.add(this.atmosphere);
+  }
+
+  #createGraticule() {
+    this.graticuleGroup = new THREE.Group();
+    this.graticuleMaterial = new THREE.LineBasicMaterial({
+      color: colorToken('--color-graticule'),
+      transparent: true,
+      opacity: 0.05,
+      depthWrite: false,
+      depthTest: true
+    });
+
+    const addLine = coordinates => {
+      const points = coordinates.map(([latitude, longitude]) => (
+        latLngToCartesian(latitude, longitude, GRATICULE_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
+      ));
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, this.graticuleMaterial);
+      line.renderOrder = 1;
+      this.graticuleGroup.add(line);
+    };
+
+    // Linhas de 15°: precisão suficiente para navegação, quase invisíveis a 5%.
+    for (let latitude = -75; latitude <= 75; latitude += 15) {
+      const coordinates = [];
+      for (let longitude = -180; longitude <= 180; longitude += 3) {
+        coordinates.push([latitude, longitude]);
+      }
+      addLine(coordinates);
+    }
+
+    for (let longitude = -180; longitude < 180; longitude += 15) {
+      const coordinates = [];
+      for (let latitude = -90; latitude <= 90; latitude += 3) {
+        coordinates.push([latitude, longitude]);
+      }
+      addLine(coordinates);
+    }
+
+    this.scene.add(this.graticuleGroup);
+  }
+
+  #createLights() {
+    this.ambientLight = new THREE.AmbientLight(colorToken('--color-light-ambient'), 0.86);
+    this.hemisphereLight = new THREE.HemisphereLight(
+      colorToken('--color-light-sky'),
+      colorToken('--color-light-ground'),
+      1.15
+    );
+    this.keyLight = new THREE.DirectionalLight(colorToken('--color-light-key'), 2.35);
+    this.keyLight.position.set(4.8, 3.1, 5.6);
+    this.fillLight = new THREE.DirectionalLight(colorToken('--color-light-fill'), 0.72);
+    this.fillLight.position.set(-4.2, 0.4, 3.1);
+    this.scene.add(this.ambientLight, this.hemisphereLight, this.keyLight, this.fillLight);
+  }
+
+  async init() {
+    this.resize();
+    if (!this.renderStarted) {
+      this.renderStarted = true;
+      this.controls.addEventListener('start', () => this.invalidate());
+      this.controls.addEventListener('change', () => this.invalidate());
+      this.invalidate();
+    }
+    this.callbacks.onProgress?.('Carregando geometria mundial…');
+    const [topology, topojson] = await Promise.all([
+      fetchJsonWithTimeout(WORLD_ATLAS_URL, 7000),
+      import(TOPOJSON_CLIENT_URL)
+    ]);
+    const features = topojson.feature(topology, topology.objects.countries).features;
+    this.callbacks.onProgress?.('Construindo países em 3D…');
+    this.#buildGlobalBorders(topojson, topology);
+    await this.#buildWorld(features);
+    this.#buildSmallDestinationHotspots();
+    this.ready = true;
+    this.setTheme();
+    this.resize();
+    this.callbacks.onReady?.();
+  }
+
+  async #buildWorld(features) {
+    const parts = features.flatMap(feature => Number(feature.id) === 10 || feature.properties?.name === 'Antarctica'
+      ? [] : atlasFeatureParts(feature));
+    for (let index = 0; index < parts.length; index += 1) {
+      const { key: countryKey, geometry } = parts[index];
+      const polygons = geometryToPolygons(geometry).map(sanitizePolygon).filter(Boolean);
+      if (!countryKey) {
+        // Draw territories absent from the travel catalog as neutral land,
+        // including Western Sahara, without assigning contested sovereignty.
+        if (!this.neutralLandMaterial) this.neutralLandMaterial = new THREE.MeshStandardMaterial({
+          color: colorToken('--color-land'), roughness: 0.82, metalness: 0,
+          side: THREE.DoubleSide, clippingPlanes: [this.horizonClipPlane],
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+        });
+        for (const polygon of polygons) {
+          const mesh = polygonToMesh(polygon, this.neutralLandMaterial, null, null);
+          if (mesh) this.worldGroup.add(mesh);
+        }
+        continue;
+      }
+      const country = COUNTRIES[countryKey];
+      const continent = country.continent;
+      const existing = this.countryRecords.get(countryKey);
+
+      const landMaterial = existing?.landMaterial ?? new THREE.MeshStandardMaterial({
+        color: colorToken('--color-land'),
+        roughness: 0.82,
+        metalness: 0,
+        // Ring winding from compact TopoJSON is not globally consistent.
+        // The horizon plane below supplies the actual back-face clipping,
+        // while DoubleSide prevents valid front polygons from disappearing.
+        side: THREE.DoubleSide,
+        clippingPlanes: [this.horizonClipPlane],
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      });
+      const borderMaterial = existing?.borderMaterial ?? new THREE.LineBasicMaterial({
+        color: colorToken('--color-land-border'),
+        transparent: true,
+        opacity: 0.86,
+        depthWrite: false,
+        depthTest: true,
+        clippingPlanes: [this.horizonClipPlane]
+      });
+      const group = existing?.group ?? new THREE.Group();
+      const borderContainer = existing?.borderContainer ?? new THREE.Group();
+      const childCountBefore = group.children.length;
+      const meshPolygons = [];
+
+      for (const polygon of polygons) {
+        const mesh = polygonToMesh(polygon, landMaterial, countryKey, continent);
+        if (mesh) {
+          group.add(mesh);
+          this.raycastMeshes.push(mesh);
+          meshPolygons.push(polygon);
+        }
+      }
+
+      if (existing) {
+        existing.borderPolygons.push(...meshPolygons);
+        // A highlight requested mid-build already outlined earlier parts.
+        if (existing.borderBuilt) {
+          for (const polygon of meshPolygons) borderContainer.add(polygonBorder(polygon, borderMaterial));
+        }
+      }
+
+      if (group.children.length === childCountBefore && !existing) {
+        landMaterial.dispose();
+        borderMaterial.dispose();
+        continue;
+      }
+
+      if (!existing) {
+        group.userData = { countryKey, continent };
+        borderContainer.userData = { countryKey, continent };
+        borderContainer.visible = false;
+        this.worldGroup.add(group);
+        this.borderGroup.add(borderContainer);
+        this.countryRecords.set(countryKey, {
+          group,
+          borderContainer,
+          borderPolygons: meshPolygons,
+          borderBuilt: false,
+          landMaterial,
+          borderMaterial,
+          continent
+        });
+      }
+
+      const prepared = this.preparedGeometries.get(countryKey) ?? [];
+      prepared.push(...prepareGeometry(geometry));
+      this.preparedGeometries.set(countryKey, prepared);
+
+      if (index % 16 === 0) {
+        this.callbacks.onProgress?.(`Construindo mapa… ${Math.round((index / Math.max(1, parts.length - 1)) * 100)}%`);
+        this.invalidate();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+    }
+    this.worldGroup.updateMatrixWorld(true);
+    this.borderGroup.updateMatrixWorld(true);
+    this.#refreshCountryMaterials();
+  }
+
+  #buildSmallDestinationHotspots() {
+    // The 110m atlas omits small islands/microstates. They get honest points,
+    // never invented country polygons; the invisible hit area is larger.
+    this.hotspotGeometry = new THREE.SphereGeometry(0.0038, 10, 8);
+    this.hotspotHitGeometry = new THREE.SphereGeometry(0.012, 10, 8);
+    this.hotspotHitMaterial = new THREE.MeshBasicMaterial({
+      colorWrite: false, depthWrite: false, transparent: true, opacity: 0
+    });
+    this.hotspotGroup = new THREE.Group();
+    this.scene.add(this.hotspotGroup);
+    for (const [countryKey, country] of Object.entries(COUNTRIES)) {
+      if (this.countryRecords.has(countryKey) || !country.latlng) continue;
+      const [latitude, longitude] = country.latlng;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      const position = latLngToCartesian(latitude, longitude, 1.022, GLOBE_YAW, GLOBE_ORIGIN);
+      const material = new THREE.MeshBasicMaterial({
+        color: colorToken('--color-land-border'),
+        depthTest: true, depthWrite: false, clippingPlanes: [this.horizonClipPlane]
+      });
+      const marker = new THREE.Mesh(this.hotspotGeometry, material);
+      marker.position.copy(position);
+      const hit = new THREE.Mesh(this.hotspotHitGeometry, this.hotspotHitMaterial);
+      hit.position.copy(position);
+      hit.userData.countryKey = countryKey;
+      this.hotspotGroup.add(marker, hit);
+      this.hotspotHitMeshes.push(hit);
+      this.hotspotRecords.set(countryKey, { marker, material });
+    }
+    this.#refreshCountryMaterials();
+  }
+
+  #buildGlobalBorders(_topojson, topology) {
+    if (this.globalBorderMaterial || !topology?.arcs) return;
+    this.globalBorderMaterial = new THREE.LineBasicMaterial({
+      color: colorToken('--color-land-border'),
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+      depthTest: true,
+      // WebGL draws Line objects at 1px regardless of linewidth.
+      clippingPlanes: [this.horizonClipPlane]
+    });
+
+    // Render each compressed arc separately. Stitching arcs into long paths
+    // can create a false bridge at a topology junction (the Brazil/Guyana
+    // artifact); independent arcs cannot cross-connect in the renderer.
+    const arcIndexes = new Set();
+    for (const geometry of topology.objects.countries.geometries ?? []) {
+      collectTopologyArcIndexes(geometry.arcs, arcIndexes);
+    }
+
+    for (const arcIndex of arcIndexes) {
+      const rawLine = decodeTopologyArc(topology, arcIndex);
+      const cleanLine = sanitizeOpenLine(rawLine);
+      if (cleanLine.length < 2) continue;
+      const samples = densifyRing(cleanLine, 4.5, false);
+      samples.push(cleanLine.at(-1));
+      const points = samples.map(([longitude, latitude]) => (
+        latLngToCartesian(latitude, longitude, BORDER_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
+      ));
+      if (points.length < 2) continue;
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(geometry, this.globalBorderMaterial);
+      line.renderOrder = 4;
+      this.globalBorderGroup.add(line);
+    }
+  }
+
+  #bindPointerEvents() {
+    this.onPointerMove = createRafThrottle((clientX, clientY) => {
+      if (this.cameraFlight || this.routePreview) return;
+      const countryKey = this.pickCountry(clientX, clientY);
+      this.#setHovered(countryKey);
+      if (countryKey) {
+        this.stage.classList.add('globe__stage--interactive');
+        this.callbacks.onHover?.(countryKey, clientX, clientY);
+      } else {
+        this.stage.classList.remove('globe__stage--interactive');
+        this.callbacks.onHover?.(null, clientX, clientY);
+      }
+    }, 24);
+
+    this.pointerDown = null;
+    this.renderer.domElement.addEventListener('pointermove', event => {
+      this.onPointerMove(event.clientX, event.clientY);
+    }, { passive: true });
+
+    this.renderer.domElement.addEventListener('pointerleave', () => {
+      this.onPointerMove.cancel();
+      this.#setHovered(null);
+      this.stage.classList.remove('globe__stage--interactive');
+      this.callbacks.onHover?.(null);
+    });
+
+    this.renderer.domElement.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || this.routePreview) return;
+      this.pointerDown = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        startedAt: performance.now()
+      };
+      this.renderer.domElement.setPointerCapture?.(event.pointerId);
+    });
+
+    this.renderer.domElement.addEventListener('pointerup', event => {
+      if (this.routePreview) return;
+      if (!this.pointerDown || event.pointerId !== this.pointerDown.id || event.button !== 0) return;
+      this.renderer.domElement.releasePointerCapture?.(event.pointerId);
+      const travel = Math.hypot(event.clientX - this.pointerDown.x, event.clientY - this.pointerDown.y);
+      const duration = performance.now() - this.pointerDown.startedAt;
+      this.pointerDown = null;
+      if (travel > 7 || duration > 650) return;
+      const countryKey = this.pickCountry(event.clientX, event.clientY);
+      if (countryKey) this.callbacks.onSelect?.(countryKey);
+    });
+  }
+
+  #bindResize() {
+    this.resizeFrame = 0;
+    this.resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = requestAnimationFrame(() => this.resize());
+    });
+    this.resizeObserver.observe(this.stage);
+  }
+
+  #pointerToNdc(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointer.set(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+  }
+
+  #findCountryByGeo(latitude, longitude) {
+    const matches = [];
+    for (const [countryKey, polygons] of this.preparedGeometries.entries()) {
+      if (!preparedGeometryContains(polygons, latitude, longitude)) continue;
+      const record = this.countryRecords.get(countryKey);
+      const continentPriority = record?.continent === this.activeContinent ? 0 : 1;
+      const smallestBounds = Math.min(...polygons.map(polygon => (
+        Math.max(0.0001, polygon.maxLongitude - polygon.minLongitude)
+        * Math.max(0.0001, polygon.maxLatitude - polygon.minLatitude)
+      )));
+      matches.push({ countryKey, continentPriority, smallestBounds });
+    }
+    matches.sort((left, right) => (
+      left.continentPriority - right.continentPriority
+      || left.smallestBounds - right.smallestBounds
+    ));
+    return matches[0]?.countryKey ?? null;
+  }
+
+  pickCountry(clientX, clientY) {
+    this.#pointerToNdc(clientX, clientY);
+    this.camera.updateMatrixWorld(true);
+    this.worldGroup.updateMatrixWorld(true);
+    this.borderGroup.updateMatrixWorld(true);
+    this.ocean.updateMatrixWorld(true);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+
+    // The nearest ocean-sphere intersection is the authoritative FRONT surface.
+    // Any land hit behind this distance is on the antipodal/back side of the globe
+    // and must never be selectable through the ocean.
+    const sphereHit = this.raycaster.intersectObject(this.ocean, false)[0];
+    if (!sphereHit) return null;
+    const frontSurfaceLimit = sphereHit.distance + PICK_SURFACE_TOLERANCE;
+
+    for (const hit of this.raycaster.intersectObjects(this.hotspotHitMeshes, false)) {
+      if (hit.distance <= frontSurfaceLimit + 0.025) return hit.object.userData.countryKey;
+    }
+
+    const landHits = this.raycaster.intersectObjects(this.raycastMeshes, false);
+    for (const hit of landHits) {
+      if (hit.distance > frontSurfaceLimit) continue;
+      const countryKey = hit.object?.userData?.countryKey;
+      if (countryKey) return countryKey;
+    }
+
+    // Ocean itself is never selectable. The front-surface point is converted back
+    // to WGS84 and accepted only if strict point-in-polygon says it is land.
+    const { latitude, longitude } = cartesianToLatLng(sphereHit.point, GLOBE_YAW, GLOBE_ORIGIN);
+    return this.#findCountryByGeo(latitude, longitude);
+  }
+
+  #setHovered(countryKey) {
+    if (countryKey === this.hoveredCountry) return;
+    const previous = this.hoveredCountry;
+    this.hoveredCountry = countryKey;
+    if (previous) this.#updateCountryMaterial(previous);
+    if (countryKey) this.#updateCountryMaterial(countryKey);
+  }
+
+  #countryState(countryKey) {
+    if (countryKey === this.selectedCountry) return 'selected';
+    if (this.visaFreeFilterActive) {
+      const continent = this.countryRecords.get(countryKey)?.continent ?? COUNTRIES[countryKey]?.continent;
+      if (this.activeContinent && continent !== this.activeContinent) return 'visa-dimmed';
+      if (!this.visaFreeCountries.has(countryKey)) return 'visa-dimmed';
+      if (countryKey === this.hoveredCountry) return 'visa-free-hover';
+      return 'visa-free';
+    }
+    if (countryKey === this.hoveredCountry) return 'hover';
+    if (this.visitedCountries.has(countryKey)) return 'visited';
+    const continent = this.countryRecords.get(countryKey)?.continent ?? COUNTRIES[countryKey]?.continent;
+    if (this.activeContinent && continent !== this.activeContinent) return 'dimmed';
+    return 'base';
+  }
+
+  #updateCountryMaterial(countryKey) {
+    this.invalidate();
+    const record = this.countryRecords.get(countryKey);
+    if (!record) {
+      this.#updateHotspotMaterial(countryKey);
+      return;
+    }
+    const state = this.#countryState(countryKey);
+    const visitedColorName = CONTINENT_COLOR_TOKENS[record.continent] ?? '--color-land-visited';
+    const colorName = state === 'selected'
+      ? '--color-land-selected'
+      : state === 'visa-free' || state === 'visa-free-hover'
+        ? '--color-land-visa-free'
+      : state === 'hover'
+        ? '--color-land-hover'
+        : state === 'visited'
+          ? visitedColorName
+          : state === 'dimmed' || state === 'visa-dimmed'
+            ? '--color-land-dimmed'
+            : '--color-land';
+    const borderName = state === 'visited'
+      ? visitedColorName
+      : state === 'selected'
+      ? '--color-border-selected'
+      : state === 'visa-free' || state === 'visa-free-hover'
+        ? '--color-land-visa-free-border'
+        : '--color-land-border';
+
+    const fillColor = colorToken(colorName);
+    record.landMaterial.color.copy(fillColor);
+    record.landMaterial.emissive.copy(fillColor);
+    record.landMaterial.emissiveIntensity = state === 'selected'
+      ? 0.13
+      : state === 'visa-free-hover'
+        ? 0.09
+        : state === 'visa-free'
+          ? 0.06
+          : state === 'hover'
+            ? 0.075
+            : state === 'visited'
+              ? 0.045
+              : 0.025;
+    record.landMaterial.opacity = state === 'visa-dimmed' ? 0.25 : state === 'dimmed' ? 0.52 : 1;
+    record.landMaterial.transparent = state === 'visa-dimmed' || state === 'dimmed';
+    const highlighted = HIGHLIGHTED_BORDER_STATES.has(state);
+    if (highlighted && !record.borderBuilt) {
+      record.borderBuilt = true;
+      for (const polygon of record.borderPolygons) record.borderContainer.add(polygonBorder(polygon, record.borderMaterial));
+    }
+    record.borderContainer.visible = highlighted;
+    const borderColor = colorToken(borderName);
+    if (state === 'visited') borderColor.offsetHSL(0, 0, -0.14);
+    record.borderMaterial.color.copy(borderColor);
+    record.borderMaterial.opacity = state === 'selected'
+      ? 1
+      : state === 'visa-free-hover'
+        ? 1
+        : state === 'visa-free'
+          ? 0.96
+          : state === 'visa-dimmed'
+            ? 0.18
+            : state === 'hover'
+              ? 0.95
+              : state === 'dimmed'
+                ? 0.28
+                : 0.76;
+  }
+
+  #refreshCountryMaterials() {
+    for (const countryKey of this.countryRecords.keys()) this.#updateCountryMaterial(countryKey);
+    for (const countryKey of this.hotspotRecords.keys()) this.#updateHotspotMaterial(countryKey);
+  }
+
+  #updateHotspotMaterial(countryKey) {
+    this.invalidate();
+    const record = this.hotspotRecords.get(countryKey);
+    if (!record) return;
+    const state = this.#countryState(countryKey);
+    const colorName = state === 'selected' ? '--color-land-selected'
+      : state === 'visa-free' || state === 'visa-free-hover' ? '--color-land-visa-free'
+        : state === 'hover' ? '--color-land-hover'
+          : state === 'visited' ? CONTINENT_COLOR_TOKENS[COUNTRIES[countryKey]?.continent] ?? '--color-land-visited'
+            : '--color-land-border';
+    record.material.color.copy(colorToken(colorName));
+    record.material.opacity = state === 'visa-dimmed' || state === 'dimmed' ? 0.25 : 0.9;
+    record.material.transparent = record.material.opacity < 1;
+    record.marker.scale.setScalar(state === 'selected' || state === 'hover' || state === 'visa-free-hover' ? 1.45 : 1);
+  }
+
+  selectCountry(countryKey, { fly = true } = {}) {
+    const previous = this.selectedCountry;
+    this.selectedCountry = countryKey;
+    if (previous) this.#updateCountryMaterial(previous);
+    if (countryKey) this.#updateCountryMaterial(countryKey);
+    if (fly && countryKey) {
+      const country = COUNTRIES[countryKey];
+      if (country?.latlng) this.flyTo(country.latlng[0], country.latlng[1], 2.02, 880);
+    }
+  }
+
+  clearSelection() {
+    const previous = this.selectedCountry;
+    this.selectedCountry = null;
+    if (previous) this.#updateCountryMaterial(previous);
+  }
+
+
+  setVisitedCountries(countries) {
+    this.visitedCountries = new Set(countries ?? []);
+    this.#refreshCountryMaterials();
+  }
+
+  setVisaFreeFilter(active, countryKeys = []) {
+    this.visaFreeFilterActive = Boolean(active);
+    this.visaFreeCountries = new Set(countryKeys ?? []);
+    this.#refreshCountryMaterials();
+  }
+
+  setContinent(continent) {
+    this.activeContinent = continent || null;
+    this.#refreshCountryMaterials();
+    if (!continent) return;
+    const camera = CONTINENT_CAMERA[continent];
+    if (camera) this.flyTo(camera.lat, camera.lng, camera.distance, 820);
+  }
+
+  home() {
+    this.stopRoutePreview(false);
+    this.activeContinent = null;
+    this.clearSelection();
+    this.#refreshCountryMaterials();
+    this.flyTo(18, -18, 3.05, 900);
+  }
+
+  flyTo(latitude, longitude, distance = 2.05, duration = 850) {
+    this.invalidate();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.cameraFlight = null;
+      this.controls.enabled = true;
+      this.camera.position.copy(latLngToCartesian(latitude, longitude, distance, GLOBE_YAW, GLOBE_ORIGIN));
+      this.camera.lookAt(GLOBE_ORIGIN);
+      this.controls.target.copy(GLOBE_ORIGIN);
+      this.controls.update();
+      return;
+    }
+    const startVector = this.camera.position.clone().sub(GLOBE_ORIGIN);
+    const startDistance = startVector.length();
+    const startDirection = startVector.normalize();
+    const endDirection = latLngToCartesian(latitude, longitude, 1, GLOBE_YAW, GLOBE_ORIGIN)
+      .sub(GLOBE_ORIGIN)
+      .normalize();
+    const rotation = new THREE.Quaternion().setFromUnitVectors(startDirection, endDirection);
+    this.cameraFlight = {
+      startedAt: performance.now(),
+      duration,
+      startDirection,
+      startDistance,
+      endDistance: distance,
+      rotation
+    };
+    this.controls.enabled = false;
+  }
+
+  #updateCameraFlight(timestamp) {
+    if (!this.cameraFlight) return;
+    const flight = this.cameraFlight;
+    const linear = THREE.MathUtils.clamp((timestamp - flight.startedAt) / flight.duration, 0, 1);
+    const eased = linear < 0.5
+      ? 4 * linear ** 3
+      : 1 - Math.pow(-2 * linear + 2, 3) / 2;
+    const partialRotation = new THREE.Quaternion().slerpQuaternions(
+      new THREE.Quaternion(),
+      flight.rotation,
+      eased
+    );
+    const direction = flight.startDirection.clone().applyQuaternion(partialRotation).normalize();
+    const distance = THREE.MathUtils.lerp(flight.startDistance, flight.endDistance, eased);
+    this.camera.position.copy(GLOBE_ORIGIN).add(direction.multiplyScalar(distance));
+    this.camera.lookAt(GLOBE_ORIGIN);
+    this.camera.updateMatrixWorld(true);
+    if (linear >= 1) {
+      this.cameraFlight = null;
+      this.controls.enabled = !this.routePreview;
+      this.controls.target.copy(GLOBE_ORIGIN);
+      this.controls.update();
+    }
+  }
+
+  #updateHorizonClip() {
+    const cameraDirection = this.camera.position.clone().sub(GLOBE_ORIGIN).normalize();
+    this.horizonClipPlane.normal.copy(cameraDirection);
+    this.horizonClipPlane.constant = -HORIZON_CLIP_EPSILON;
+  }
+
+  setTheme() {
+    this.invalidate();
+    const theme = document.documentElement.dataset.theme || 'dark';
+    const dark = theme === 'dark';
+    this.oceanMaterial.color.copy(colorToken('--color-ocean'));
+    this.oceanMaterial.emissive.copy(colorToken('--color-ocean-emissive'));
+    this.oceanMaterial.emissiveIntensity = dark ? 0.1 : 0.06;
+    this.oceanMaterial.roughness = dark ? 0.82 : 0.78;
+    this.oceanMaterial.clearcoat = dark ? 0.03 : 0.05;
+    this.atmosphereMaterial.uniforms.atmosphereColor.value.copy(colorToken('--color-globe-atmosphere'));
+    this.atmosphereMaterial.uniforms.atmosphereOpacity.value = dark ? 0.12 : 0.07;
+    this.graticuleMaterial.color.copy(colorToken('--color-graticule'));
+    this.graticuleMaterial.opacity = dark ? 0.055 : 0.05;
+    this.globalBorderMaterial?.color.copy(colorToken('--color-land-border'));
+    this.neutralLandMaterial?.color.copy(colorToken('--color-land'));
+
+    this.ambientLight.color.copy(colorToken('--color-light-ambient'));
+    this.hemisphereLight.color.copy(colorToken('--color-light-sky'));
+    this.hemisphereLight.groundColor.copy(colorToken('--color-light-ground'));
+    this.keyLight.color.copy(colorToken('--color-light-key'));
+    this.fillLight.color.copy(colorToken('--color-light-fill'));
+    this.ambientLight.intensity = dark ? 0.9 : 0.92;
+    this.hemisphereLight.intensity = dark ? 1.12 : 1.02;
+    this.keyLight.intensity = dark ? 2.5 : 1.72;
+    this.fillLight.intensity = dark ? 0.76 : 0.46;
+    this.renderer.toneMappingExposure = dark ? 1.08 : 1;
+    this.flightVisualization.setTheme(colorToken('--color-accent'), colorToken(dark ? '--color-text' : '--color-surface'));
+    this.#refreshCountryMaterials();
+  }
+
+  startRoutePreview(route) {
+    this.invalidate();
+    if (!this.ready || this.disposed) return false;
+    this.stopRoutePreview(false);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const savedCamera = this.camera.position.clone();
+    const longRoute = route.angle > 1.75;
+    // Begin at GRU so departure is understandable before the camera follows
+    // the moving aircraft on long routes.
+    const focus = routePoint(route, longRoute && !reducedMotion ? 0 : 0.5);
+    const { latitude, longitude } = cartesianToLatLng(
+      new THREE.Vector3(focus.x, focus.y, focus.z), GLOBE_YAW, GLOBE_ORIGIN
+    );
+    const distance = longRoute ? 3.35 : 2.9;
+    const preflightMs = reducedMotion ? 0 : 950;
+    const startedAt = performance.now() + preflightMs;
+    const savedSelection = this.selectedCountry;
+    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1, arrivalReported: false };
+    // Keep the thin cyan route legible over the destination's selected fill.
+    // Restore selection on exit; neither visited state nor filters are changed.
+    this.clearSelection();
+    this.#setHovered(null);
+    this.callbacks.onHover?.(null);
+    this.flightVisualization.start(route, startedAt, reducedMotion);
+    this.flyTo(latitude, longitude, distance, preflightMs);
+    this.controls.enabled = false;
+    return true;
+  }
+
+  stopRoutePreview(restoreCamera = true) {
+    this.invalidate();
+    if (!this.routePreview) return;
+    const savedCamera = this.routePreview.savedCamera;
+    const savedSelection = this.routePreview.savedSelection;
+    this.routePreview = null;
+    this.flightVisualization.clear();
+    this.selectCountry(savedSelection, { fly: false });
+    this.controls.enabled = true;
+    if (restoreCamera) {
+      const { latitude, longitude } = cartesianToLatLng(savedCamera, GLOBE_YAW, GLOBE_ORIGIN);
+      this.flyTo(latitude, longitude, savedCamera.length(), 780);
+    } else this.cameraFlight = null;
+  }
+
+  resize() {
+    this.invalidate();
+    const rect = this.stage.getBoundingClientRect();
+    const width = Math.max(1, rect.width);
+    const height = Math.max(1, rect.height);
+    this.renderer.setSize(width, height, false);
+    this.viewSize = { width, height };
+    this.camera.aspect = width / height;
+    this.#applyViewOffset();
+  }
+
+  // Mantém o país selecionado na parte visível do globo quando um painel cobre
+  // a lateral direita. `right` é a largura coberta, em px; 0 remove o ajuste.
+  setViewInset({ right = 0 } = {}) {
+    this.viewInsetTarget = Number.isFinite(right) ? Math.max(0, right) : 0;
+    this.invalidate();
+  }
+
+  // Sem ajuste durante a prévia de rota (o painel some) ou quando sobraria
+  // pouca área visível (o painel ocupa quase toda a tela).
+  #effectiveViewInset() {
+    const { width } = this.viewSize;
+    const inset = this.routePreview ? 0 : this.viewInsetTarget;
+    return inset > 0 && width - inset >= 240 ? inset : 0;
+  }
+
+  #applyViewOffset() {
+    const { width, height } = this.viewSize;
+    const shift = this.viewInsetCurrent / 2;
+    if (shift < 0.5) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(width, height, shift, 0, width, height);
+    this.camera.updateProjectionMatrix();
+  }
+
+  #updateViewInset(timestamp) {
+    const target = this.#effectiveViewInset();
+    const last = this.viewInsetFrame ?? timestamp;
+    this.viewInsetFrame = timestamp;
+    if (this.reducedMotionQuery.matches || Math.abs(target - this.viewInsetCurrent) < 0.5) {
+      if (this.viewInsetCurrent === target) return false;
+      this.viewInsetCurrent = target;
+    } else {
+      // Aproximação exponencial (~300 ms), acompanhando a abertura do painel.
+      const step = 1 - Math.exp(-Math.max(0, timestamp - last) / 90);
+      this.viewInsetCurrent += (target - this.viewInsetCurrent) * step;
+    }
+    this.#applyViewOffset();
+    return this.viewInsetCurrent !== target;
+  }
+
+  // Renderização sob demanda: um quadro só é desenhado quando algo muda
+  // (interação, voo de câmera, prévia de rota, material, tema, tamanho). Com o
+  // globo parado, nenhum requestAnimationFrame fica agendado.
+  invalidate(frames = 2) {
+    this.pendingFrames = Math.max(this.pendingFrames ?? 0, frames);
+    this.#requestFrame();
+  }
+
+  #requestFrame() {
+    if (this.frameScheduled || this.disposed || !this.renderStarted) return;
+    this.frameScheduled = true;
+    requestAnimationFrame(timestamp => this.#render(timestamp));
+  }
+
+  #render(timestamp) {
+    this.frameScheduled = false;
+    if (this.disposed) return;
+    let animating = this.#updateViewInset(timestamp);
+    if (this.cameraFlight) animating = true;
+    this.#updateCameraFlight(timestamp);
+    if (this.routePreview) animating = true;
+    if (this.routePreview) {
+      const progress = this.flightVisualization.update(timestamp);
+      const preview = this.routePreview;
+      if (preview.longRoute && timestamp >= preview.startedAt && progress !== preview.lastProgress) {
+        const focus = routePoint(preview.route, progress * 0.97);
+        this.camera.position.set(focus.x, focus.y, focus.z).normalize().multiplyScalar(preview.distance);
+        this.camera.lookAt(GLOBE_ORIGIN);
+        preview.lastProgress = progress;
+      }
+      if (progress >= 1 && !preview.arrivalReported) {
+        preview.arrivalReported = true;
+        this.callbacks.onRouteArrived?.();
+      }
+    } else if (!this.cameraFlight && this.controls.update()) animating = true; // amortecimento ainda girando
+    this.#updateHorizonClip();
+    this.renderer.render(this.scene, this.camera);
+    this.pendingFrames = Math.max(0, (this.pendingFrames ?? 0) - 1);
+    if (animating || this.pendingFrames > 0) this.#requestFrame();
+  }
+
+  destroy() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.onPointerMove?.cancel?.();
+    this.resizeObserver?.disconnect();
+    cancelAnimationFrame(this.resizeFrame);
+    this.controls.dispose();
+    this.flightVisualization.dispose();
+    this.hotspotGroup?.parent?.remove(this.hotspotGroup);
+    this.hotspotGeometry?.dispose();
+    this.hotspotHitGeometry?.dispose();
+    this.hotspotHitMaterial?.dispose();
+    for (const record of this.hotspotRecords.values()) record.material.dispose();
+
+    for (const record of this.countryRecords.values()) {
+      record.group.traverse(object => object.geometry?.dispose?.());
+      record.borderContainer.traverse(object => object.geometry?.dispose?.());
+      record.landMaterial.dispose();
+      record.borderMaterial.dispose();
+    }
+    this.worldGroup.traverse(object => {
+      if (object.isMesh && object.material === this.neutralLandMaterial) object.geometry?.dispose?.();
+    });
+    this.neutralLandMaterial?.dispose();
+    this.ocean.geometry.dispose();
+    this.oceanMaterial.dispose();
+    this.atmosphere.geometry.dispose();
+    this.atmosphereMaterial.dispose();
+    this.graticuleGroup.traverse(object => object.geometry?.dispose?.());
+    this.graticuleMaterial.dispose();
+    this.globalBorderGroup.traverse(object => object.geometry?.dispose?.());
+    this.globalBorderMaterial?.dispose();
+    this.renderer.dispose();
+  }
+}
+
+export { CONTINENT_LABELS };
