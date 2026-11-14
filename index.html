@@ -66,20 +66,13 @@
       <button class="header-action header-action--primary" id="discover-button" type="button" aria-label="Descobrir destino">
         <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span class="header-action__label">Descobrir</span>
       </button>
-      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Minhas viagens" title="Minhas viagens">
-        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Viagens</span>
+      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Planner" title="Planner de viagem">
+        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Planner</span>
         <span class="header-action__badge" id="trips-count" hidden>0</span>
       </button>
       <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
         <svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg><span class="header-action__label">Milhas</span>
       </button>
-      <div class="wishlist">
-        <button class="header-action" id="wishlist-toggle" type="button" aria-expanded="false" aria-controls="wishlist-panel" aria-label="Abrir lista Quero ir" title="Quero ir">
-          <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg><span class="header-action__label">Quero ir</span>
-          <span class="header-action__badge" id="wishlist-count" hidden>0</span>
-        </button>
-        <div class="wishlist-panel" id="wishlist-panel" role="region" aria-label="Lista Quero ir" hidden></div>
-      </div>
       <button class="header-action header-action--theme" id="theme-button" type="button" aria-label="Ativar modo claro">
         <svg class="icon icon--sun" aria-hidden="true"><use href="#i-sun"/></svg>
         <svg class="icon icon--moon" aria-hidden="true"><use href="#i-moon"/></svg>
@@ -135,12 +128,11 @@
     <div class="miles-hub__content" id="miles-content"></div>
   </aside>
 
-  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planejamento de viagem" inert>
+  <aside class="miles-hub planner-panel" id="planner-panel" aria-label="Planner de viagem" inert>
     <header class="miles-hub__header">
       <div>
-        <span class="eyebrow">Planejamento</span>
-        <h2 class="miles-hub__title">Minhas viagens</h2>
-        <p class="miles-hub__subtitle">Datas, orçamento e preparação, salvos neste navegador.</p>
+        <span class="eyebrow">Planejamento de viagem</span>
+        <h2 class="miles-hub__title">Planner</h2>
       </div>
       <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </header>
@@ -152,7 +144,6 @@
       <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
       <span class="country-panel__spacer"></span>
       <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
-      <button class="visit-button wishlist-button" id="wishlist-button" type="button" aria-pressed="false">☆ Quero ir</button>
     </header>
 
     <div class="country-panel__identity">

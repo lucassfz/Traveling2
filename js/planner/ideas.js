@@ -1,10 +1,10 @@
-import { DESTINATION_PROFILES } from './destination.profiles.js';
-import { tripRange } from './destination.discovery.js';
+import { DESTINATION_PROFILES } from '../destination.profiles.js';
+import { tripRange } from '../destination.discovery.js';
 
-// Estimativa da lista "Quero ir": para cada país usa o perfil de menor custo
+// Ideias do Planner (países da antiga lista "Quero ir"): para cada país usa o perfil de menor custo
 // mínimo, sem margem de pico (mês não definido). Países sem perfil revisado
 // ficam sem estimativa e fora do total — nada é inventado.
-export function wishlistEstimate(countryKeys, profiles = DESTINATION_PROFILES) {
+export function ideaEstimates(countryKeys, profiles = DESTINATION_PROFILES) {
   const items = countryKeys.map(countryKey => {
     const options = profiles.filter(profile => profile.countryKey === countryKey);
     if (!options.length) return { countryKey, region: null, range: null };
