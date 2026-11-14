@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readdir } from 'node:fs/promises';
 import { COUNTRIES } from '../js/countries.dataset.js';
-import { indexGeoData, loadGeo, validateGeoData } from '../js/geo/geo.repository.js';
+import { GEO_COUNTRIES, indexGeoData, loadGeo, validateGeoData } from '../js/geo/geo.repository.js';
 
 // Casos sintéticos: o validador precisa recusar dados quebrados.
 const base = () => ({
@@ -49,6 +49,7 @@ const catalogCodes = new Set(Object.values(COUNTRIES).map(country => country.alp
 assert.ok(catalogCodes.has('BR'), 'catálogo sem alpha2');
 const files = (await readdir(new URL('../data/geo/', import.meta.url))).filter(name => name.endsWith('.json'));
 assert.ok(files.length > 0, 'nenhum arquivo em data/geo');
+assert.deepEqual(files.map(file => file.replace(/\.json$/, '')).sort(), [...GEO_COUNTRIES].sort(), 'GEO_COUNTRIES precisa listar exatamente os arquivos de data/geo');
 let divisionCount = 0;
 let placeCount = 0;
 for (const file of files) {

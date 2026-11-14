@@ -1846,6 +1846,91 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
   font-size: .75rem;
 }
 
+/* Estados e cidades (Fase 2C): Mundo › País › Estado › Cidade. */
+.geo-nav[hidden] { display: none; }
+.geo-nav__groups { display: grid; gap: var(--space-3); }
+.geo-nav__region {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-text-muted);
+  font-size: .6875rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.geo-nav__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.geo-nav__chip,
+.geo-nav__place,
+.geo-nav__crumb {
+  appearance: none;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
+}
+.geo-nav__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: .8125rem;
+}
+.geo-nav__chip span { color: var(--color-text-muted); font-size: .6875rem; font-weight: 600; }
+.geo-nav__chip:hover,
+.geo-nav__place:hover { border-color: var(--color-border-strong); background: var(--color-surface-hover); color: var(--color-text); }
+.geo-nav__breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: .8125rem;
+}
+.geo-nav__breadcrumb li + li::before { content: "›"; margin-right: 6px; color: var(--color-text-muted); }
+.geo-nav__crumb {
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.geo-nav__crumb:hover { color: var(--color-accent-strong); }
+.geo-nav__breadcrumb [aria-current] { color: var(--color-text); font-weight: 600; }
+.geo-nav__title { margin: 0 0 var(--space-3); color: var(--color-text); font-size: 1.125rem; font-weight: 600; outline: none; }
+.geo-nav .info-grid + .section-heading { margin-top: var(--space-4); }
+.geo-nav__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.geo-nav__place {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: .8125rem;
+  text-align: left;
+}
+.geo-nav__place span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-nav__place small { flex: none; color: var(--color-accent); font-size: .6875rem; font-weight: 600; }
+.geo-nav__fly { margin-top: var(--space-3); }
+.geo-nav__note,
+.geo-nav__source { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: .75rem; }
+.geo-nav__source a { color: inherit; }
+@media (max-width: 360px) { .geo-nav__list { grid-template-columns: 1fr; } }
+
 .route-builder {
   display: grid;
   gap: var(--space-4);
