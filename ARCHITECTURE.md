@@ -54,6 +54,8 @@ All country meshes, borders, markers, fly-to camera targets, and fallback PIP us
 
 Startup loads the catalog, globe and drawer only. History (~160 KB), the Miles hub (~63 KB, plus its DOM) and Discovery (~60 KB) load with dynamic `import()` on first use, and are prefetched with `requestIdleCallback` once the interface is ready. Until the Miles hub loads, a placeholder keeps the latest route context. The globe renders on demand: `MapEngine.invalidate()` schedules frames only while something changes.
 
+The shell is a single header (brand, search with `/` or Ctrl+K, Descobrir, Viagens, Milhas, Quero ir, theme) plus a bottom dock (visited count, continents, visa-free filter). Icons are one inline SVG sprite in `index.html`. The brand reveal plays for about 1 s once per browser session. The dark-mode starfield is painted once per resize or theme change, not animated.
+
 The application UI no longer waits for the world atlas. The interface becomes interactive first, while the globe reports progressive status. Network fetches have timeouts. A classic-script boot guard hides the global loader after 8 seconds even if ES-module/CDN loading fails before `app.js` executes.
 
 ## Media verification

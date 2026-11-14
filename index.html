@@ -2,97 +2,88 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Traveling — globo 3D interativo com guias de países, rotas e estimativas de milhas.">
+  <meta name="theme-color" content="#05070c">
   <title>Traveling — Explore o mundo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2215%22 fill=%22%2305070c%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229.5%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.6%22/%3E%3Cpath d=%22M6.5 16h19M16 6.5c3.2 3.4 3.2 15.6 0 19M16 6.5c-3.2 3.4-3.2 15.6 0 19%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.2%22/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.5l-1.9-5.7-5.6-1.9L10.1 9z"/><path d="M19 3v3M17.5 4.5h3"/></symbol>
+    <symbol id="i-suitcase" viewBox="0 0 24 24"><rect x="3.5" y="7" width="17" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M8 7v13M16 7v13"/></symbol>
+    <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 15.5v-1.7l-7.5-4.6V4.5a1.5 1.5 0 0 0-3 0v4.7L3 13.8v1.7l7.5-2.3v4.6l-2 1.5v1.2l3.5-1 3.5 1v-1.2l-2-1.5v-4.6z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.8 2.5 5.1 5.6.8-4 4 .9 5.6-5-2.6-5 2.6.9-5.6-4-4 5.6-.8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.6c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></symbol>
+  </svg>
+
   <div class="splash-screen" id="splash-screen" role="status" aria-label="Abrindo Traveling">
-    <div class="splash-screen__wordmark" aria-hidden="true">TRAVELING</div>
-    <svg class="splash-screen__scene" viewBox="0 0 720 360" aria-hidden="true">
-      <defs>
-        <linearGradient id="splash-ocean" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stop-color="#0f172a"></stop>
-          <stop offset="100%" stop-color="#070a12"></stop>
-        </linearGradient>
-        <clipPath id="splash-globe-clip"><circle cx="360" cy="204" r="132"></circle></clipPath>
-      </defs>
-      <circle class="splash-screen__globe" cx="360" cy="204" r="132"></circle>
-      <g class="splash-screen__graticule" clip-path="url(#splash-globe-clip)">
-        <ellipse cx="360" cy="204" rx="132" ry="42"></ellipse>
-        <ellipse cx="360" cy="204" rx="132" ry="84"></ellipse>
-        <ellipse cx="360" cy="204" rx="52" ry="132"></ellipse>
-        <ellipse cx="360" cy="204" rx="100" ry="132"></ellipse>
-      </g>
-      <path class="splash-screen__flight-path" d="M 12 268 C 132 104, 258 286, 374 176 S 548 62, 708 132"></path>
-      <g class="splash-screen__airliner">
-        <path class="splash-screen__airliner-wing" d="M 20 -5 L -20 -7 L -94 -47 L -104 -43 L -56 -3 L 8 3 Z"></path>
-        <path class="splash-screen__airliner-wing" d="M 20 5 L -20 7 L -94 47 L -104 43 L -56 3 L 8 -3 Z"></path>
-        <path class="splash-screen__airliner-tail" d="M -42 -4 L -76 -35 L -86 -31 L -68 -2 Z"></path>
-        <path class="splash-screen__airliner-tail" d="M -42 4 L -76 35 L -86 31 L -68 2 Z"></path>
-        <ellipse class="splash-screen__airliner-engine" cx="-42" cy="-23" rx="13" ry="7"></ellipse>
-        <ellipse class="splash-screen__airliner-engine" cx="-42" cy="23" rx="13" ry="7"></ellipse>
-        <path class="splash-screen__airliner-body" d="M -78 0 C -60 -6 -36 -8 -5 -8 L 26 -7 L 50 -3 L 70 0 L 50 3 L 26 7 L -5 8 C -36 8 -60 6 -78 0 Z"></path>
-        <path class="splash-screen__airliner-cockpit" d="M 47 -2 L 63 0 L 47 2 Q 51 0 47 -2 Z"></path>
-        <animateMotion id="splash-flight" begin="indefinite" dur="2.55s" rotate="auto" path="M 12 268 C 132 104, 258 286, 374 176 S 548 62, 708 132" keyTimes="0;0.68;0.88;1" keySplines="0.2 0.75 0.24 1;0.14 0.55 0.25 1;0.1 0 0.4 1" calcMode="spline" fill="freeze"></animateMotion>
-        <animateTransform id="splash-flight-scale" attributeName="transform" additive="sum" type="scale" begin="splash-flight.begin" dur="2.55s" values=".76 .76;1.05 1.05;1.34 1.34;4.8 4.8" keyTimes="0;.68;.88;1" calcMode="spline" keySplines=".2 .75 .24 1;.14 .55 .25 1;.1 0 .4 1" fill="freeze"></animateTransform>
-        <animate id="splash-flight-fade" attributeName="opacity" begin="splash-flight.begin" dur="2.55s" values="0;1;1;0" keyTimes="0;.08;.82;1" fill="freeze"></animate>
-      </g>
-    </svg>
+    <div class="splash-screen__mark" aria-hidden="true">
+      <span class="splash-screen__wordmark">Traveling</span>
+      <span class="splash-screen__line"></span>
+    </div>
   </div>
 
   <header class="app-header">
     <button class="app-header__brand" id="home-button" type="button" aria-label="Voltar à visão global">
-      <span class="app-header__brand-accent">TRAVEL</span>ING
+      <svg class="icon app-header__brand-mark" aria-hidden="true"><use href="#i-globe"/></svg>
+      <span class="app-header__brand-word">Traveling</span>
     </button>
 
-    <div class="app-header__actions">
-      <div class="explorer-counter" aria-label="Destinos marcados como visitados">
-        <span aria-hidden="true">🌍</span>
-        <span class="explorer-counter__label">Visitados</span>
-        <strong class="explorer-counter__value" id="visited-count">0</strong>
-        <span class="explorer-counter__total" id="visited-total">/ 0</span>
-      </div>
+    <div class="search" id="country-search">
+      <label class="sr-only" for="country-search-input">Buscar país</label>
+      <svg class="icon search__icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input
+        class="search__input"
+        id="country-search-input"
+        type="search"
+        placeholder="Buscar país"
+        autocomplete="off"
+        spellcheck="false"
+        aria-autocomplete="list"
+        aria-controls="country-search-results"
+        aria-keyshortcuts="/ Control+K"
+      >
+      <kbd class="search__kbd" aria-hidden="true">/</kbd>
+      <div class="search__results" id="country-search-results" role="listbox" aria-label="Sugestões de países"></div>
+    </div>
 
+    <div class="app-header__actions">
+      <button class="header-action header-action--search" id="search-toggle" type="button" aria-label="Buscar país" aria-controls="country-search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      </button>
+      <button class="header-action header-action--primary" id="discover-button" type="button" aria-label="Descobrir destino">
+        <svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span class="header-action__label">Descobrir</span>
+      </button>
+      <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Minhas viagens" title="Minhas viagens">
+        <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Viagens</span>
+        <span class="header-action__badge" id="trips-count" hidden>0</span>
+      </button>
+      <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
+        <svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg><span class="header-action__label">Milhas</span>
+      </button>
       <div class="wishlist">
-        <button class="explorer-counter wishlist__toggle" id="wishlist-toggle" type="button" aria-expanded="false" aria-controls="wishlist-panel" aria-label="Abrir lista Quero ir">
-          <span aria-hidden="true">⭐</span>
-          <span class="explorer-counter__label">Quero ir</span>
-          <strong class="explorer-counter__value" id="wishlist-count">0</strong>
+        <button class="header-action" id="wishlist-toggle" type="button" aria-expanded="false" aria-controls="wishlist-panel" aria-label="Abrir lista Quero ir" title="Quero ir">
+          <svg class="icon" aria-hidden="true"><use href="#i-star"/></svg><span class="header-action__label">Quero ir</span>
+          <span class="header-action__badge" id="wishlist-count" hidden>0</span>
         </button>
         <div class="wishlist-panel" id="wishlist-panel" role="region" aria-label="Lista Quero ir" hidden></div>
       </div>
-
-      <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
-        <span class="visa-filter__flag" aria-hidden="true">🇧🇷</span>
-        <span class="visa-filter__label">Isento de visto</span>
-        <strong class="visa-filter__count" id="visa-free-count">0</strong>
+      <button class="header-action header-action--theme" id="theme-button" type="button" aria-label="Ativar modo claro">
+        <svg class="icon icon--sun" aria-hidden="true"><use href="#i-sun"/></svg>
+        <svg class="icon icon--moon" aria-hidden="true"><use href="#i-moon"/></svg>
       </button>
-
-      <button class="icon-button" id="theme-button" type="button" aria-label="Ativar modo claro">☀️</button>
-      <button class="discover-button" id="discover-button" type="button" aria-label="Descobrir destino" title="Descobrir destino">
-        <span aria-hidden="true">✦</span><span class="discover-button__label">Descobrir destino</span>
-      </button>
-
-      <div class="search" id="country-search">
-        <label class="sr-only" for="country-search-input">Buscar país</label>
-        <input
-          class="search__input"
-          id="country-search-input"
-          type="search"
-          placeholder="Buscar país..."
-          autocomplete="off"
-          spellcheck="false"
-          aria-autocomplete="list"
-          aria-controls="country-search-results"
-        >
-        <span class="search__icon" aria-hidden="true">⌕</span>
-        <div class="search__results" id="country-search-results" role="listbox" aria-label="Sugestões de países"></div>
-      </div>
     </div>
   </header>
 
@@ -110,27 +101,26 @@
     </div>
   </main>
 
-  <nav class="continent-nav" aria-label="Selecionar continente">
-    <button class="continent-nav__button" type="button" data-continent="EU"><span class="continent-nav__dot continent-nav__dot--europe"></span>Europa</button>
-    <button class="continent-nav__button" type="button" data-continent="NA"><span class="continent-nav__dot continent-nav__dot--north-america"></span>Am. Norte</button>
-    <button class="continent-nav__button" type="button" data-continent="SA"><span class="continent-nav__dot continent-nav__dot--south-america"></span>Am. Sul</button>
-    <button class="continent-nav__button" type="button" data-continent="AF"><span class="continent-nav__dot continent-nav__dot--africa"></span>África</button>
-    <button class="continent-nav__button" type="button" data-continent="AS"><span class="continent-nav__dot continent-nav__dot--asia"></span>Ásia</button>
-    <button class="continent-nav__button" type="button" data-continent="OC"><span class="continent-nav__dot continent-nav__dot--oceania"></span>Oceania</button>
-  </nav>
-
-  <div class="navigation-trail" id="navigation-trail" aria-label="Histórico de navegação"></div>
-
-  <button class="miles-launcher" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub">
-    <span class="miles-launcher__icon" aria-hidden="true">✦</span>
-    <span class="miles-launcher__label">Milhas</span>
-  </button>
-
-  <button class="miles-launcher trips-launcher" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Minhas viagens">
-    <span class="miles-launcher__icon" aria-hidden="true">🧳</span>
-    <span class="miles-launcher__label">Viagens</span>
-    <span class="trips-launcher__count" id="trips-count" hidden>0</span>
-  </button>
+  <div class="dock">
+    <div class="dock__stat" title="Destinos marcados como visitados">
+      <svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>
+      <span class="sr-only">Visitados:</span>
+      <strong id="visited-count">0</strong><span class="dock__stat-total" id="visited-total">/ 0</span>
+    </div>
+    <nav class="continent-nav" aria-label="Selecionar continente">
+      <button class="continent-nav__button" type="button" data-continent="EU">Europa</button>
+      <button class="continent-nav__button" type="button" data-continent="NA">Am. Norte</button>
+      <button class="continent-nav__button" type="button" data-continent="SA">Am. Sul</button>
+      <button class="continent-nav__button" type="button" data-continent="AF">África</button>
+      <button class="continent-nav__button" type="button" data-continent="AS">Ásia</button>
+      <button class="continent-nav__button" type="button" data-continent="OC">Oceania</button>
+    </nav>
+    <button class="visa-filter" id="visa-free-filter" type="button" aria-pressed="false" aria-label="Mostrar destinos isentos de visto para brasileiros">
+      <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+      <span class="visa-filter__label">Sem visto</span>
+      <strong class="visa-filter__count" id="visa-free-count">0</strong>
+    </button>
+  </div>
 
   <aside class="miles-hub" id="miles-hub" aria-label="Milhas e aeroportos" inert>
     <header class="miles-hub__header">
@@ -139,7 +129,7 @@
         <h2 class="miles-hub__title">Milhas &amp; Aeroportos</h2>
         <p class="miles-hub__subtitle">Compare resgates, cartões, salas e aeroportos da sua viagem.</p>
       </div>
-      <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar Milhas e Aeroportos">✕</button>
+      <button class="icon-button" id="miles-close-button" type="button" aria-label="Fechar Milhas e Aeroportos"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </header>
     <div class="miles-tabs" id="miles-tabs" role="tablist" aria-label="Seções de Milhas e Aeroportos"></div>
     <div class="miles-hub__content" id="miles-content"></div>
@@ -152,15 +142,15 @@
         <h2 class="miles-hub__title">Minhas viagens</h2>
         <p class="miles-hub__subtitle">Datas, orçamento e preparação, salvos neste navegador.</p>
       </div>
-      <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento">✕</button>
+      <button class="icon-button" id="planner-close-button" type="button" aria-label="Fechar planejamento"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </header>
     <div class="planner" id="planner-content"><p class="planner-empty">Carregando…</p></div>
   </aside>
 
   <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
     <header class="country-panel__toolbar">
-      <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel">✕</button>
-      <div class="country-panel__path" id="country-path">Mundo</div>
+      <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      <span class="country-panel__spacer"></span>
       <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
       <button class="visit-button wishlist-button" id="wishlist-button" type="button" aria-pressed="false">☆ Quero ir</button>
     </header>
@@ -171,8 +161,8 @@
         <div class="country-panel__region" id="country-region">—</div>
         <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
         <div class="country-actions">
-          <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>✈ Explorar destino</button>
-          <button class="secondary-button country-plan-button" id="country-plan-button" type="button">＋ Planejar viagem</button>
+          <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>Explorar destino</button>
+          <button class="secondary-button country-plan-button" id="country-plan-button" type="button">Planejar viagem</button>
         </div>
         <p class="country-explore-status" id="country-explore-status" role="status" aria-live="polite"></p>
       </div>
@@ -231,7 +221,7 @@
 
           <div class="form-grid">
             <label class="form-field form-field--wide">
-              <span class="form-field__label">Aeroporto de origem — código IATA (3 letras) ou ICAO (4 letras)</span>
+              <span class="form-field__label">Aeroporto de origem <span class="form-field__hint">IATA ou ICAO</span></span>
               <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" value="GRU" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off" aria-describedby="flight-preview-status">
               <datalist id="airport-suggestions"></datalist>
             </label>
@@ -280,7 +270,7 @@
   <section class="flight-preview-panel" id="flight-preview-panel" aria-label="Visualização da rota" hidden inert>
     <div class="flight-preview-panel__header">
       <span class="eyebrow">Rota de referência</span>
-      <button class="icon-button" id="flight-preview-close" type="button" aria-label="Fechar visualização da rota">✕</button>
+      <button class="icon-button" id="flight-preview-close" type="button" aria-label="Fechar visualização da rota"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
     <strong id="flight-preview-title"></strong>
     <span id="flight-preview-codes"></span>
