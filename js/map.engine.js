@@ -374,7 +374,7 @@ export class MapEngine {
     this.renderer.domElement.tabIndex = 0;
     this.stage.appendChild(this.renderer.domElement);
 
-    this.camera.position.copy(latLngToCartesian(18, -18, 3.05, GLOBE_YAW, GLOBE_ORIGIN));
+    this.camera.position.copy(latLngToCartesian(18, -18, this.#homeDistance(), GLOBE_YAW, GLOBE_ORIGIN));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.055;
@@ -551,6 +551,20 @@ export class MapEngine {
     this.fillLight = new THREE.DirectionalLight(colorToken('--color-light-fill'), 0.72);
     this.fillLight.position.set(-4.2, 0.4, 3.1);
     this.scene.add(this.ambientLight, this.hemisphereLight, this.keyLight, this.fillLight);
+    // As luzes principal e de preenchimento acompanham a câmera: guarda a posição
+    // delas relativa à vista inicial e a reaplica a cada quadro, então qualquer
+    // região do globo recebe a mesma iluminação da abertura (antes Ásia e Oceania
+    // ficavam no lado escuro).
+    this.camera.lookAt(GLOBE_ORIGIN);
+    this.camera.updateMatrixWorld(true);
+    const toCamera = this.camera.matrixWorld.clone().invert();
+    this.keyLightOffset = this.keyLight.position.clone().applyMatrix4(toCamera);
+    this.fillLightOffset = this.fillLight.position.clone().applyMatrix4(toCamera);
+  }
+
+  #followCameraLights() {
+    this.keyLight.position.copy(this.keyLightOffset).applyMatrix4(this.camera.matrixWorld);
+    this.fillLight.position.copy(this.fillLightOffset).applyMatrix4(this.camera.matrixWorld);
   }
 
   async init() {
@@ -1108,7 +1122,7 @@ export class MapEngine {
     this.activeContinent = null;
     this.clearSelection();
     this.#refreshCountryMaterials();
-    this.flyTo(18, -18, 3.05, 900);
+    this.flyTo(18, -18, this.#homeDistance(), 900);
   }
 
   /** Cidades de um país (ISO2), do mesmo arquivo usado no globo. */
@@ -1162,6 +1176,16 @@ export class MapEngine {
     this.flyTo(latitude, longitude, 1 + altitude, 380);
   }
 
+  // Distância da vista inicial: 3.05 em telas largas; em telas estreitas (celular
+  // em pé), o suficiente para o globo inteiro caber na largura, até o limite de zoom.
+  #homeDistance() {
+    const width = this.stage.clientWidth || window.innerWidth;
+    const height = this.stage.clientHeight || window.innerHeight;
+    const halfHorizontal = Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * (width / Math.max(1, height)));
+    const fit = 1.08 / Math.sin(halfHorizontal);
+    return THREE.MathUtils.clamp(fit, 3.05, 4.6);
+  }
+
   flyTo(latitude, longitude, distance = 2.05, duration = 850) {
     this.invalidate();
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -1180,9 +1204,16 @@ export class MapEngine {
       .sub(GLOBE_ORIGIN)
       .normalize();
     const rotation = new THREE.Quaternion().setFromUnitVectors(startDirection, endDirection);
+    // Duração proporcional à distância (saltos curtos são rápidos; nunca passa do
+    // valor pedido, do qual a prévia de rota depende) e um arco suave nos voos
+    // longos: a câmera sobe um pouco no meio do caminho, como num globo de mapas.
+    const angle = startDirection.angleTo(endDirection);
+    const adaptive = THREE.MathUtils.clamp(380 + angle * 700, duration * 0.55, duration);
+    const arc = angle > 0.35 && distance < 3.2 ? Math.min(0.9, angle * 0.45) : 0;
     this.cameraFlight = {
       startedAt: performance.now(),
-      duration,
+      duration: adaptive,
+      arc,
       startDirection,
       startDistance,
       endDistance: distance,
@@ -1204,7 +1235,7 @@ export class MapEngine {
       eased
     );
     const direction = flight.startDirection.clone().applyQuaternion(partialRotation).normalize();
-    const distance = THREE.MathUtils.lerp(flight.startDistance, flight.endDistance, eased);
+    const distance = THREE.MathUtils.lerp(flight.startDistance, flight.endDistance, eased) + flight.arc * Math.sin(Math.PI * eased);
     this.camera.position.copy(GLOBE_ORIGIN).add(direction.multiplyScalar(distance));
     this.camera.lookAt(GLOBE_ORIGIN);
     this.camera.updateMatrixWorld(true);
@@ -1393,6 +1424,7 @@ export class MapEngine {
     const altitude = this.camera.position.length() - 1;
     this.controls.rotateSpeed = 0.52 * THREE.MathUtils.clamp(altitude / 1.6, 0.025, 1);
     this.camera.updateMatrixWorld();
+    this.#followCameraLights();
     if (this.routePreview) this.adminLayer.hide();
     else this.adminLayer.update();
     this.renderer.render(this.scene, this.camera);

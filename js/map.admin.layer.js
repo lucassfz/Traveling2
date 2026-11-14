@@ -669,9 +669,17 @@ export class AdminLayer {
     }
     for (const [key, element] of this.labels) {
       if (used.has(key)) continue;
-      element.hidden = true;
       this.labels.delete(key);
-      this.freeLabels.push(element);
+      // Sai esmaecendo; só volta para a reserva quando terminar (não é reaproveitado no meio).
+      if (this.reducedMotion.matches || element.hidden) {
+        element.hidden = true;
+        this.freeLabels.push(element);
+        continue;
+      }
+      element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: 'ease-in' }).onfinish = () => {
+        element.hidden = true;
+        this.freeLabels.push(element);
+      };
     }
   }
 
