@@ -372,6 +372,17 @@ select:focus-visible {
   fill: #0369a1;
 }
 
+/* Abertura no tema claro: mesma cena e animação, cores do tema claro. */
+[data-theme='light'] .splash-screen { background: var(--color-background); }
+[data-theme='light'] .splash-screen::before { background: radial-gradient(circle at 50% 58%, rgba(2, 121, 179, .10), transparent 42%); }
+[data-theme='light'] .splash-screen__wordmark { color: var(--color-text); }
+[data-theme='light'] .splash-screen__globe { fill: url(#splash-ocean-light); stroke: rgba(48, 70, 90, .32); }
+[data-theme='light'] .splash-screen__graticule { stroke: rgba(2, 121, 179, .22); }
+[data-theme='light'] .splash-screen__flight-path { stroke: var(--color-accent); opacity: .6; }
+[data-theme='light'] .splash-screen__airliner { filter: drop-shadow(0 4px 9px rgba(2, 121, 179, .22)); }
+[data-theme='light'] .splash-screen__airliner-body { stroke: #7dd3fc; }
+[data-theme='light'] .splash-screen__airliner-engine { fill: var(--color-accent-strong); }
+
 @keyframes splashWordmarkIn {
   to { opacity: 1; }
 }
