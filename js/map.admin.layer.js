@@ -155,7 +155,11 @@ export class AdminLayer {
     this.overlay.className = 'globe-labels';
     this.overlay.setAttribute('aria-hidden', 'true');
     stage.appendChild(this.overlay);
-    this.pool = [];
+    this.labels = new Map();       // chave do lugar → elemento (o mesmo nó acompanha a cidade)
+    this.freeLabels = [];          // elementos livres para reaproveitar
+    this.fades = new Map();        // material → { to } (transição de opacidade dos destaques)
+    this.lastFrame = performance.now();
+    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.placed = [];
     this.cache = new Map();        // ISO2 → registro (LRU pela ordem de inserção)
     this.selectedCode = null;      // país selecionado no app
@@ -214,6 +218,16 @@ export class AdminLayer {
   /** ISO2 do país cujas cidades estão na tela (o selecionado ou o do centro), ou null. */
   get focusCode() {
     return this.focus?.status === 'ready' ? this.focus.code : null;
+  }
+
+  /** Pré-carrega um país (hover) no tempo ocioso: ao clicar, estados e cidades já estão prontos. */
+  prefetch(alpha2) {
+    if (!/^[A-Z]{2}$/.test(alpha2 ?? '') || this.cache.has(alpha2) || this.prefetchTimer) return;
+    const run = () => {
+      this.prefetchTimer = 0;
+      if (!this.cache.has(alpha2)) this.#ensure(alpha2);
+    };
+    this.prefetchTimer = 'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 600 }) : setTimeout(run, 150);
   }
 
   /** Cidades do país (carrega o arquivo se preciso). Usado pelo Planner e pela Descoberta. */
@@ -409,7 +423,10 @@ export class AdminLayer {
     const color = style.getPropertyValue(onSelectedCountry ? '--color-background' : '--color-accent').trim() || '#7cc9f5';
     line.color.set(color);
     fillMaterial.color.set(color);
-    fillMaterial.opacity = selected ? (onSelectedCountry ? 0.3 : 0.2) : (onSelectedCountry ? 0.16 : 0.1);
+    this.#fadeTo(fillMaterial, selected ? (onSelectedCountry ? 0.3 : 0.2) : (onSelectedCountry ? 0.16 : 0.1));
+    this.#fadeTo(line, selected ? 1 : 0.85);
+    fillMaterial.opacity = 0;
+    line.opacity = 0;
     const entry = this.#shapeGeometries(key, shapes);
     entry.users += 1;
     const objects = entry.lines.map(geometry => {
@@ -422,6 +439,32 @@ export class AdminLayer {
     objects.push(fill);
     for (const object of objects) this.group.add(object);
     this.highlights[slot] = { city, key, entry, objects, onSelected: onSelectedCountry };
+  }
+
+  // Começa transparente e aproxima a opacidade alvo a cada quadro.
+  #fadeTo(material, to) {
+    if (this.reducedMotion.matches) {
+      material.opacity = to;
+      this.fades.delete(material);
+      return;
+    }
+    if (!this.fades.has(material) && !(material.userData.faded)) material.opacity = 0;
+    material.userData.faded = true;
+    this.fades.set(material, { to });
+    this.invalidate();
+  }
+
+  #updateFades(now) {
+    const step = 1 - Math.exp(-(now - this.lastFrame) / 70);
+    this.lastFrame = now;
+    for (const [material, fade] of this.fades) {
+      material.opacity += (fade.to - material.opacity) * step;
+      if (Math.abs(fade.to - material.opacity) < 0.004) {
+        material.opacity = fade.to;
+        this.fades.delete(material);
+      }
+    }
+    if (this.fades.size) this.invalidate();
   }
 
   // Regiões do país (área clicável da cidade principal de cada uma).
@@ -480,6 +523,7 @@ export class AdminLayer {
 
   // Chamado a cada quadro desenhado pelo globo (antes do render).
   update() {
+    this.#updateFades(performance.now());
     const distance = this.camera.position.length();
     this.distance = distance;
     this.cameraDirection.copy(this.camera.position).normalize();
@@ -596,14 +640,24 @@ export class AdminLayer {
       this.placed = [];
       this.lastLabelKey = '';
     }
-    while (this.pool.length < placed.length) {
-      const element = document.createElement('span');
-      element.innerHTML = '<i class="globe-label__mark"></i><b class="globe-label__text"></b>';
-      this.overlay.appendChild(element);
-      this.pool.push(element);
-    }
-    placed.forEach(({ item, x, y }, index) => {
-      const element = this.pool[index];
+    const used = new Set();
+    for (const { item, x, y } of placed) {
+      const key = item.id ?? `s:${item.country}:${item.name}`;
+      used.add(key);
+      let element = this.labels.get(key);
+      if (!element) {
+        element = this.freeLabels.pop();
+        if (!element) {
+          element = document.createElement('span');
+          element.innerHTML = '<i class="globe-label__mark"></i><b class="globe-label__text"></b>';
+          this.overlay.appendChild(element);
+        }
+        this.labels.set(key, element);
+        element.lastChild.textContent = item.name;
+        element.hidden = false;
+        // Entrada suave (só opacidade: a posição usa transform a cada quadro).
+        if (!this.reducedMotion.matches) element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+      }
       let className = item.kind === 'state'
         ? 'globe-label globe-label--state'
         : `globe-label globe-label--city${item.rank === 0 ? ' globe-label--capital' : item.rank === 1 ? ' globe-label--seat' : ''}`;
@@ -611,12 +665,14 @@ export class AdminLayer {
       if (item === this.hoveredItem) className += ' globe-label--hover';
       if (item.country === this.selectedCode) className += ' globe-label--on-selected';
       if (element.className !== className) element.className = className;
-      const text = element.lastChild;
-      if (text.textContent !== item.name) text.textContent = item.name;
       element.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-      element.hidden = false;
-    });
-    for (let index = placed.length; index < this.pool.length; index += 1) this.pool[index].hidden = true;
+    }
+    for (const [key, element] of this.labels) {
+      if (used.has(key)) continue;
+      element.hidden = true;
+      this.labels.delete(key);
+      this.freeLabels.push(element);
+    }
   }
 
   /**
@@ -688,7 +744,11 @@ export class AdminLayer {
     this.lastLabelKey = '';
     for (const object of this.focus?.objects ?? []) object.visible = false;
     for (const highlight of Object.values(this.highlights)) for (const object of highlight?.objects ?? []) object.visible = false;
-    for (const element of this.pool) element.hidden = true;
+    for (const element of this.labels.values()) {
+      element.hidden = true;
+      this.freeLabels.push(element);
+    }
+    this.labels.clear();
   }
 
   dispose() {

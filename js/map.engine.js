@@ -362,7 +362,13 @@ export class MapEngine {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.localClippingEnabled = true;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    // Resolução dinâmica: nítida parada, mais leve em movimento (giro, zoom, voo).
+    this.idlePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.motionPixelRatio = Math.min(window.devicePixelRatio || 1, 1);
+    this.renderer.setPixelRatio(this.idlePixelRatio);
+    this.interacting = false;
+    this.restoreResolutionTimer = 0;
+    this.landTweens = new Map(); // material → transição de cor
     this.renderer.setClearAlpha(0);
     this.renderer.domElement.className = 'globe__canvas';
     this.renderer.domElement.tabIndex = 0;
@@ -438,13 +444,9 @@ export class MapEngine {
   }
 
   #createOcean() {
-    this.oceanMaterial = new THREE.MeshPhysicalMaterial({
-      roughness: 0.8,
-      metalness: 0,
-      clearcoat: 0.04,
-      clearcoatRoughness: 0.9,
-      ior: 1.33
-    });
+    // Material padrão: o oceano cobre a maior área da tela, e o clearcoat do
+    // material físico (4%, imperceptível) custava um cálculo extra por pixel.
+    this.oceanMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 });
     this.ocean = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 80, 56), this.oceanMaterial);
     this.ocean.position.copy(GLOBE_ORIGIN);
     this.ocean.rotation.y = GLOBE_YAW;
@@ -555,7 +557,8 @@ export class MapEngine {
     this.resize();
     if (!this.renderStarted) {
       this.renderStarted = true;
-      this.controls.addEventListener('start', () => this.invalidate());
+      this.controls.addEventListener('start', () => { this.interacting = true; this.invalidate(); });
+      this.controls.addEventListener('end', () => { this.interacting = false; this.invalidate(); });
       this.controls.addEventListener('change', () => this.invalidate());
       this.invalidate();
     }
@@ -569,6 +572,9 @@ export class MapEngine {
     this.#buildGlobalBorders(topojson, topology);
     await this.#buildWorld(features);
     this.#buildSmallDestinationHotspots();
+    // Compila os shaders em paralelo (KHR_parallel_shader_compile) em vez de
+    // travar a página no primeiro quadro com os países.
+    if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera).catch(() => {});
     this.ready = true;
     this.setTheme();
     this.resize();
@@ -769,6 +775,7 @@ export class MapEngine {
         return;
       }
       this.#setHovered(countryKey);
+      if (countryKey) this.adminLayer.prefetch(COUNTRIES[countryKey]?.alpha2);
       if (countryKey) {
         this.stage.classList.add('globe__stage--interactive');
         this.callbacks.onHover?.(countryKey, clientX, clientY);
@@ -950,9 +957,7 @@ export class MapEngine {
         : '--color-land-border';
 
     const fillColor = colorToken(colorName);
-    record.landMaterial.color.copy(fillColor);
-    record.landMaterial.emissive.copy(fillColor);
-    record.landMaterial.emissiveIntensity = state === 'selected'
+    this.#tweenLand(record.landMaterial, fillColor, state === 'hover' || state === 'visa-free-hover' ? 140 : 280, state === 'selected'
       ? 0.13
       : state === 'visa-free-hover'
         ? 0.09
@@ -962,7 +967,7 @@ export class MapEngine {
             ? 0.075
             : state === 'visited'
               ? 0.045
-              : 0.025;
+              : 0.025);
     record.landMaterial.opacity = state === 'visa-dimmed' ? 0.25 : state === 'dimmed' ? 0.52 : 1;
     record.landMaterial.transparent = state === 'visa-dimmed' || state === 'dimmed';
     const highlighted = HIGHLIGHTED_BORDER_STATES.has(state);
@@ -987,6 +992,55 @@ export class MapEngine {
               : state === 'dimmed'
                 ? 0.28
                 : 0.76;
+  }
+
+  // Transição de cor/brilho de um material de terra (ease-out cúbico).
+  #tweenLand(material, color, duration, intensity) {
+    if (!this.ready || this.reducedMotionQuery.matches) {
+      material.color.copy(color);
+      material.emissive.copy(color);
+      material.emissiveIntensity = intensity;
+      this.landTweens.delete(material);
+      return;
+    }
+    const tween = this.landTweens.get(material);
+    if (tween ? tween.toColor.equals(color) && tween.toIntensity === intensity
+      : material.color.equals(color) && material.emissiveIntensity === intensity) return;
+    this.landTweens.set(material, {
+      fromColor: material.color.clone(), toColor: color.clone(),
+      fromIntensity: material.emissiveIntensity, toIntensity: intensity,
+      start: performance.now(), duration
+    });
+    this.invalidate();
+  }
+
+  #updateLandTweens(now) {
+    for (const [material, tween] of this.landTweens) {
+      const t = THREE.MathUtils.clamp((now - tween.start) / tween.duration, 0, 1);
+      const eased = 1 - (1 - t) ** 3;
+      material.color.copy(tween.fromColor).lerp(tween.toColor, eased);
+      material.emissive.copy(material.color);
+      material.emissiveIntensity = THREE.MathUtils.lerp(tween.fromIntensity, tween.toIntensity, eased);
+      if (t >= 1) this.landTweens.delete(material);
+    }
+    return this.landTweens.size > 0;
+  }
+
+  // Menos pixels enquanto a câmera se move; resolução cheia ~200 ms depois de parar.
+  #setMotionResolution(moving) {
+    if (moving) {
+      clearTimeout(this.restoreResolutionTimer);
+      this.restoreResolutionTimer = 0;
+      if (this.renderer.getPixelRatio() !== this.motionPixelRatio) this.renderer.setPixelRatio(this.motionPixelRatio);
+      return;
+    }
+    if (this.renderer.getPixelRatio() === this.idlePixelRatio || this.restoreResolutionTimer) return;
+    this.restoreResolutionTimer = setTimeout(() => {
+      this.restoreResolutionTimer = 0;
+      if (this.disposed) return;
+      this.renderer.setPixelRatio(this.idlePixelRatio);
+      this.invalidate();
+    }, 200);
   }
 
   #refreshCountryMaterials() {
@@ -1177,7 +1231,6 @@ export class MapEngine {
     this.oceanMaterial.emissive.copy(colorToken('--color-ocean-emissive'));
     this.oceanMaterial.emissiveIntensity = dark ? 0.1 : 0.06;
     this.oceanMaterial.roughness = dark ? 0.82 : 0.78;
-    this.oceanMaterial.clearcoat = dark ? 0.03 : 0.05;
     this.atmosphereMaterial.uniforms.atmosphereColor.value.copy(colorToken('--color-globe-atmosphere'));
     this.atmosphereMaterial.uniforms.atmosphereOpacity.value = dark ? 0.12 : 0.07;
     this.graticuleMaterial.color.copy(colorToken('--color-graticule'));
@@ -1312,6 +1365,8 @@ export class MapEngine {
     this.frameScheduled = false;
     if (this.disposed) return;
     let animating = this.#updateViewInset(timestamp);
+    let cameraMoving = Boolean(this.cameraFlight || this.routePreview || this.interacting);
+    if (this.#updateLandTweens(performance.now())) animating = true;
     if (this.cameraFlight) animating = true;
     this.#updateCameraFlight(timestamp);
     if (this.routePreview) animating = true;
@@ -1328,7 +1383,11 @@ export class MapEngine {
         preview.arrivalReported = true;
         this.callbacks.onRouteArrived?.();
       }
-    } else if (!this.cameraFlight && this.controls.update()) animating = true; // amortecimento ainda girando
+    } else if (!this.cameraFlight && this.controls.update()) { // amortecimento ainda girando
+      animating = true;
+      cameraMoving = true;
+    }
+    this.#setMotionResolution(cameraMoving);
     this.#updateHorizonClip();
     // Perto da superfície o giro por pixel precisa ser menor, como num mapa.
     const altitude = this.camera.position.length() - 1;
@@ -1346,6 +1405,7 @@ export class MapEngine {
     this.disposed = true;
     this.onPointerMove?.cancel?.();
     this.resizeObserver?.disconnect();
+    clearTimeout(this.restoreResolutionTimer);
     cancelAnimationFrame(this.resizeFrame);
     this.controls.dispose();
     this.flightVisualization.dispose();

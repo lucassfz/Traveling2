@@ -1,5 +1,6 @@
 import { AirportRepository } from './airports.repository.js';
 import { createCityCard } from './city.card.js';
+import { attachIndicator } from './core/indicator.js';
 import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
 import { escapeHtml } from './core/html.js';
 import {
@@ -952,6 +953,7 @@ async function initializeMap() {
       onProgress: message => { elements.globeStatus.lastElementChild.textContent = message; },
       onReady: () => {
         elements.globeStatus.classList.add('globe__status--hidden');
+        document.getElementById('globe')?.classList.add('globe--ready');
         updateFlightPreviewAvailability();
       }
     });
@@ -963,6 +965,7 @@ async function initializeMap() {
     elements.globeFallback.classList.remove('globe__fallback--visible');
   } catch (error) {
     console.error('Traveling map initialization failed:', error);
+    document.getElementById('globe')?.classList.add('globe--ready');
     elements.globeStatus.classList.add('globe__status--hidden');
     elements.globeFallback.classList.add('globe__fallback--visible');
     const detail = elements.globeFallback.querySelector('span');
@@ -1212,6 +1215,10 @@ function initialize() {
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
   updateAirportSuggestions();
   bindUiEvents();
+  // Indicadores deslizantes: continentes (pílula) e abas (traço).
+  attachIndicator(document.querySelector('.continent-nav'), { active: '.continent-nav__button--active' });
+  attachIndicator(document.querySelector('.country-tabs'), { active: '.country-tabs__button--active', mode: 'underline' });
+  attachIndicator(document.getElementById('miles-tabs'), { active: '.miles-tab--active', mode: 'underline' });
   watchGlobeInset();
   state.milesEngine = milesPlaceholder;
   renderTripsCount();
