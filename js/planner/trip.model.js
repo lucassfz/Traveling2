@@ -94,6 +94,7 @@ function normalizeMiles(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const miles = {};
   for (const key of ['fareBRL', 'points', 'taxesBRL', 'myCostPer1000BRL']) {
+    if (raw[key] === null || raw[key] === undefined || raw[key] === '') continue;
     const value = amount(raw[key]);
     if (value !== null) miles[key] = value;
   }

@@ -6,6 +6,7 @@ import {
   addLine, createTrip, isoDate, normalizeStore, normalizeTrip, removeLine, tripDays, tripMonth, tripTotals, updateLine, updateTrip
 } from '../js/planner/trip.model.js';
 import { createTripStore } from '../js/planner/trip.store.js';
+import { compareCashAndMiles, flightSuggestion, localCostSuggestion } from '../js/planner/planner.estimates.js';
 
 let counter = 0;
 const idFactory = prefix => `${prefix}_test${String(++counter).padStart(4, '0')}`;
@@ -108,4 +109,29 @@ blocked.save(createTrip({ countryKey: 'Japan', idFactory }));
 assert.equal(blocked.persistent, false, 'armazenamento bloqueado é sinalizado');
 assert.equal(blocked.trips.length, 1, 'mas a viagem continua na sessão');
 
-console.log('Planner: modelo, totais, normalização e armazenamento verificados.');
+// Dinheiro × milhas guardado na viagem: campo apagado some, não vira zero.
+const withMiles = updateTrip(trip, { miles: { fareBRL: 9300, points: 70000, taxesBRL: 450, myCostPer1000BRL: null } });
+assert.deepEqual(withMiles.miles, { fareBRL: 9300, points: 70000, taxesBRL: 450 });
+assert.equal(updateTrip(trip, { miles: { fareBRL: '' } }).miles, undefined);
+
+// Sugestões e comparação (planner.estimates.js).
+assert.deepEqual(flightSuggestion({ cash: { brl: { low: 4630, high: 8160 } } }, { travelers: 2 }), { amountBRL: 25580, perLegLow: 4630, perLegHigh: 8160 }, 'média × 2 trechos × 2 pessoas');
+assert.equal(flightSuggestion({ cash: { brl: null, usd: { low: 1, high: 2 } } }), null, 'sem câmbio, sem sugestão em reais');
+assert.equal(flightSuggestion(null), null);
+const local = localCostSuggestion([
+  { localWeekBRL: [3000, 5000], region: 'Tóquio', reviewedOn: '2026-09-26' },
+  { localWeekBRL: [2500, 6000], region: 'Quioto', reviewedOn: '2026-09-20' },
+  { localWeekBRL: [0, 5000] }
+], { days: 14, travelers: 2 });
+assert.deepEqual(local, { amountBRL: 17000, low: 2500, high: 6000, days: 14, regions: ['Tóquio', 'Quioto'], reviewedOn: '2026-09-20' }, 'faixa entre perfis × 14/7 × 2');
+assert.equal(localCostSuggestion([], { days: 7 }), null, 'sem perfil revisado, sem sugestão');
+assert.equal(localCostSuggestion([{ localWeekBRL: [1000, 1000] }]).days, 7, 'sem datas considera 7 dias');
+assert.equal(compareCashAndMiles({ fareBRL: 3000 }), null);
+const cashVsMiles = compareCashAndMiles({ fareBRL: 3000, points: 40000, taxesBRL: 200, myCostPer1000BRL: 50 });
+assert.equal(cashVsMiles.perThousand, 70);
+assert.equal(cashVsMiles.better, 'points', 'R$ 70 por mil > milheiro de R$ 50');
+assert.equal(compareCashAndMiles({ fareBRL: 3000, points: 40000, taxesBRL: 200, myCostPer1000BRL: 90 }).better, 'cash');
+assert.equal(compareCashAndMiles({ fareBRL: 3000, points: 40000, taxesBRL: 200 }).better, null);
+assert.ok(compareCashAndMiles({ fareBRL: 300, points: 40000, taxesBRL: 500 }).error, 'taxas acima do preço');
+
+console.log('Planner: modelo, totais, normalização, armazenamento, sugestões e milhas verificados.');

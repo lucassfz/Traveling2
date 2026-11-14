@@ -2526,3 +2526,12 @@ body.route-mode .app-header__brand { pointer-events: none; }
 @media (max-width: 360px) {
   .explorer-counter__total { display: none; }
 }
+.planner-subsection { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); }
+.planner-subsection__title { margin: 0; font-size: .86rem; font-weight: 700; }
+.planner-miles-result { display: grid; gap: var(--space-2); font-size: .86rem; line-height: 1.5; color: var(--color-text-secondary); }
+.planner-miles-result p { margin: 0; }
+.planner-miles-result strong { color: var(--color-text); }
+.planner-error { margin: 0; color: var(--color-danger); font-size: .82rem; }
+#planner-awards:empty { display: none; }
+#planner-awards { display: grid; gap: 2px; }
+#planner-awards .planner-hint { font-variant-numeric: tabular-nums; }
