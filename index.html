@@ -6,6 +6,17 @@
   <meta name="description" content="Traveling — globo 3D interativo com guias de países, rotas e estimativas de milhas.">
   <meta name="theme-color" content="#05070c">
   <title>Traveling — Explore o mundo</title>
+  <script>
+    // Aplica o tema salvo antes da primeira pintura, para a abertura e a
+    // página não piscarem no tema errado. app.js continua dono da lógica.
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        document.documentElement.dataset.theme = savedTheme;
+        if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#eef1f3');
+      }
+    } catch (error) { /* armazenamento bloqueado: segue o padrão escuro */ }
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2215%22 fill=%22%2305070c%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229.5%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.6%22/%3E%3Cpath d=%22M6.5 16h19M16 6.5c3.2 3.4 3.2 15.6 0 19M16 6.5c-3.2 3.4-3.2 15.6 0 19%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.2%22/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

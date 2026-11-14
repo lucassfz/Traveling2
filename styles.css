@@ -327,6 +327,11 @@ select:focus-visible {
   animation: splashLine 900ms 200ms var(--ease-out) forwards;
 }
 
+/* Abertura no tema claro: mesma marca e animação, cores do tema claro. */
+[data-theme='light'] .splash-screen { background: radial-gradient(ellipse at 50% 60%, #ffffff 0%, var(--color-background) 62%); }
+[data-theme='light'] .splash-screen__wordmark { color: var(--color-text); }
+[data-theme='light'] .splash-screen__line { background: linear-gradient(90deg, transparent, var(--color-accent), transparent); }
+
 @keyframes splashWordmarkIn { to { opacity: 1; transform: none; } }
 @keyframes splashLine { to { transform: scaleX(1); } }
 @keyframes splashReveal { to { opacity: 0; visibility: hidden; } }
