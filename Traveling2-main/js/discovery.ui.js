@@ -1,25 +1,42 @@
 import { BUDGETS, CLIMATES, DISCOVERY_MONTHS, INTERESTS, TRIP_REFERENCE } from './destination.profiles.js';
-import { formatTripRange, nextDiscoveryIndex, noMatchAdvice, rankDestinations } from './destination.discovery.js';
+import { formatTripRange, noMatchAdvice, rankDestinations } from './destination.discovery.js';
+import { flagImageUrl } from './country.exploration.js';
 import { provenanceLabel } from './provenance.js';
 
-const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+// Descobrir: um único painel. As preferências ficam no topo, em botões, e a
+// lista de destinos que combinam se atualiza a cada toque. Tocar num destino
+// destaca o país no globo e abre as ações (explorar, rota, planejar).
+// País, globo e voo continuam com o app.
 
-// Owns only this compact panel. Country details, globe and flight remain in app.
+const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+const MAX_RESULTS = 12;
+const SEASON_LABELS = ['Evitar', 'Aceitável', 'Boa', 'Ideal'];
+const BUDGET_SHORT = { 5000: 'Até 5 mil', 8000: 'Até 8 mil', 12000: 'Até 12 mil', 18000: 'Até 18 mil', above: '18 mil+', any: 'Tanto faz' };
+const MAX_INTERESTS = 2;
+
+// Sem interesse escolhido: melhor resultado de cada país entre todos os interesses.
+function rankWithoutInterests(countries, preferences) {
+  const best = new Map();
+  for (const interest of Object.keys(INTERESTS)) {
+    for (const match of rankDestinations(countries, { ...preferences, interests: [interest] })) {
+      const current = best.get(match.countryKey);
+      if (!current || match.score > current.score) best.set(match.countryKey, match);
+    }
+  }
+  return [...best.values()].sort((a, b) => Number(b.tier === 'strong') - Number(a.tier === 'strong') || b.score - a.score || a.countryKey.localeCompare(b.countryKey, 'en'));
+}
+
 export class DiscoveryUI {
   constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose }) {
     Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose });
     this.preferences = { interests: [], climate: 'any', budget: 'any', month: new Date().getMonth(), visaFree: false };
-    this.step = 1;
+    // `step` e `index` são lidos pelo app (rota do destino atual).
+    this.step = 'result';
     this.matches = [];
-    this.index = 0;
+    this.index = -1;
     this.version = 0;
     this.handleClick = event => this.click(event);
-    this.handleChange = event => {
-      if (event.target.id === 'discovery-budget') this.preferences.budget = event.target.value;
-      if (event.target.id === 'discovery-visa') this.preferences.visaFree = event.target.checked;
-    };
     element.addEventListener('click', this.handleClick);
-    element.addEventListener('change', this.handleChange);
   }
 
   get isOpen() { return !this.element.hidden; }
@@ -28,15 +45,14 @@ export class DiscoveryUI {
     this.element.hidden = false;
     this.element.inert = false;
     this.trigger.setAttribute('aria-expanded', 'true');
-    if (this.step === 'loading') this.step = 3;
+    this.#compute();
     this.render();
-    if (this.step === 'result' && this.matches.length) this.onHighlight(this.matches[this.index]);
+    if (this.matches[this.index]) this.onHighlight(this.matches[this.index]);
   }
 
   close(restoreFocus = false) {
     if (!this.isOpen) return;
     this.version += 1;
-    clearTimeout(this.timer);
     this.element.hidden = true;
     this.element.inert = true;
     this.trigger.setAttribute('aria-expanded', 'false');
@@ -44,104 +60,153 @@ export class DiscoveryUI {
     if (restoreFocus) this.trigger.focus({ preventScroll: true });
   }
 
-  render(focus = true) {
-    let body;
-    let title = 'Para onde você deveria ir?';
-    if (this.step === 1) body = `
-      <p>Conte um pouco sobre a viagem. O que você procura?</p>
-      <div class="discovery-options" role="group" aria-label="Interesses da viagem">${Object.entries(INTERESTS).map(([id, label]) => `<button type="button" data-interest="${id}" aria-pressed="${this.preferences.interests.includes(id)}" ${this.preferences.interests.length === 2 && !this.preferences.interests.includes(id) ? 'disabled' : ''}>${label}</button>`).join('')}</div>
-      <small>Escolha 1 ou 2, na ordem de preferência. Toque novamente para remover.</small>
-      <button class="primary-button" data-action="next" ${this.preferences.interests.length ? '' : 'disabled'}>Continuar</button>`;
-    else if (this.step === 2) body = `
-      <p>Qual clima combina com você?</p>
-      <div class="discovery-options" role="group" aria-label="Clima da viagem">${Object.entries(CLIMATES).map(([id, label]) => `<button type="button" data-climate="${id}" aria-pressed="${this.preferences.climate === id}">${label}</button>`).join('')}</div>
-      <label class="form-field" for="discovery-budget"><span>Quanto pretende gastar?</span><select class="form-field__control" id="discovery-budget">${BUDGETS.map(band => `<option value="${band.id}" ${this.preferences.budget === band.id ? 'selected' : ''}>${band.label}</option>`).join('')}</select></label>
-      <details><summary>O que entra nessa estimativa?</summary><p>${escape(TRIP_REFERENCE)}</p></details>
-      <div class="discovery-nav"><button class="secondary-button" data-action="back">Voltar</button><button class="primary-button" data-action="next">Continuar</button></div>`;
-    else if (this.step === 3) body = `
-      <p>Quando pretende viajar?</p>
-      <div class="discovery-months" role="group" aria-label="Mês da descoberta">${DISCOVERY_MONTHS.map((month, index) => `<button type="button" data-month="${index}" aria-pressed="${this.preferences.month === index}">${month}</button>`).join('')}</div>
-      <label class="discovery-check"><input type="checkbox" id="discovery-visa" ${this.preferences.visaFree ? 'checked' : ''}> 🛂 Priorizar destinos sem visto</label>
-      <small>É uma preferência, não uma restrição. eVisa, visto na chegada e autorização eletrônica não recebem esse bônus.</small>
-      <div class="discovery-nav"><button class="secondary-button" data-action="back">Voltar</button><button class="primary-button" data-action="find">Encontrar meu destino</button></div>`;
-    else if (this.step === 'loading') body = '<p role="status" class="discovery-loading">✦ Encontrando boas combinações…</p>';
-    else if (!this.matches.length) {
-      title = 'Vamos ajustar a viagem?';
-      body = `<p role="status">Não encontramos uma combinação forte com todos esses filtros.</p><p>${escape(noMatchAdvice(this.countries, this.preferences))}</p><small>A busca considera apenas os roteiros com perfil editorial disponível, não todos os países do mundo.</small><button class="primary-button" data-action="edit">Editar preferências</button>`;
-    } else {
-      const match = this.matches[this.index];
-      title = `${match.country.flag} ${match.country.namePt}`;
-      body = `<p class="discovery-region">${escape(match.profile.region)} · ${DISCOVERY_MONTHS[this.preferences.month]}</p>
-        <small>${escape(match.matchSummary)}</small>
-        <strong class="discovery-price">${formatTripRange(match.range)} <small>/ pessoa · 7 dias</small></strong>
-        ${provenanceLabel('estimate', {
-          date: match.profile.reviewedOn,
-          dateLabel: 'revisada em',
-          detail: 'faixa de planejamento, não cotação · saída de GRU; conexões podem ser necessárias'
-        })}
-        <ul class="discovery-reasons">${match.reasons.slice(0, 2).map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>
-        <small>${escape(match.reasons[3])}</small>
-        <details><summary>Temporada, entrada e cuidados</summary><p>${escape(match.reasons[2])}</p>${match.reasons.slice(4).map(reason => `<p>${escape(reason)}</p>`).join('')}<p>${escape(match.profile.note)}</p><p>${escape(TRIP_REFERENCE)}</p></details>
-        <div class="discovery-result-actions">
-          <button class="primary-button" data-action="explore">Explorar ${escape(match.country.namePt)}</button>
-          <button class="secondary-button" data-action="route">✈ Ver rota saindo de GRU</button>
-          ${this.onPlan ? '<button class="secondary-button" data-action="plan">＋ Planejar esta viagem</button>' : ''}
-          <button class="discovery-text-button" data-action="another" ${this.matches.length < 2 ? 'disabled' : ''}>↻ Mostrar outro destino</button>
+  #compute() {
+    const previous = this.matches[this.index]?.countryKey;
+    const prefs = this.preferences;
+    this.matches = (prefs.interests.length ? rankDestinations(this.countries, prefs) : rankWithoutInterests(this.countries, prefs)).slice(0, MAX_RESULTS);
+    this.index = this.matches.findIndex(match => match.countryKey === previous);
+  }
+
+  #chips(kind, entries, isOn, { disabled = () => false } = {}) {
+    return entries.map(([value, label]) => `<button type="button" class="discovery-chip" data-${kind}="${escape(value)}" aria-pressed="${isOn(value)}" ${disabled(value) ? 'disabled' : ''}>${escape(label)}</button>`).join('');
+  }
+
+  #filters() {
+    const prefs = this.preferences;
+    return `
+      <div class="discovery-filters">
+        <div class="discovery-filter">
+          <span class="discovery-filter__label">O que você quer? <small>até ${MAX_INTERESTS}</small></span>
+          <div class="discovery-chips" role="group" aria-label="Interesses">${this.#chips('interest', Object.entries(INTERESTS), id => prefs.interests.includes(id),
+            { disabled: id => prefs.interests.length >= MAX_INTERESTS && !prefs.interests.includes(id) })}</div>
         </div>
-        <p class="discovery-feedback" role="status"></p>
-        <button class="discovery-text-button" data-action="edit">Editar preferências</button>`;
+        <div class="discovery-filter">
+          <span class="discovery-filter__label">Quando?</span>
+          <div class="discovery-chips discovery-chips--months" role="group" aria-label="Mês">${this.#chips('month', DISCOVERY_MONTHS.map((label, index) => [index, label]), index => prefs.month === Number(index))}</div>
+        </div>
+        <div class="discovery-filter">
+          <span class="discovery-filter__label">Clima</span>
+          <div class="discovery-chips" role="group" aria-label="Clima">${this.#chips('climate', Object.entries(CLIMATES), id => prefs.climate === id)}</div>
+        </div>
+        <div class="discovery-filter">
+          <span class="discovery-filter__label">Orçamento por pessoa <small>7 dias, com passagem</small></span>
+          <div class="discovery-chips" role="group" aria-label="Orçamento">${this.#chips('budget', BUDGETS.filter(band => band.id !== 'above').map(band => [band.id, BUDGET_SHORT[band.id] ?? band.label]), id => prefs.budget === id)}</div>
+        </div>
+        <button type="button" class="discovery-chip discovery-chip--toggle" data-action="visa" aria-pressed="${prefs.visaFree}">🛂 Priorizar sem visto</button>
+      </div>`;
+  }
+
+  #seasonBar(profile) {
+    return `<span class="discovery-season" aria-label="Melhores meses">${profile.seasonSuitability.map((value, month) => `<i class="discovery-season__m discovery-season__m--${value}${month === this.preferences.month ? ' discovery-season__m--now' : ''}" title="${DISCOVERY_MONTHS[month]}: ${SEASON_LABELS[value]}"></i>`).join('')}</span>`;
+  }
+
+  #card(match, index) {
+    const open = index === this.index;
+    const flag = flagImageUrl(match.country.alpha2);
+    return `
+      <li class="discovery-card ${open ? 'discovery-card--open' : ''}">
+        <button type="button" class="discovery-card__head" data-pick="${index}" aria-expanded="${open}">
+          ${flag ? `<img class="discovery-card__flag" src="${flag}" alt="" width="40" height="30" loading="lazy" decoding="async">` : `<span class="discovery-card__flag">${escape(match.country.flag || '')}</span>`}
+          <span class="discovery-card__body">
+            <strong>${escape(match.country.namePt)}</strong>
+            <small>${escape(match.profile.region)}</small>
+          </span>
+          <span class="discovery-card__side">
+            <span class="discovery-badge discovery-badge--${match.tier}">${match.tier === 'strong' ? 'Combina muito' : 'Boa opção'}</span>
+            <strong>${formatTripRange(match.range)}</strong>
+          </span>
+        </button>
+        ${open ? `
+          <div class="discovery-card__detail">
+            <div class="discovery-card__season">${this.#seasonBar(match.profile)}<small>${SEASON_LABELS[match.profile.seasonSuitability[this.preferences.month]]} época em ${DISCOVERY_MONTHS[this.preferences.month]}</small></div>
+            <ul class="discovery-reasons">${match.reasons.slice(0, 2).map(reason => `<li>${escape(reason)}</li>`).join('')}</ul>
+            <p class="discovery-note">${escape(match.profile.note)}</p>
+            <div class="discovery-result-actions">
+              <button class="primary-button" type="button" data-action="explore">Explorar ${escape(match.country.namePt)}</button>
+              <button class="secondary-button" type="button" data-action="route">✈ Ver rota</button>
+              ${this.onPlan ? '<button class="secondary-button" type="button" data-action="plan">＋ Planejar</button>' : ''}
+            </div>
+            <p class="discovery-feedback" role="status"></p>
+          </div>` : ''}
+      </li>`;
+  }
+
+  #results() {
+    if (!this.matches.length) {
+      return `<div class="discovery-empty" role="status"><strong>Nenhum destino com essa combinação.</strong><p>${escape(noMatchAdvice(this.countries, { ...this.preferences, interests: this.preferences.interests.length ? this.preferences.interests : ['cultura'] }))}</p></div>`;
     }
-    this.element.innerHTML = `<div class="discovery-header"><span class="eyebrow">${typeof this.step === 'number' ? `Sua viagem · ${this.step} de 3` : 'Sua próxima viagem'}</span><button class="icon-button" aria-label="Fechar descoberta" data-action="close">✕</button></div><h2 id="discovery-title" tabindex="-1">${escape(title)}</h2>${body}`;
+    const strong = this.matches.filter(match => match.tier === 'strong').length;
+    return `
+      <div class="discovery-results__head">
+        <strong>${this.matches.length} ${this.matches.length === 1 ? 'destino' : 'destinos'} para ${DISCOVERY_MONTHS[this.preferences.month]}</strong>
+        <button type="button" class="discovery-text-button" data-action="surprise">🎲 Surpreenda-me</button>
+      </div>
+      ${strong ? '' : '<small>Nenhuma combinação perfeita; estas são as melhores com ressalvas.</small>'}
+      <ul class="discovery-list">${this.matches.map((match, index) => this.#card(match, index)).join('')}</ul>
+      ${provenanceLabel('estimate', { detail: 'faixa por pessoa, 7 dias, saindo de GRU; não é cotação' })}
+      <details class="discovery-about"><summary>O que entra no preço?</summary><p>${escape(TRIP_REFERENCE)}</p></details>`;
+  }
+
+  render(focus = true) {
+    const scroll = this.element.scrollTop;
+    this.element.innerHTML = `
+      <div class="discovery-header">
+        <div><span class="eyebrow">Descobrir</span><h2 id="discovery-title" tabindex="-1">Para onde ir?</h2></div>
+        <button class="icon-button" type="button" aria-label="Fechar descoberta" data-action="close">✕</button>
+      </div>
+      ${this.#filters()}
+      <section class="discovery-results" aria-live="polite" aria-label="Destinos sugeridos">${this.#results()}</section>`;
     if (focus) {
       this.element.scrollTop = 0;
       this.element.querySelector('h2').focus({ preventScroll: true });
-    }
+    } else this.element.scrollTop = scroll;
+  }
+
+  #select(index) {
+    this.index = index;
+    this.render(false);
+    const match = this.matches[index];
+    if (!match) return;
+    this.onHighlight(match);
+    this.element.querySelector('.discovery-card--open')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   async click(event) {
     const button = event.target.closest('button');
-    if (!button || button.disabled) return;
-    const { interest, climate, month, action } = button.dataset;
-    if (interest || climate || month !== undefined) {
-      if (interest) {
-        const selected = this.preferences.interests;
-        this.preferences.interests = selected.includes(interest) ? selected.filter(value => value !== interest) : [...selected, interest].slice(0, 2);
-      }
-      if (climate) this.preferences.climate = climate;
-      if (month !== undefined) this.preferences.month = Number(month);
+    if (!button || button.disabled || !this.element.contains(button)) return;
+    const { interest, climate, month, budget, pick, action } = button.dataset;
+    const prefs = this.preferences;
+    if (interest || climate || month !== undefined || budget || action === 'visa') {
+      if (interest) prefs.interests = prefs.interests.includes(interest) ? prefs.interests.filter(value => value !== interest) : [...prefs.interests, interest].slice(0, MAX_INTERESTS);
+      if (climate) prefs.climate = climate;
+      if (month !== undefined) prefs.month = Number(month);
+      if (budget) prefs.budget = budget;
+      if (action === 'visa') prefs.visaFree = !prefs.visaFree;
+      this.version += 1;
+      this.#compute();
       this.render(false);
-      const selector = interest ? `[data-interest="${interest}"]` : climate ? `[data-climate="${climate}"]` : `[data-month="${month}"]`;
+      const selector = interest ? `[data-interest="${interest}"]` : climate ? `[data-climate="${climate}"]` : month !== undefined ? `[data-month="${month}"]` : budget ? `[data-budget="${budget}"]` : '[data-action="visa"]';
       this.element.querySelector(selector)?.focus({ preventScroll: true });
       return;
     }
-    if (action === 'close') { this.close(true); return; }
-    if (action === 'next') this.step += 1;
-    if (action === 'back') this.step -= 1;
-    if (action === 'edit') this.step = 1;
-    if (action === 'find') {
-      this.matches = rankDestinations(this.countries, this.preferences);
-      this.index = 0;
-      this.step = 'loading';
-      this.render();
-      const version = ++this.version;
-      const finish = () => {
-        if (!this.isOpen || version !== this.version) return;
-        this.step = 'result';
-        this.render();
-        if (this.matches.length) this.onHighlight(this.matches[0]);
-      };
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) finish();
-      else this.timer = setTimeout(finish, 850);
+    if (pick !== undefined) {
+      const index = Number(pick);
+      if (index === this.index) { this.index = -1; this.render(false); return; }
+      this.#select(index);
       return;
     }
-    if (action === 'another') {
-      this.index = nextDiscoveryIndex(this.matches, this.index);
-      this.onHighlight(this.matches[this.index]);
+    if (action === 'close') { this.close(true); return; }
+    if (action === 'surprise' && this.matches.length) {
+      const options = this.matches.map((_, index) => index).filter(index => index !== this.index);
+      this.#select(options[Math.floor(Math.random() * options.length)] ?? 0);
+      return;
     }
-    if (action === 'explore') { this.onExplore(this.matches[this.index], this.preferences); return; }
+    const match = this.matches[this.index];
+    if (!match) return;
+    if (action === 'explore') { this.onExplore(match, prefs); return; }
     if (action === 'plan' && this.onPlan) {
-      const budgetCeiling = BUDGETS.find(band => band.id === this.preferences.budget)?.ceiling ?? Infinity;
-      this.onPlan(this.matches[this.index], { ...this.preferences, budgetCeiling });
+      const budgetCeiling = BUDGETS.find(band => band.id === prefs.budget)?.ceiling ?? Infinity;
+      this.onPlan(match, { ...prefs, budgetCeiling });
       return;
     }
     if (action === 'route') {
@@ -151,23 +216,18 @@ export class DiscoveryUI {
       controls.forEach(control => { control.disabled = true; });
       feedback.textContent = 'Preparando rota no globo…';
       try {
-        const opened = await this.onRoute(this.matches[this.index], button);
+        const opened = await this.onRoute(match, button);
         if (this.isOpen && version === this.version) feedback.textContent = opened ? '' : 'Rota indisponível agora. Aguarde o globo ou tente novamente.';
       } catch {
         if (this.isOpen && version === this.version) feedback.textContent = 'Não foi possível carregar o aeroporto. Tente novamente com conexão.';
       } finally {
-        controls.forEach(control => { control.disabled = control.dataset.action === 'another' && this.matches.length < 2; });
+        controls.forEach(control => { if (control.isConnected) control.disabled = false; });
       }
-      return;
     }
-    this.version += 1;
-    this.render();
   }
 
   destroy() {
     this.close();
-    clearTimeout(this.timer);
     this.element.removeEventListener('click', this.handleClick);
-    this.element.removeEventListener('change', this.handleChange);
   }
 }

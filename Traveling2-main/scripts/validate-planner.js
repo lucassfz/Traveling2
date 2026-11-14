@@ -272,3 +272,23 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(tripProgress(updateTrip(planned, { budgetBRL: null })).done[3], false, 'sem orçamento nem outros gastos');
   console.log('Planner: passo a passo (etapas, progresso e etapa salva) verificado.');
 }
+
+// Escolhas por toque: mês, duração, grupo, pagamento, estilo e interesses.
+{
+  const { TRIP_DURATIONS, tripProgress } = await import('../js/planner/trip.model.js');
+  const base = createTrip({ countryKey: 'Japan', idFactory });
+  assert.equal(base.month, null);
+  assert.deepEqual(base.interests, []);
+  const chosen = updateTrip(base, { month: 4, duration: 10, group: 'couple', payWith: 'miles', style: 'balanced', interests: ['food', 'food', 'spaceship', 'culture'] });
+  assert.equal(tripMonth(chosen), 4, 'mês escolhido vale sem datas');
+  assert.equal(tripDays(chosen), 10, 'duração escolhida vale sem datas');
+  assert.deepEqual(chosen.interests, ['food', 'culture'], 'interesses sem repetição nem valores desconhecidos');
+  assert.deepEqual(tripProgress(chosen).done.slice(0, 4), [true, true, true, true]);
+  const invalid = updateTrip(base, { month: 12, duration: 4, group: 'x', payWith: 'x', style: 'x', transport: 'x' });
+  assert.deepEqual([invalid.month, invalid.duration, invalid.group, invalid.payWith, invalid.style, invalid.transport], [null, null, null, null, null, null]);
+  const exact = updateTrip(chosen, { startDate: '2027-09-01', endDate: '2027-09-05' });
+  assert.equal(tripMonth(exact), 8, 'datas exatas têm prioridade sobre o mês');
+  assert.equal(tripDays(exact), 5, 'datas exatas têm prioridade sobre a duração');
+  assert.ok(TRIP_DURATIONS.every(item => Number.isInteger(item.days) && item.label));
+  console.log('Planner: escolhas por toque verificadas.');
+}
