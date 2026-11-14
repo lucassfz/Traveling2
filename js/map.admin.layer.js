@@ -189,6 +189,11 @@ export class AdminLayer {
     this.#touch();
   }
 
+  /** ISO2 do país cujas cidades estão na tela (o selecionado ou o do centro), ou null. */
+  get focusCode() {
+    return this.focus?.status === 'ready' ? this.focus.code : null;
+  }
+
   /** Cidades do país (carrega o arquivo se preciso). Usado pelo Planner e pela Descoberta. */
   async citiesOf(code) {
     const record = this.#ensure(code);
@@ -408,7 +413,8 @@ export class AdminLayer {
       this.#renderLabels([]);
       return;
     }
-    if (distance <= URBAN_PREFETCH) this.#ensureUrban(record);
+    const urbanActive = distance <= URBAN_DISTANCE || code === this.selectedCode;
+    if (urbanActive || distance <= URBAN_PREFETCH) this.#ensureUrban(record);
 
     const fade = (start, end) => THREE.MathUtils.clamp((start - distance) / (start - end), 0, 1);
     if (record.lines) {
@@ -424,7 +430,7 @@ export class AdminLayer {
       this.dotMaterial.color.set(color);
     }
     if (record.urban) {
-      record.urban.visible = distance <= URBAN_DISTANCE;
+      record.urban.visible = urbanActive;
       this.urbanMaterial.opacity = 0.2 + 0.45 * fade(URBAN_DISTANCE, 1.1);
     }
     if (record.dots) {
@@ -544,9 +550,7 @@ export class AdminLayer {
       if (x >= box[0] - 3 && x <= box[2] + 3 && y >= box[1] - 3 && y <= box[3] + 3) return item;
     }
     const minimum = tierPopulation(DOT_TIERS, this.distance);
-    if (minimum === Infinity) return null;
-
-    if (record.areas && this.distance <= URBAN_DISTANCE) {
+    if (record.areas) {
       const point = surfacePoint();
       if (point) {
         for (const area of record.areas) {
@@ -559,11 +563,13 @@ export class AdminLayer {
     // km por pixel no centro da tela (altitude × campo de visão).
     const viewHeightKm = 2 * (this.distance - 1) * EARTH_RADIUS_KM * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const kmPerPx = viewHeightKm / Math.max(1, this.size.height);
-    const areasActive = record.areas && this.distance <= URBAN_DISTANCE;
+    const areasActive = Boolean(record.areas);
+    const labeled = new Set(this.placed.map(({ item }) => item));
     let best = null;
     let bestScore = 1;
     for (const city of record.cities) {
-      if (city.population < minimum || (areasActive && city.hasOutline) || !this.#visible(city)) continue;
+      // Alvo circular só para cidades que aparecem (ponto ou nome) e sem contorno carregado.
+      if ((city.population < minimum && !labeled.has(city)) || (areasActive && city.hasOutline) || !this.#visible(city)) continue;
       const point = this.#project(city);
       if (!point) continue;
       const radiusKm = Math.sqrt(Math.max(city.population, 15000) / HIT_DENSITY / Math.PI);

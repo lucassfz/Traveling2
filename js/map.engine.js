@@ -756,11 +756,21 @@ export class MapEngine {
       this.adminLayer.setHovered(place);
       if (place) {
         this.#setHovered(null);
+        this.stage.classList.remove('globe__stage--explore');
         this.stage.classList.add('globe__stage--interactive');
         this.callbacks.onHover?.(null, clientX, clientY);
         return;
       }
       const countryKey = this.pickCountry(clientX, clientY);
+      if (countryKey && this.#isExploring(countryKey)) {
+        // País já escolhido: o clique vai para as cidades (ou aproxima), não para o país.
+        this.#setHovered(null);
+        this.stage.classList.remove('globe__stage--interactive');
+        this.stage.classList.add('globe__stage--explore');
+        this.callbacks.onHover?.(null, clientX, clientY);
+        return;
+      }
+      this.stage.classList.remove('globe__stage--explore');
       this.#setHovered(countryKey);
       if (countryKey) {
         this.stage.classList.add('globe__stage--interactive');
@@ -780,6 +790,7 @@ export class MapEngine {
       this.onPointerMove.cancel();
       this.#setHovered(null);
       this.adminLayer.setHovered(null);
+      this.stage.classList.remove('globe__stage--explore');
       this.stage.classList.remove('globe__stage--interactive');
       this.callbacks.onHover?.(null);
     });
@@ -808,13 +819,21 @@ export class MapEngine {
         this.callbacks.onCitySelect?.(place);
         return;
       }
+      const countryKey = this.pickCountry(event.clientX, event.clientY);
+      // País já selecionado (ou já aproximado): o clique não repete a seleção.
+      // Num estado, aproxima até ele; num ponto vazio, aproxima naquele ponto
+      // para as cidades dali ficarem ao alcance.
+      if (countryKey && this.#isExploring(countryKey) && place?.kind !== 'state') {
+        const point = this.#surfacePoint(event.clientX, event.clientY);
+        if (point) this.zoomAt(point.lat, point.lng, 0.55);
+        return;
+      }
       if (place?.kind === 'state') {
         // Estado: aproxima até ver as cidades dele.
         const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
         this.flyTo(place.lat, place.lng, Math.max(this.controls.minDistance, Math.min(distance * 0.82, 1.32)), 700);
         return;
       }
-      const countryKey = this.pickCountry(event.clientX, event.clientY);
       if (countryKey) this.callbacks.onSelect?.(countryKey);
     });
   }
@@ -1076,6 +1095,24 @@ export class MapEngine {
     if (!city || !fly) return;
     const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
     this.flyTo(city.lat, city.lng, Math.min(distance, 1.3), 650);
+  }
+
+  // O país já está escolhido: selecionado, ou é o país das cidades na tela
+  // depois de aproximar. Aí cliques e hover vão para as cidades.
+  #isExploring(countryKey) {
+    const alpha2 = COUNTRIES[countryKey]?.alpha2;
+    if (!alpha2 || alpha2 !== this.adminLayer.focusCode) return false;
+    // 2.08: a distância de quem acabou de selecionar um país (2.02); as vistas de
+    // continente ficam mais longe (≥ 2.15), então o primeiro clique ainda seleciona.
+    return countryKey === this.selectedCountry || this.camera.position.distanceTo(GLOBE_ORIGIN) <= 2.08;
+  }
+
+  // Aproxima centralizando um ponto (clique num lugar vazio do país escolhido).
+  zoomAt(latitude, longitude, factor = 0.55) {
+    if (this.routePreview) return;
+    const current = this.camera.position.distanceTo(GLOBE_ORIGIN);
+    const altitude = THREE.MathUtils.clamp((current - 1) * factor, this.controls.minDistance - 1, this.controls.maxDistance - 1);
+    this.flyTo(latitude, longitude, 1 + altitude, 650);
   }
 
   // Aproxima (factor < 1) ou afasta (factor > 1) mantendo o mesmo ponto no centro.
