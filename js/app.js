@@ -927,6 +927,7 @@ async function initializeMap() {
       }
     });
     state.map.setVisitedCountries?.(state.visited);
+    bindGlobeHelpers();
     syncGlobeInset();
     renderVisaFreeFilter();
     await state.map.init();
@@ -938,6 +939,22 @@ async function initializeMap() {
     const detail = elements.globeFallback.querySelector('span');
     if (detail) detail.textContent = 'O mapa 3D não carregou. A busca, os guias, voos e o hub de milhas continuam disponíveis.';
   }
+}
+
+// Botões de zoom e a dica de uso (mostrada uma vez, some no primeiro gesto).
+function bindGlobeHelpers() {
+  const hint = document.getElementById('globe-hint');
+  const dismissHint = () => {
+    if (!hint || hint.hidden) return;
+    hint.hidden = true;
+    writeStorage(STORAGE_KEYS.globeHint, 'seen');
+  };
+  if (hint && readStorage(STORAGE_KEYS.globeHint) !== 'seen') {
+    hint.hidden = false;
+    for (const type of ['pointerdown', 'wheel']) elements.globeStage.addEventListener(type, dismissHint, { once: true, passive: true });
+  }
+  document.getElementById('zoom-in')?.addEventListener('click', () => { dismissHint(); state.map?.zoom(0.55); });
+  document.getElementById('zoom-out')?.addEventListener('click', () => { dismissHint(); state.map?.zoom(1.8); });
 }
 
 // O painel do país cobre a lateral direita do globo; o motor desloca a

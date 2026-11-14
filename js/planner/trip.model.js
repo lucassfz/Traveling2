@@ -9,7 +9,7 @@ export const PLANNER_STEPS = Object.freeze([
   { id: 'destination', label: 'Destino', title: 'Para onde você vai?' },
   { id: 'dates', label: 'Datas', title: 'Quando e com quem?' },
   { id: 'flight', label: 'Voo', title: 'Como você vai chegar?' },
-  { id: 'budget', label: 'Orçamento', title: 'Quanto vai custar?' },
+  { id: 'budget', label: 'Estilo', title: 'Como você quer viajar?' },
   { id: 'prep', label: 'Preparação', title: 'Está tudo pronto?' },
   { id: 'summary', label: 'Resumo', title: 'Sua viagem' }
 ]);
@@ -36,6 +36,41 @@ export const LODGING_LEVELS = Object.freeze({
   comfort: 'Conforto (hotel 3–4★)',
   superior: 'Superior (hotel 4–5★)'
 });
+
+// Escolhas do passo a passo: tudo por botões, sem campos de texto.
+export const TRIP_DURATIONS = Object.freeze([
+  { days: 3, label: 'Fim de semana' },
+  { days: 5, label: '5 dias' },
+  { days: 7, label: '1 semana' },
+  { days: 10, label: '10 dias' },
+  { days: 14, label: '2 semanas' },
+  { days: 21, label: '3 semanas' },
+  { days: 30, label: '1 mês' }
+]);
+export const TRAVEL_GROUPS = Object.freeze({ solo: 'Sozinho', couple: 'Casal', family: 'Família', friends: 'Amigos' });
+export const PAY_OPTIONS = Object.freeze({ cash: 'Dinheiro', miles: 'Milhas', undecided: 'Ainda não sei' });
+export const FLIGHT_PREFERENCES = Object.freeze({ direct: 'O mais direto possível', cheapest: 'O mais barato, mesmo com escalas' });
+export const TRAVEL_STYLES = Object.freeze({ economic: 'Econômico', balanced: 'Equilibrado', comfort: 'Conforto' });
+export const LOCAL_TRANSPORT = Object.freeze({ public: 'Transporte público', car: 'Carro alugado', tours: 'Passeios guiados', mixed: 'Um pouco de tudo' });
+export const INTERESTS = Object.freeze({
+  culture: 'Cultura e história',
+  food: 'Gastronomia',
+  nature: 'Natureza',
+  beach: 'Praia',
+  nightlife: 'Vida noturna',
+  shopping: 'Compras',
+  adventure: 'Aventura',
+  relax: 'Descanso'
+});
+// Aeroportos de saída oferecidos como opção (os mais usados para voos internacionais).
+export const ORIGIN_AIRPORTS = Object.freeze([
+  ['GRU', 'São Paulo · Guarulhos'], ['VCP', 'Campinas · Viracopos'], ['GIG', 'Rio de Janeiro · Galeão'],
+  ['BSB', 'Brasília'], ['CNF', 'Belo Horizonte · Confins'], ['POA', 'Porto Alegre'], ['CWB', 'Curitiba'],
+  ['FLN', 'Florianópolis'], ['SSA', 'Salvador'], ['REC', 'Recife'], ['FOR', 'Fortaleza'], ['NAT', 'Natal'],
+  ['BEL', 'Belém'], ['MAO', 'Manaus'], ['GYN', 'Goiânia'], ['VIX', 'Vitória']
+]);
+const DURATION_DAYS = new Set(TRIP_DURATIONS.map(item => item.days));
+const choice = (options, value) => (Object.hasOwn(options, value) ? value : null);
 
 // estimate = valor sugerido ou chutado; quote = preço encontrado pelo usuário;
 // paid = já pago.
@@ -192,6 +227,14 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     lines,
     step: clampStep(raw.step),
     entryReviewed: raw.entryReviewed === true,
+    month: Number.isInteger(raw.month) && raw.month >= 0 && raw.month <= 11 ? raw.month : null,
+    duration: DURATION_DAYS.has(raw.duration) ? raw.duration : null,
+    group: choice(TRAVEL_GROUPS, raw.group),
+    payWith: choice(PAY_OPTIONS, raw.payWith),
+    flightPreference: choice(FLIGHT_PREFERENCES, raw.flightPreference),
+    style: choice(TRAVEL_STYLES, raw.style),
+    transport: choice(LOCAL_TRANSPORT, raw.transport),
+    interests: [...new Set(Array.isArray(raw.interests) ? raw.interests : [])].filter(id => Object.hasOwn(INTERESTS, id)),
     ...(miles ? { miles } : {}),
     ...(text(raw.profileId, 60) ? { profileId: text(raw.profileId, 60) } : {})
   };
@@ -215,9 +258,10 @@ export function tripProgress(trip) {
   const lines = trip?.lines ?? [];
   const done = [
     Boolean(trip?.countryKey),
-    Boolean(trip?.startDate && trip?.endDate),
-    lines.some(line => line.category === 'flights') || Boolean(trip?.miles?.fareBRL),
-    trip?.budgetBRL !== null && trip?.budgetBRL !== undefined || lines.some(line => line.category !== 'flights'),
+    Boolean(trip?.startDate && trip?.endDate) || (Number.isInteger(trip?.month) && Boolean(trip?.duration)),
+    // Viagens antigas (gastos digitados) continuam contando como etapa feita.
+    Boolean(trip?.payWith) || lines.some(line => line.category === 'flights') || Boolean(trip?.miles?.fareBRL),
+    Boolean(trip?.style) || trip?.budgetBRL !== null && trip?.budgetBRL !== undefined || lines.some(line => line.category !== 'flights'),
     trip?.entryReviewed === true
   ];
   done.push(done.every(Boolean));
@@ -249,9 +293,10 @@ export function removeLine(trip, lineId, options) {
   return updateTrip(trip, { lines: trip.lines.filter(line => line.id !== lineId) }, options);
 }
 
-// Dias de viagem, contando o dia de ida e o de volta. null sem as duas datas.
+// Dias de viagem, contando o dia de ida e o de volta. Sem as duas datas, usa a
+// duração escolhida; null sem nenhuma das duas.
 export function tripDays(trip) {
-  if (!trip?.startDate || !trip?.endDate) return null;
+  if (!trip?.startDate || !trip?.endDate) return trip?.duration ?? null;
   return Math.round((Date.parse(`${trip.endDate}T00:00:00Z`) - Date.parse(`${trip.startDate}T00:00:00Z`)) / DAY_MS) + 1;
 }
 
@@ -261,9 +306,10 @@ export function tripNights(trip) {
   return days === null ? null : Math.max(0, days - 1);
 }
 
-// Mês (0–11) da data de ida, para estimativas sazonais e checklist.
+// Mês (0–11) da data de ida (ou o mês escolhido), para estimativas sazonais e checklist.
 export function tripMonth(trip) {
-  return trip?.startDate ? Number(trip.startDate.slice(5, 7)) - 1 : null;
+  if (trip?.startDate) return Number(trip.startDate.slice(5, 7)) - 1;
+  return Number.isInteger(trip?.month) ? trip.month : null;
 }
 
 const round2 = value => Math.round(value * 100) / 100;

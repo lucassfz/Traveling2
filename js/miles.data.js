@@ -1,9 +1,7 @@
 export const MILES_TABS = Object.freeze([
-  { key: 'overview', label: 'Visão geral' },
+  { key: 'convert', label: 'Conversor' },
   { key: 'cards', label: 'Cartões' },
-  { key: 'lounges', label: 'Salas VIP' },
-  { key: 'upgrades', label: 'Upgrades' },
-  { key: 'airports', label: 'Aeroportos' }
+  { key: 'lounges', label: 'Salas VIP' }
 ]);
 
 export const LEARNING_PATHS = Object.freeze([

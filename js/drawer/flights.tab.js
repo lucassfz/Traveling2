@@ -176,7 +176,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       const guideAirport = [origin, destination].find(airport => miles?.hasAirportGuide(airport.iata));
       elements.flightPreviewAirports.hidden = !guideAirport;
       elements.flightPreviewAirports.dataset.airportCode = guideAirport?.iata || '';
-      if (guideAirport) elements.flightPreviewAirports.textContent = `Ver guia do aeroporto · ${guideAirport.iata}`;
+      if (guideAirport) elements.flightPreviewAirports.textContent = `Ver salas VIP · ${guideAirport.iata}`;
       state.routeReturnFocus = returnFocus || elements.flightPreviewButton;
       state.routeObscured = [...document.querySelectorAll('.country-panel, .discovery-panel, .miles-hub, .app-header, .dock')]
         .map(element => [element, element.inert]);
@@ -297,9 +297,9 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       `;
       const miles = await loadMiles();
     const guideActions = [origin, destination].map((airport, index) => miles?.hasAirportGuide(airport.iata)
-        ? `<button type="button" data-route-airport="${escapeHtml(airport.iata)}">Guia ${index ? 'do destino' : 'da origem'} · ${escapeHtml(airport.iata)}</button>` : '').join('');
+        ? `<button type="button" data-route-airport="${escapeHtml(airport.iata)}">Salas VIP ${index ? 'no destino' : 'na origem'} · ${escapeHtml(airport.iata)}</button>` : '').join('');
       elements.routeAirportActions.hidden = false;
-      elements.routeAirportActions.innerHTML = `${guideActions}<button type="button" data-route-redemption="true">Comparar com preço real</button>`;
+      elements.routeAirportActions.innerHTML = `${guideActions}<button type="button" data-route-redemption="true">Vale a pena usar milhas?</button>`;
       updateFlightPreviewAvailability();
     } catch (error) {
       elements.routeResult.innerHTML = `<div class="route-error">${escapeHtml(error.message)}</div>`;
