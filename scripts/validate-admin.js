@@ -8,7 +8,11 @@ const index = JSON.parse(await readFile(new URL('index.json', dir), 'utf8'));
 const files = (await readdir(dir)).filter(file => file.endsWith('.json') && file !== 'index.json');
 const urbanDir = new URL('urban/', dir);
 const urbanFiles = new Set((await readdir(urbanDir)).filter(file => file.endsWith('.json')));
+const regionDir = new URL('regions/', dir);
+const regionFiles = new Set((await readdir(regionDir)).filter(file => file.endsWith('.json')));
 let outlines = 0;
+let regionAreas = 0;
+let regionSeats = 0;
 let largestUrban = 0;
 
 assert.equal(index.schema, 2);
@@ -67,9 +71,27 @@ for (const file of files) {
     assert.equal(seen.size, flagged.size, `urban/${file}: cidades marcadas sem contorno`);
     outlines += seen.size;
   } else assert.equal(flagged.size, 0, `${file}: marcadas sem arquivo urban`);
+  // Regiões: área clicável da cidade principal (índice válido ou -1).
+  if (regionFiles.has(file)) {
+    const regionData = JSON.parse(await readFile(new URL(file, regionDir), 'utf8'));
+    assert.equal(regionData.country, code, `regions/${file}: country`);
+    for (const [name, seat, ...polygons] of regionData.areas) {
+      assert.ok(typeof name === 'string' && name.trim(), `regions/${file}: região sem nome`);
+      assert.ok(seat === -1 || (Number.isInteger(seat) && seat < data.cities.length), `regions/${file}: cidade principal de ${name}`);
+      assert.ok(polygons.length, `regions/${file}: ${name} sem polígono`);
+      for (const polygon of polygons) {
+        for (const ring of polygon) {
+          assert.ok(ring.length >= 8 && ring.length % 2 === 0, `regions/${file}: anel curto em ${name}`);
+          for (let i = 0; i < ring.length; i += 2) assert.ok(lng(ring[i]) && lat(ring[i + 1]), `regions/${file}: ponto inválido em ${name}`);
+        }
+      }
+      regionAreas += 1;
+      if (seat >= 0) regionSeats += 1;
+    }
+  }
   divisions += data.divisions.length;
   cities += data.cities.length;
 }
 assert.ok(largest < 400_000, 'nenhum país passa de 400 KB');
 assert.ok(largestUrban < 1_500_000, 'nenhum arquivo de contornos passa de 1,5 MB');
-console.log(`Admin: ${files.length} países, ${divisions} divisões, ${cities} cidades (${outlines} com contorno urbano); maior arquivo ${(largest / 1024).toFixed(0)} KB, maior contorno ${(largestUrban / 1024).toFixed(0)} KB.`);
+console.log(`Admin: ${files.length} países, ${divisions} divisões, ${cities} cidades (${outlines} com contorno urbano), ${regionAreas} regiões (${regionSeats} com cidade principal); maior arquivo ${(largest / 1024).toFixed(0)} KB, maior contorno ${(largestUrban / 1024).toFixed(0)} KB.`);

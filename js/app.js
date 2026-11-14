@@ -582,7 +582,8 @@ function renderCountry(countryKey) {
 
 // Cidade clicada no globo: cartão próprio; o painel do país fica como está.
 let cityCard = null;
-function selectCity(city) {
+// Clique no globo: a vista fica onde está (sem voo nem zoom).
+function selectCity(city, { fly = false } = {}) {
   if (!city) return;
   cityCard ??= createCityCard({
     root: document.getElementById('city-card'),
@@ -592,7 +593,7 @@ function selectCity(city) {
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => state.map?.selectCity(null)
   });
-  state.map?.selectCity(city);
+  state.map?.selectCity(city, { fly });
   cityCard.show(city);
 }
 

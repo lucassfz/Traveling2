@@ -19,15 +19,13 @@ import { geographicToCartesian } from './geospatial.js';
 
 const dataUrl = code => new URL(`../data/admin/${code}.json`, import.meta.url);
 const urbanUrl = code => new URL(`../data/admin/urban/${code}.json`, import.meta.url);
+const regionUrl = code => new URL(`../data/admin/regions/${code}.json`, import.meta.url);
+const HIGHLIGHT_CACHE = 24;
 
 const FOCUS_DISTANCE = 2.15;   // abaixo disso há um país em foco
 const STATE_DISTANCE = 1.9;    // divisas e nomes de estados do país em foco
 const URBAN_DISTANCE = 1.6;    // contornos urbanos visíveis e clicáveis pela área
 const URBAN_PREFETCH = 1.8;    // pede o arquivo de contornos um pouco antes
-const EARTH_RADIUS_KM = 6371;
-// Densidade típica de área urbana (hab/km²), só para o alvo de clique de
-// cidades sem contorno mapeado; o círculo não é desenhado.
-const HIT_DENSITY = 2500;
 const MIN_HIT_PX = 12;
 const LINE_RADIUS = 1.0105;
 const POINT_RADIUS = 1.0095;   // pontos e rótulos usam o mesmo raio: nome centrado no ponto
@@ -80,20 +78,39 @@ function ringPositions(ring, radius) {
   return positions;
 }
 
-// Preenchimento do contorno selecionado: triangulação no plano lng/lat (áreas
-// urbanas são pequenas o bastante para isso), projetada na esfera.
-function fillGeometry(rings, radius) {
+// Preenchimento de formas [[anel externo, buraco…], …] em [lng, lat, …]:
+// triangulação no plano lng/lat, com triângulos subdivididos até ~0,75° para
+// acompanharem a curvatura do globo (senão regiões grandes afundam sob a terra).
+function fillGeometry(shapes, radius) {
   const positions = [];
-  for (const ring of rings) {
+  const push = point => {
+    const p = geographicToCartesian(point.y, point.x, radius);
+    positions.push(p.x, p.y, p.z);
+  };
+  const subdivide = (a, b, c, depth) => {
+    if (depth >= 6 || Math.max(a.distanceTo(b), b.distanceTo(c), c.distanceTo(a)) <= 0.75) {
+      push(a); push(b); push(c);
+      return;
+    }
+    const ab = a.clone().add(b).multiplyScalar(0.5);
+    const bc = b.clone().add(c).multiplyScalar(0.5);
+    const ca = c.clone().add(a).multiplyScalar(0.5);
+    subdivide(a, ab, ca, depth + 1);
+    subdivide(ab, b, bc, depth + 1);
+    subdivide(ca, bc, c, depth + 1);
+    subdivide(ab, bc, ca, depth + 1);
+  };
+  const toPoints = ring => {
     const points = [];
     for (let i = 0; i < ring.length; i += 2) points.push(new THREE.Vector2(ring[i], ring[i + 1]));
     if (points.length > 3 && points[0].equals(points.at(-1))) points.pop();
-    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(points, [])) {
-      for (const point of [points[a], points[b], points[c]]) {
-        const p = geographicToCartesian(point.y, point.x, radius);
-        positions.push(p.x, p.y, p.z);
-      }
-    }
+    return points;
+  };
+  for (const shape of shapes) {
+    const outer = toPoints(shape[0]);
+    const holes = shape.slice(1).map(toPoints);
+    const all = [...outer, ...holes.flat()];
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(outer, holes)) subdivide(all[a], all[b], all[c], 0);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -127,6 +144,9 @@ export class AdminLayer {
     this.hoverLineMaterial = new THREE.LineBasicMaterial({ ...lineOptions, opacity: 0.85 });
     this.hoverFillMaterial = new THREE.MeshBasicMaterial({ ...lineOptions, opacity: 0.12, side: THREE.DoubleSide });
     this.highlights = { selected: null, hover: null };
+    this.shapeCache = new Map();   // chave → geometrias de destaque (LRU)
+    this.lastPick = null;          // { city, region }: por onde a cidade foi apontada
+    this.selectedRegion = null;
     this.dotMaterial = new THREE.PointsMaterial({
       size: 5, sizeAttenuation: false, map: dotTexture(), transparent: true, alphaTest: 0.3,
       depthWrite: false, depthTest: true, clippingPlanes: [clipPlane]
@@ -169,6 +189,8 @@ export class AdminLayer {
   // Aceita a cidade do globo ou de js/geo/cities.js (mesmo id e índice).
   setSelectedCity(city) {
     this.selectedCity = city ?? null;
+    // Escolhida pela região (clique fora da mancha urbana): destaca a região inteira.
+    this.selectedRegion = city && this.lastPick?.city === city ? this.lastPick.region : null;
     if (city) {
       const record = this.#ensure(city.country);
       record.ready.then(() => {
@@ -185,7 +207,7 @@ export class AdminLayer {
     this.hoveredItem = item ?? null;
     // A área inteira da cidade acende sob o ponteiro (exceto a já selecionada).
     const city = item?.kind === 'city' && item.id !== this.selectedCity?.id ? item : null;
-    this.#setHighlight('hover', city);
+    this.#setHighlight('hover', city, city && this.lastPick?.city === city ? this.lastPick.region : null);
     this.#touch();
   }
 
@@ -335,45 +357,107 @@ export class AdminLayer {
   }
 
   #refreshSelectedOutline() {
-    this.#setHighlight('selected', this.selectedCity);
+    this.#setHighlight('selected', this.selectedCity, this.selectedRegion);
     // A cidade selecionada não precisa mais do destaque de hover.
     if (this.highlights.hover?.city.id === this.selectedCity?.id) this.#setHighlight('hover', null);
   }
 
-  // Contorno (linha + preenchimento) de uma cidade, em dois "slots": seleção e
-  // hover. Sobre o país selecionado, cujo preenchimento já usa a cor de
-  // destaque, o contorno passa para a cor do fundo para continuar visível.
-  #setHighlight(slot, city) {
-    const current = this.highlights[slot];
-    if (current && current.city.id === city?.id && current.onSelected === (city.country === this.selectedCode)) return;
-    for (const object of current?.objects ?? []) {
-      this.group.remove(object);
-      object.geometry.dispose();
+  // Geometrias (linhas + preenchimento) de uma forma, guardadas num LRU curto
+  // para o hover não refazer a triangulação a cada movimento.
+  #shapeGeometries(key, shapes) {
+    let entry = this.shapeCache.get(key);
+    if (entry) {
+      this.shapeCache.delete(key);
+      this.shapeCache.set(key, entry);
+      return entry;
     }
+    const lines = shapes.flat().map(ring => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(ringPositions(ring, URBAN_RADIUS + 0.0002), 3));
+      return geometry;
+    });
+    entry = { lines, fill: fillGeometry(shapes, URBAN_RADIUS), users: 0 };
+    this.shapeCache.set(key, entry);
+    for (const [oldKey, old] of this.shapeCache) {
+      if (this.shapeCache.size <= HIGHLIGHT_CACHE) break;
+      if (old.users > 0) continue;
+      for (const geometry of [...old.lines, old.fill]) geometry.dispose();
+      this.shapeCache.delete(oldKey);
+    }
+    return entry;
+  }
+
+  // Destaque em dois "slots" (seleção e hover). A área é a região da cidade
+  // quando ela foi apontada pela região; senão a mancha urbana, se houver.
+  // Sobre o país selecionado (preenchido com a cor de destaque), usa a cor do fundo.
+  #setHighlight(slot, city, region = null) {
+    const current = this.highlights[slot];
+    const key = !city ? null : region ? `r:${city.country}:${region.name}` : `u:${city.id}`;
+    const onSelectedCountry = Boolean(city) && city.country === this.selectedCode;
+    if (current?.key === key && current?.onSelected === onSelectedCountry && key) return;
+    for (const object of current?.objects ?? []) this.group.remove(object);
+    if (current) current.entry.users -= 1;
     this.highlights[slot] = null;
-    const rings = city ? this.cache.get(city.country)?.outlines?.get(city.index) : null;
-    if (!rings) return;
+    if (!city) return;
+    const rings = region ? null : this.cache.get(city.country)?.outlines?.get(city.index);
+    const shapes = region ? region.polygons : rings?.map(ring => [ring]);
+    if (!shapes?.length) return;
     const selected = slot === 'selected';
     const line = selected ? this.urbanSelectedMaterial : this.hoverLineMaterial;
     const fillMaterial = selected ? this.urbanFillMaterial : this.hoverFillMaterial;
     const style = getComputedStyle(document.documentElement);
-    const onSelectedCountry = city.country === this.selectedCode;
     const color = style.getPropertyValue(onSelectedCountry ? '--color-background' : '--color-accent').trim() || '#7cc9f5';
     line.color.set(color);
     fillMaterial.color.set(color);
-    fillMaterial.opacity = selected ? (onSelectedCountry ? 0.35 : 0.22) : (onSelectedCountry ? 0.2 : 0.12);
-    const objects = rings.map(ring => {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(ringPositions(ring, URBAN_RADIUS + (selected ? 0.0002 : 0.0001)), 3));
+    fillMaterial.opacity = selected ? (onSelectedCountry ? 0.3 : 0.2) : (onSelectedCountry ? 0.16 : 0.1);
+    const entry = this.#shapeGeometries(key, shapes);
+    entry.users += 1;
+    const objects = entry.lines.map(geometry => {
       const loop = new THREE.LineLoop(geometry, line);
       loop.renderOrder = selected ? 4.5 : 4.45;
       return loop;
     });
-    const fill = new THREE.Mesh(fillGeometry(rings, URBAN_RADIUS), fillMaterial);
+    const fill = new THREE.Mesh(entry.fill, fillMaterial);
     fill.renderOrder = selected ? 4.25 : 4.24;
     objects.push(fill);
     for (const object of objects) this.group.add(object);
-    this.highlights[slot] = { city, objects, onSelected: onSelectedCountry };
+    this.highlights[slot] = { city, key, entry, objects, onSelected: onSelectedCountry };
+  }
+
+  // Regiões do país (área clicável da cidade principal de cada uma).
+  #ensureRegions(record) {
+    if (record.regionStatus) return;
+    record.regionStatus = 'loading';
+    fetchJson(regionUrl(record.code)).then(data => {
+      record.regionAreas = data.areas.map(([name, seat, ...polygons]) => {
+        const box = [Infinity, Infinity, -Infinity, -Infinity];
+        for (const polygon of polygons) {
+          const ring = polygon[0];
+          for (let i = 0; i < ring.length; i += 2) {
+            box[0] = Math.min(box[0], ring[i]); box[2] = Math.max(box[2], ring[i]);
+            box[1] = Math.min(box[1], ring[i + 1]); box[3] = Math.max(box[3], ring[i + 1]);
+          }
+        }
+        return { name, city: record.cities[seat] ?? null, polygons, box, size: (box[2] - box[0]) * (box[3] - box[1]) };
+      }).sort((a, b) => a.size - b.size);
+      record.regionStatus = 'ready';
+      this.#touch();
+    }).catch(() => { record.regionStatus = 'none'; });
+  }
+
+  // Cidade mais próxima de um ponto (regiões sem cidade de 15 mil+).
+  #nearestCity(record, lat, lng) {
+    const scale = Math.cos(THREE.MathUtils.degToRad(lat));
+    let best = null;
+    let bestDistance = Infinity;
+    for (const city of record.cities) {
+      const distance = ((city.lng - lng) * scale) ** 2 + (city.lat - lat) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = city;
+      }
+    }
+    return best;
   }
 
   // ---------- Foco ----------
@@ -413,6 +497,7 @@ export class AdminLayer {
       this.#renderLabels([]);
       return;
     }
+    this.#ensureRegions(record);
     const urbanActive = distance <= URBAN_DISTANCE || code === this.selectedCode;
     if (urbanActive || distance <= URBAN_PREFETCH) this.#ensureUrban(record);
 
@@ -535,52 +620,67 @@ export class AdminLayer {
   }
 
   /**
-   * Cidade ou estado sob o ponteiro (x, y relativos ao palco), ou null.
-   *   1. nome visível (rótulo);
-   *   2. área urbana que contém o ponto da superfície (o alvo é a cidade inteira);
-   *   3. cidades sem contorno: alvo circular do tamanho aproximado da cidade
-   *      (pela população), nunca menor que MIN_HIT_PX.
+   * Cidade sob o ponteiro (x, y relativos ao palco), ou null. Ordem:
+   *   1. nome visível (nome de estado → cidade principal da região);
+   *   2. mancha urbana que contém o ponto;
+   *   3. alvo circular de cidades visíveis sem mancha;
+   *   4. região que contém o ponto → cidade principal dela (a região inteira é a
+   *      área clicável), ou a cidade mais próxima se a região não tem cidade.
+   * `lastPick.region` diz se a cidade veio pela região (para destacar a área certa).
    * @param {() => {lat: number, lng: number}|null} surfacePoint  Calculado só se preciso.
    */
   pick(x, y, surfacePoint = () => null) {
+    this.lastPick = null;
     const record = this.focus;
     if (!record || record.status !== 'ready') return null;
+    const regionOf = name => record.regionAreas?.find(area => area.name === name) ?? null;
+    const found = (city, region = null) => {
+      if (!city) return null;
+      this.lastPick = { city, region };
+      return city;
+    };
     for (let index = this.placed.length - 1; index >= 0; index -= 1) {
       const { item, box } = this.placed[index];
-      if (x >= box[0] - 3 && x <= box[2] + 3 && y >= box[1] - 3 && y <= box[3] + 3) return item;
+      if (x < box[0] - 3 || x > box[2] + 3 || y < box[1] - 3 || y > box[3] + 3) continue;
+      if (item.kind === 'city') return found(item);
+      const region = regionOf(item.name);
+      if (region?.city) return found(region.city, region);
     }
-    const minimum = tierPopulation(DOT_TIERS, this.distance);
-    if (record.areas) {
-      const point = surfacePoint();
-      if (point) {
-        for (const area of record.areas) {
-          if (point.lng < area.box[0] || point.lng > area.box[2] || point.lat < area.box[1] || point.lat > area.box[3]) continue;
-          if (area.rings.some(ring => inFlatRing(ring, point.lng, point.lat))) return area.city;
-        }
+
+    let point;
+    const surface = () => (point === undefined ? (point = surfacePoint()) : point);
+    const inShape = (shape, lng, lat) => inFlatRing(shape[0], lng, lat) && !shape.slice(1).some(hole => inFlatRing(hole, lng, lat));
+    const inBox = (box, at) => at.lng >= box[0] && at.lng <= box[2] && at.lat >= box[1] && at.lat <= box[3];
+
+    if (record.areas && surface()) {
+      for (const area of record.areas) {
+        if (inBox(area.box, point) && area.rings.some(ring => inFlatRing(ring, point.lng, point.lat))) return found(area.city);
       }
     }
 
-    // km por pixel no centro da tela (altitude × campo de visão).
-    const viewHeightKm = 2 * (this.distance - 1) * EARTH_RADIUS_KM * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const kmPerPx = viewHeightKm / Math.max(1, this.size.height);
-    const areasActive = Boolean(record.areas);
+    const minimum = tierPopulation(DOT_TIERS, this.distance);
     const labeled = new Set(this.placed.map(({ item }) => item));
     let best = null;
-    let bestScore = 1;
+    let bestDistance = MIN_HIT_PX;
     for (const city of record.cities) {
-      // Alvo circular só para cidades que aparecem (ponto ou nome) e sem contorno carregado.
-      if ((city.population < minimum && !labeled.has(city)) || (areasActive && city.hasOutline) || !this.#visible(city)) continue;
-      const point = this.#project(city);
-      if (!point) continue;
-      const radiusKm = Math.sqrt(Math.max(city.population, 15000) / HIT_DENSITY / Math.PI);
-      const radius = Math.max(MIN_HIT_PX, radiusKm / kmPerPx);
-      const score = Math.hypot(point.x - x, point.y - y) / radius;
-      if (score < bestScore) {
-        bestScore = score;
+      if ((city.population < minimum && !labeled.has(city)) || (record.areas && city.hasOutline) || !this.#visible(city)) continue;
+      const projected = this.#project(city);
+      if (!projected) continue;
+      const distance = Math.hypot(projected.x - x, projected.y - y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
         best = city;
       }
     }
-    return best;
+    if (best) return found(best);
+
+    if (record.regionAreas && surface()) {
+      for (const region of record.regionAreas) {
+        if (!inBox(region.box, point) || !region.polygons.some(shape => inShape(shape, point.lng, point.lat))) continue;
+        return region.city ? found(region.city, region) : found(this.#nearestCity(record, point.lat, point.lng));
+      }
+    }
+    return null;
   }
 
   hide() {
@@ -593,7 +693,7 @@ export class AdminLayer {
 
   dispose() {
     for (const record of this.cache.values()) for (const object of record.objects) object.geometry.dispose();
-    for (const highlight of Object.values(this.highlights)) for (const object of highlight?.objects ?? []) object.geometry.dispose();
+    for (const entry of this.shapeCache.values()) for (const geometry of [...entry.lines, entry.fill]) geometry.dispose();
     for (const material of [this.stateMaterial, this.urbanMaterial, this.urbanSelectedMaterial, this.urbanFillMaterial, this.hoverLineMaterial, this.hoverFillMaterial]) material.dispose();
     this.dotMaterial.map?.dispose();
     this.dotMaterial.dispose();

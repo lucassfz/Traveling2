@@ -3189,7 +3189,3 @@ body.route-mode .city-card { visibility: hidden; }
 .planner-city__name small { color: var(--color-text-secondary); font-size: .76rem; }
 .discovery-cities { display: grid; gap: 6px; }
 .discovery-cities:empty { display: none; }
-
-/* País já escolhido: fora das cidades o clique aproxima (js/map.engine.js #isExploring). */
-.globe__stage--explore .globe__canvas { cursor: zoom-in; }
-.globe__stage--explore.globe__stage--interactive .globe__canvas { cursor: pointer; }

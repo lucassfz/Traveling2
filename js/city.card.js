@@ -49,8 +49,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     const facts = [
       ['População', formatPopulation(city.population)],
       ['Hora local', time],
-      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`],
-      ['Área urbana', city.hasOutline ? 'Contorno destacado no mapa' : null]
+      ['Coordenadas', `${coordinate(city.lat, 'N', 'S')}, ${coordinate(city.lng, 'L', 'O')}`]
     ].filter(([, value]) => value);
     root.innerHTML = `
       <div class="city-card__head">

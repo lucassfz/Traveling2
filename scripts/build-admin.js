@@ -24,6 +24,10 @@ const CITIES_URL = 'https://download.geonames.org/export/dump/cities15000.zip';
 const ADMIN1_CODES_URL = 'https://download.geonames.org/export/dump/admin1CodesASCII.txt';
 const OUTPUT_DIR = new URL('../data/admin/', import.meta.url);
 const URBAN_DIR = new URL('../data/admin/urban/', import.meta.url);
+// Regiões (estados/províncias) como área clicável da cidade principal de cada uma.
+const REGION_DIR = new URL('../data/admin/regions/', import.meta.url);
+// ~1,5 km: bordas de região legíveis no zoom máximo, arquivos pequenos.
+const REGION_TOLERANCE = 0.015;
 const URBAN_URLS = ['ne_10m_urban_areas_landscan', 'ne_10m_urban_areas']
   .map(name => `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/${NE_COMMIT}/geojson/${name}.geojson`);
 // ~600 m: contorno urbano legível no zoom máximo (≈500 km de altitude).
@@ -340,7 +344,8 @@ async function main() {
   }
 
   await mkdir(URBAN_DIR, { recursive: true });
-  for (const dir of [OUTPUT_DIR, URBAN_DIR]) {
+  await mkdir(REGION_DIR, { recursive: true });
+  for (const dir of [OUTPUT_DIR, URBAN_DIR, REGION_DIR]) {
     for (const file of await readdir(dir)) if (file.endsWith('.json')) await rm(new URL(file, dir));
   }
 
@@ -350,6 +355,8 @@ async function main() {
   let totalBytes = 0;
   let urbanBytes = 0;
   let outlined = 0;
+  let regionCount = 0;
+  let regionBytes = 0;
   let cityCount = 0;
   for (const code of [...codes].sort()) {
     const features = byCountry.get(code) ?? [];
@@ -389,6 +396,29 @@ async function main() {
         outlines.push([position, ...rings]);
       });
     outlined += outlines.length;
+
+    // Regiões: polígonos (anel externo + buracos) e a cidade principal de cada
+    // uma — capital, senão sede regional, senão a maior cidade dentro dela.
+    const areas = [];
+    if (features.length > 1) {
+      const inPolygon = (polygon, lng, lat) => inRing(polygon[0], lng, lat) && !polygon.slice(1).some(hole => inRing(hole, lng, lat));
+      for (const feature of features) {
+        const name = divisionName(feature.properties);
+        const polygons = polygonsOf(feature.geometry);
+        if (!name || !polygons.length) continue;
+        const boxes = polygons.map(polygon => ringBox(polygon[0]));
+        let seat = -1;
+        raw.forEach((city, position) => {
+          if (!polygons.some((polygon, index) => inBox(boxes[index], city.lng, city.lat) && inPolygon(polygon, city.lng, city.lat))) return;
+          if (seat < 0) seat = position; // raw já está em ordem: capital, sedes, população
+        });
+        const shapes = polygons
+          .map(polygon => polygon.map(ring => flatLine(simplify(ring, REGION_TOLERANCE))).filter(ring => ring && ring.length >= 8))
+          .filter(shape => shape.length);
+        if (shapes.length) areas.push([name, seat, ...shapes]);
+      }
+    }
+    regionCount += areas.length;
     cityCount += places.length;
 
     // Um país com uma só divisão (microestados) não tem divisa interna nem rótulo útil.
@@ -405,6 +435,11 @@ async function main() {
     const json = JSON.stringify({ country: code, divisions, lines, cities: places, zones, regions });
     totalBytes += json.length;
     await writeFile(new URL(`${code}.json`, OUTPUT_DIR), `${json}\n`);
+    if (areas.length) {
+      const regionJson = JSON.stringify({ country: code, areas });
+      regionBytes += regionJson.length;
+      await writeFile(new URL(`${code}.json`, REGION_DIR), `${regionJson}\n`);
+    }
     if (outlines.length) {
       const urbanJson = JSON.stringify({ country: code, outlines });
       urbanBytes += urbanJson.length;
@@ -425,10 +460,12 @@ async function main() {
     // cidades: [nome, lat, lng, população, 0 capital | 1 sede regional | 2 cidade,
     //   índice em zones (fuso IANA) ou -1, índice em regions ou -1, 1 se há contorno em urban/<ISO2>.json].
     // urban/<ISO2>.json: outlines: [[índice da cidade, anel, anel…]] com anéis [lng, lat, …].
+    // regions/<ISO2>.json: areas: [[nome, índice da cidade principal ou -1, polígono, polígono…]],
+    //   cada polígono = [anel externo, buraco…].
     countries: index
   };
   await writeFile(new URL('index.json', OUTPUT_DIR), `${JSON.stringify(indexFile)}\n`);
-  console.log(`${Object.keys(index).length} países, ${cityCount} cidades (${outlined} com contorno urbano). ${(totalBytes / 1024 / 1024).toFixed(2)} MB + ${(urbanBytes / 1024 / 1024).toFixed(2)} MB de contornos.`);
+  console.log(`${Object.keys(index).length} países, ${cityCount} cidades (${outlined} com contorno urbano), ${regionCount} regiões. ${(totalBytes / 1024 / 1024).toFixed(2)} MB + ${(urbanBytes / 1024 / 1024).toFixed(2)} MB de contornos + ${(regionBytes / 1024 / 1024).toFixed(2)} MB de regiões.`);
 }
 
 main().catch(error => {
