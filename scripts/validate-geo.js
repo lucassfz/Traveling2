@@ -33,6 +33,7 @@ broken(data => { data.places[0].lat = 95; }, /lat inválida/);
 broken(data => { data.places[0].lng = Number.NaN; }, /lng inválida/);
 broken(data => { data.places[0].kind = 'beach'; }, /kind inválido/);
 broken(data => { data.places[0].population = -1; }, /population/);
+broken(data => { data.places[0].ids = { ibge: -3 }; }, /ids inválidos/);
 assert.equal(validateGeoData(base(), 'YY').some(error => /arquivo de YY/.test(error)), true);
 
 const indexed = indexGeoData(base());
@@ -40,6 +41,8 @@ assert.equal(indexed.division('XX-AA').name, 'Alfa');
 assert.equal(indexed.places('XX-AA')[0].name, 'Cidade A');
 assert.equal(indexed.division('XX-ZZ'), null);
 assert.deepEqual(indexed.places('XX-ZZ'), []);
+assert.equal(indexed.capitalPlace('XX-AA').id, 'XX-AA-cidade-a');
+assert.equal(indexed.capitalPlace('XX-ZZ'), null);
 
 // Arquivos versionados.
 const catalogCodes = new Set(Object.values(COUNTRIES).map(country => country.alpha2).filter(Boolean));
@@ -74,5 +77,29 @@ for (const division of br.divisions) {
 assert.deepEqual(br.division('BR-BA'), { id: 'BR-BA', code: 'BA', ibge: 29, name: 'Bahia', type: 'state', region: 'Nordeste', capital: { name: 'Salvador', ibge: 2927408 } });
 assert.equal(br.division('BR-DF').capital.name, 'Brasília');
 assert.equal(br.division('BR-SP').capital.name, 'São Paulo');
+
+// Cidades: código IBGE dentro do estado, GeoNames único, ponto dentro do Brasil,
+// e toda capital presente como lugar com o mesmo nome e código.
+const placeIbge = new Set();
+const placeGeonames = new Set();
+for (const division of br.divisions) {
+  for (const place of br.places(division.id)) {
+    assert.ok(Number.isInteger(place.ids?.ibge) && String(place.ids.ibge).startsWith(String(division.ibge)), `${place.id}: código IBGE fora de ${division.code}`);
+    assert.ok(Number.isInteger(place.ids?.geonames) && place.ids.geonames > 0, `${place.id}: sem GeoNames`);
+    assert.ok(!placeIbge.has(place.ids.ibge) && !placeGeonames.has(place.ids.geonames), `${place.id}: código repetido`);
+    placeIbge.add(place.ids.ibge);
+    placeGeonames.add(place.ids.geonames);
+    assert.ok(place.lat > -34 && place.lat < 6 && place.lng > -74 && place.lng < -34, `${place.id}: fora do Brasil`);
+  }
+  const capital = br.capitalPlace(division.id);
+  assert.ok(capital, `${division.id}: capital ${division.capital.name} sem lugar`);
+  assert.equal(capital.name, division.capital.name, `${division.id}: nome da capital`);
+}
+const portoSeguro = br.place('BR-BA-porto-seguro');
+assert.equal(portoSeguro?.ids.ibge, 2925303);
+assert.ok(Math.abs(portoSeguro.lat - -16.45) < 0.05 && Math.abs(portoSeguro.lng - -39.06) < 0.05, 'Porto Seguro: coordenadas');
+const saoPaulo = br.place('BR-SP-sao-paulo');
+assert.ok(Math.abs(saoPaulo.lat - -23.55) < 0.05 && Math.abs(saoPaulo.lng - -46.63) < 0.05, 'São Paulo: coordenadas do centro');
+assert.ok(br.places('BR-BA').length >= 40, 'Bahia: cidades acima de 50 mil habitantes');
 
 console.log(`Geografia: ${files.length} país(es), ${divisionCount} divisões, ${placeCount} lugares.`);

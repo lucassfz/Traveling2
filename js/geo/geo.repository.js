@@ -72,7 +72,8 @@ export function validateGeoData(data, expectedCountry = data?.country) {
     if (!PLACE_KINDS.includes(place?.kind)) fail(`${label}: kind inválido (${place?.kind})`);
     if (!(Number.isFinite(place?.lat) && Math.abs(place.lat) <= 90)) fail(`${label}: lat inválida`);
     if (!(Number.isFinite(place?.lng) && Math.abs(place.lng) <= 180)) fail(`${label}: lng inválida`);
-    if (place?.population !== undefined && !(Number.isInteger(place.population) && place.population >= 0)) fail(`${label}: population inválida`);
+    if (place?.ids !== undefined && (typeof place.ids !== 'object' || Object.values(place.ids).some(value => !(Number.isInteger(value) && value > 0) && !isText(value)))) fail(`${label}: ids inválidos`);
+    if (place?.population !== undefined &&!(Number.isInteger(place.population) && place.population >= 0)) fail(`${label}: population inválida`);
   }
   if (places?.length && !covered.has('places')) fail('nenhuma fonte cobre places');
   return errors;
@@ -90,7 +91,15 @@ export function indexGeoData(data) {
     divisions: [...data.divisions].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
     division: id => divisions.get(id) ?? null,
     places: id => placesByDivision.get(id) ?? [],
-    place: id => data.places.find(place => place.id === id) ?? null
+    place: id => data.places.find(place => place.id === id) ?? null,
+    // Lugar da capital, pelo código IBGE quando houver, senão pelo nome.
+    capitalPlace: id => {
+      const capital = divisions.get(id)?.capital;
+      if (!capital) return null;
+      const list = placesByDivision.get(id) ?? [];
+      return list.find(place => capital.ibge && place.ids?.ibge === capital.ibge)
+        ?? list.find(place => place.name === capital.name) ?? null;
+    }
   };
 }
 
