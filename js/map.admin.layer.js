@@ -22,7 +22,13 @@ const urbanUrl = code => new URL(`../data/admin/urban/${code}.json`, import.meta
 
 const FOCUS_DISTANCE = 2.15;   // abaixo disso há um país em foco
 const STATE_DISTANCE = 1.9;    // divisas e nomes de estados do país em foco
-const URBAN_DISTANCE = 1.45;   // contornos urbanos
+const URBAN_DISTANCE = 1.6;    // contornos urbanos visíveis e clicáveis pela área
+const URBAN_PREFETCH = 1.8;    // pede o arquivo de contornos um pouco antes
+const EARTH_RADIUS_KM = 6371;
+// Densidade típica de área urbana (hab/km²), só para o alvo de clique de
+// cidades sem contorno mapeado; o círculo não é desenhado.
+const HIT_DENSITY = 2500;
+const MIN_HIT_PX = 12;
 const LINE_RADIUS = 1.0105;
 const POINT_RADIUS = 1.0095;   // pontos e rótulos usam o mesmo raio: nome centrado no ponto
 const URBAN_RADIUS = 1.0098;
@@ -94,6 +100,16 @@ function fillGeometry(rings, radius) {
   return geometry;
 }
 
+function inFlatRing(ring, lng, lat) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
+    const xi = ring[i]; const yi = ring[i + 1];
+    const xj = ring[j]; const yj = ring[j + 1];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
 export class AdminLayer {
   /**
    * @param {object} deps
@@ -108,6 +124,9 @@ export class AdminLayer {
     this.urbanMaterial = new THREE.LineBasicMaterial({ ...lineOptions, opacity: 0.55 });
     this.urbanSelectedMaterial = new THREE.LineBasicMaterial({ ...lineOptions, opacity: 1 });
     this.urbanFillMaterial = new THREE.MeshBasicMaterial({ ...lineOptions, opacity: 0.22, side: THREE.DoubleSide });
+    this.hoverLineMaterial = new THREE.LineBasicMaterial({ ...lineOptions, opacity: 0.85 });
+    this.hoverFillMaterial = new THREE.MeshBasicMaterial({ ...lineOptions, opacity: 0.12, side: THREE.DoubleSide });
+    this.highlights = { selected: null, hover: null };
     this.dotMaterial = new THREE.PointsMaterial({
       size: 5, sizeAttenuation: false, map: dotTexture(), transparent: true, alphaTest: 0.3,
       depthWrite: false, depthTest: true, clippingPlanes: [clipPlane]
@@ -131,7 +150,6 @@ export class AdminLayer {
     this.cameraDirection = new THREE.Vector3();
     this.lastLabelKey = '';
     this.version = 0;              // muda quando dados ou seleção mudam
-    this.selectedOutline = null;   // contorno + preenchimento da cidade selecionada
     this.setTheme();
   }
 
@@ -165,6 +183,9 @@ export class AdminLayer {
   setHovered(item) {
     if (this.hoveredItem === item) return;
     this.hoveredItem = item ?? null;
+    // A área inteira da cidade acende sob o ponteiro (exceto a já selecionada).
+    const city = item?.kind === 'city' && item.id !== this.selectedCity?.id ? item : null;
+    this.#setHighlight('hover', city);
     this.#touch();
   }
 
@@ -291,44 +312,63 @@ export class AdminLayer {
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       record.urban = this.#add(record, new THREE.LineSegments(geometry, this.urbanMaterial));
       record.urban.renderOrder = 4.3;
+      // Áreas para o clique: caixa + anéis, das menores para as maiores.
+      record.areas = [...record.outlines].map(([index, rings]) => {
+        const box = [Infinity, Infinity, -Infinity, -Infinity];
+        for (const ring of rings) {
+          for (let i = 0; i < ring.length; i += 2) {
+            box[0] = Math.min(box[0], ring[i]); box[2] = Math.max(box[2], ring[i]);
+            box[1] = Math.min(box[1], ring[i + 1]); box[3] = Math.max(box[3], ring[i + 1]);
+          }
+        }
+        return { city: record.cities[index], rings, box, size: (box[2] - box[0]) * (box[3] - box[1]) };
+      }).filter(area => area.city).sort((a, b) => a.size - b.size);
       record.urbanStatus = 'ready';
       this.#refreshSelectedOutline();
       this.#touch();
     }).catch(() => { record.urbanStatus = null; });
   }
 
-  // Contorno destacado (linha + preenchimento) da cidade selecionada.
   #refreshSelectedOutline() {
-    if (this.selectedOutline) {
-      for (const object of this.selectedOutline.objects) {
-        this.group.remove(object);
-        object.geometry.dispose();
-      }
-      this.selectedOutline = null;
+    this.#setHighlight('selected', this.selectedCity);
+    // A cidade selecionada não precisa mais do destaque de hover.
+    if (this.highlights.hover?.city.id === this.selectedCity?.id) this.#setHighlight('hover', null);
+  }
+
+  // Contorno (linha + preenchimento) de uma cidade, em dois "slots": seleção e
+  // hover. Sobre o país selecionado, cujo preenchimento já usa a cor de
+  // destaque, o contorno passa para a cor do fundo para continuar visível.
+  #setHighlight(slot, city) {
+    const current = this.highlights[slot];
+    if (current && current.city.id === city?.id && current.onSelected === (city.country === this.selectedCode)) return;
+    for (const object of current?.objects ?? []) {
+      this.group.remove(object);
+      object.geometry.dispose();
     }
-    const city = this.selectedCity;
+    this.highlights[slot] = null;
     const rings = city ? this.cache.get(city.country)?.outlines?.get(city.index) : null;
     if (!rings) return;
-    // Sobre o país selecionado o preenchimento já usa a cor de destaque: o contorno
-    // da cidade passa para a cor do fundo para continuar visível.
+    const selected = slot === 'selected';
+    const line = selected ? this.urbanSelectedMaterial : this.hoverLineMaterial;
+    const fillMaterial = selected ? this.urbanFillMaterial : this.hoverFillMaterial;
     const style = getComputedStyle(document.documentElement);
     const onSelectedCountry = city.country === this.selectedCode;
     const color = style.getPropertyValue(onSelectedCountry ? '--color-background' : '--color-accent').trim() || '#7cc9f5';
-    this.urbanSelectedMaterial.color.set(color);
-    this.urbanFillMaterial.color.set(color);
-    this.urbanFillMaterial.opacity = onSelectedCountry ? 0.35 : 0.22;
+    line.color.set(color);
+    fillMaterial.color.set(color);
+    fillMaterial.opacity = selected ? (onSelectedCountry ? 0.35 : 0.22) : (onSelectedCountry ? 0.2 : 0.12);
     const objects = rings.map(ring => {
       const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(ringPositions(ring, URBAN_RADIUS + 0.0002), 3));
-      const line = new THREE.LineLoop(geometry, this.urbanSelectedMaterial);
-      line.renderOrder = 4.5;
-      return line;
+      geometry.setAttribute('position', new THREE.BufferAttribute(ringPositions(ring, URBAN_RADIUS + (selected ? 0.0002 : 0.0001)), 3));
+      const loop = new THREE.LineLoop(geometry, line);
+      loop.renderOrder = selected ? 4.5 : 4.45;
+      return loop;
     });
-    const fill = new THREE.Mesh(fillGeometry(rings, URBAN_RADIUS), this.urbanFillMaterial);
-    fill.renderOrder = 4.25;
+    const fill = new THREE.Mesh(fillGeometry(rings, URBAN_RADIUS), fillMaterial);
+    fill.renderOrder = selected ? 4.25 : 4.24;
     objects.push(fill);
     for (const object of objects) this.group.add(object);
-    this.selectedOutline = { city, objects };
+    this.highlights[slot] = { city, objects, onSelected: onSelectedCountry };
   }
 
   // ---------- Foco ----------
@@ -361,14 +401,14 @@ export class AdminLayer {
       this.focus = record;
       this.version += 1;
     }
-    if (this.selectedOutline) {
-      for (const object of this.selectedOutline.objects) object.visible = this.selectedOutline.city.country === code;
+    for (const highlight of Object.values(this.highlights)) {
+      for (const object of highlight?.objects ?? []) object.visible = highlight.city.country === code;
     }
     if (!record || record.status !== 'ready') {
       this.#renderLabels([]);
       return;
     }
-    if (distance <= URBAN_DISTANCE) this.#ensureUrban(record);
+    if (distance <= URBAN_PREFETCH) this.#ensureUrban(record);
 
     const fade = (start, end) => THREE.MathUtils.clamp((start - distance) / (start - end), 0, 1);
     if (record.lines) {
@@ -385,7 +425,7 @@ export class AdminLayer {
     }
     if (record.urban) {
       record.urban.visible = distance <= URBAN_DISTANCE;
-      this.urbanMaterial.opacity = 0.25 + 0.4 * fade(URBAN_DISTANCE, 1.1);
+      this.urbanMaterial.opacity = 0.2 + 0.45 * fade(URBAN_DISTANCE, 1.1);
     }
     if (record.dots) {
       const minimum = tierPopulation(DOT_TIERS, distance);
@@ -434,10 +474,12 @@ export class AdminLayer {
     }
     for (const city of record.cities) {
       const selected = city.id === this.selectedCity?.id;
+      // A cidade sob o ponteiro sempre mostra o nome, mesmo pequena ou encoberta.
+      const hovered = city === this.hoveredItem;
       const capital = city.rank === 0 && distance <= CAPITAL_DISTANCE + 0.3;
       const stateCapital = city.rank === 1 && distance <= STATE_CAPITAL_DISTANCE;
-      if (!selected && !capital && !stateCapital && city.population < minPopulation) continue;
-      consider(city, (selected ? 1e12 : 0) + (city.rank === 0 ? 1e9 : city.rank === 1 ? 2e6 : 0) + city.population);
+      if (!selected && !hovered && !capital && !stateCapital && city.population < minPopulation) continue;
+      consider(city, (selected ? 1e12 : hovered ? 1e11 : 0) + (city.rank === 0 ? 1e9 : city.rank === 1 ? 2e6 : 0) + city.population);
     }
 
     candidates.sort((a, b) => b.priority - a.priority);
@@ -487,10 +529,14 @@ export class AdminLayer {
   }
 
   /**
-   * Cidade ou estado sob o ponteiro (coordenadas relativas ao palco), ou null.
-   * Primeiro os rótulos visíveis; depois o ponto de cidade mais próximo.
+   * Cidade ou estado sob o ponteiro (x, y relativos ao palco), ou null.
+   *   1. nome visível (rótulo);
+   *   2. área urbana que contém o ponto da superfície (o alvo é a cidade inteira);
+   *   3. cidades sem contorno: alvo circular do tamanho aproximado da cidade
+   *      (pela população), nunca menor que MIN_HIT_PX.
+   * @param {() => {lat: number, lng: number}|null} surfacePoint  Calculado só se preciso.
    */
-  pick(x, y) {
+  pick(x, y, surfacePoint = () => null) {
     const record = this.focus;
     if (!record || record.status !== 'ready') return null;
     for (let index = this.placed.length - 1; index >= 0; index -= 1) {
@@ -499,15 +545,32 @@ export class AdminLayer {
     }
     const minimum = tierPopulation(DOT_TIERS, this.distance);
     if (minimum === Infinity) return null;
+
+    if (record.areas && this.distance <= URBAN_DISTANCE) {
+      const point = surfacePoint();
+      if (point) {
+        for (const area of record.areas) {
+          if (point.lng < area.box[0] || point.lng > area.box[2] || point.lat < area.box[1] || point.lat > area.box[3]) continue;
+          if (area.rings.some(ring => inFlatRing(ring, point.lng, point.lat))) return area.city;
+        }
+      }
+    }
+
+    // km por pixel no centro da tela (altitude × campo de visão).
+    const viewHeightKm = 2 * (this.distance - 1) * EARTH_RADIUS_KM * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const kmPerPx = viewHeightKm / Math.max(1, this.size.height);
+    const areasActive = record.areas && this.distance <= URBAN_DISTANCE;
     let best = null;
-    let bestDistance = PICK_RADIUS_PX ** 2;
+    let bestScore = 1;
     for (const city of record.cities) {
-      if (city.population < minimum || !this.#visible(city)) continue;
+      if (city.population < minimum || (areasActive && city.hasOutline) || !this.#visible(city)) continue;
       const point = this.#project(city);
       if (!point) continue;
-      const squared = (point.x - x) ** 2 + (point.y - y) ** 2;
-      if (squared < bestDistance) {
-        bestDistance = squared;
+      const radiusKm = Math.sqrt(Math.max(city.population, 15000) / HIT_DENSITY / Math.PI);
+      const radius = Math.max(MIN_HIT_PX, radiusKm / kmPerPx);
+      const score = Math.hypot(point.x - x, point.y - y) / radius;
+      if (score < bestScore) {
+        bestScore = score;
         best = city;
       }
     }
@@ -518,14 +581,14 @@ export class AdminLayer {
     this.placed = [];
     this.lastLabelKey = '';
     for (const object of this.focus?.objects ?? []) object.visible = false;
-    for (const object of this.selectedOutline?.objects ?? []) object.visible = false;
+    for (const highlight of Object.values(this.highlights)) for (const object of highlight?.objects ?? []) object.visible = false;
     for (const element of this.pool) element.hidden = true;
   }
 
   dispose() {
     for (const record of this.cache.values()) for (const object of record.objects) object.geometry.dispose();
-    for (const object of this.selectedOutline?.objects ?? []) object.geometry.dispose();
-    for (const material of [this.stateMaterial, this.urbanMaterial, this.urbanSelectedMaterial, this.urbanFillMaterial]) material.dispose();
+    for (const highlight of Object.values(this.highlights)) for (const object of highlight?.objects ?? []) object.geometry.dispose();
+    for (const material of [this.stateMaterial, this.urbanMaterial, this.urbanSelectedMaterial, this.urbanFillMaterial, this.hoverLineMaterial, this.hoverFillMaterial]) material.dispose();
     this.dotMaterial.map?.dispose();
     this.dotMaterial.dispose();
     this.group.parent?.remove(this.group);

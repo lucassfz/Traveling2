@@ -1056,7 +1056,18 @@ export class MapEngine {
   pickPlace(clientX, clientY) {
     if (!this.ready) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
-    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top);
+    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top, () => this.#surfacePoint(clientX, clientY));
+  }
+
+  // Latitude/longitude do ponto da superfície sob o ponteiro (só o lado visível).
+  #surfacePoint(clientX, clientY) {
+    this.#pointerToNdc(clientX, clientY);
+    this.camera.updateMatrixWorld(true);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const hit = this.raycaster.intersectObject(this.ocean, false)[0];
+    if (!hit) return null;
+    const { latitude, longitude } = cartesianToLatLng(hit.point, GLOBE_YAW, GLOBE_ORIGIN);
+    return { lat: latitude, lng: longitude };
   }
 
   // Destaca uma cidade e a centraliza sem mudar o zoom (ou aproximando um pouco).
