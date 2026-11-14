@@ -112,14 +112,19 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       (state.originAirport.iata || state.originAirport.icao) === (state.destinationAirport.iata || state.destinationAirport.icao);
     const ready = Boolean(state.map?.ready && state.originAirport && state.destinationAirport && state.countryKey && !state.routePreviewActive && !sameAirport);
     elements.flightPreviewButton.disabled = !ready;
+    // "Explorar destino" sempre parte de GRU. Quando o destino também é GRU
+    // (o Brasil, país de origem), não há rota a mostrar: explica e orienta.
     const exploreSameAirport = (state.destinationAirport?.iata || state.destinationAirport?.icao) === 'GRU';
     elements.countryExploreButton.disabled = !state.map?.ready || !state.countryKey || !state.destinationAirport || state.routePreviewActive || exploreSameAirport;
-    if (exploreSameAirport && state.countryKey) elements.countryExploreStatus.textContent = 'Rota ainda não disponível para este destino.';
+    if (exploreSameAirport && state.countryKey) {
+      elements.countryExploreStatus.textContent = 'A rota de demonstração parte de São Paulo (GRU), que já fica aqui. Para voos nacionais, use a aba Voos e escolha outra origem.';
+    }
+    const sameCode = sameAirport ? (state.originAirport.iata || state.originAirport.icao) : '';
     elements.flightPreviewStatus.textContent = !state.map?.ready
       ? 'Aguarde o carregamento do globo 3D.'
       : !state.originAirport ? 'Escolha um aeroporto de origem válido.'
       : !state.destinationAirport ? 'Aeroporto de destino indisponível para esta visualização.'
-        : sameAirport ? 'Origem e destino precisam ser aeroportos diferentes.'
+        : sameAirport ? `Origem e destino são o mesmo aeroporto (${sameCode}). Escolha outra origem, por exemplo GIG, BSB ou SSA.`
           : `Parte de ${state.originAirport.city || state.originAirport.name} (${state.originAirport.iata || state.originAirport.icao}).`;
   }
 
@@ -240,7 +245,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       if (!origin) throw new Error('Aeroporto não encontrado. Verifique o código IATA/ICAO ou sua conexão para carregar a base global.');
       const destination = state.destinationAirport || await resolveDestinationAirport(state.countryKey);
       if (!destination) throw new Error('Não foi possível determinar um aeroporto de destino para este país.');
-      if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) throw new Error('Origem e destino precisam ser aeroportos diferentes.');
+      if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) throw new Error(`Origem e destino são o mesmo aeroporto (${origin.iata || origin.icao}). Escolha outra origem, por exemplo GIG, BSB ou SSA.`);
 
       state.destinationAirport = destination;
       state.originAirport = origin;

@@ -16,6 +16,7 @@ import { brasiliaTimezoneNote } from './timezone.br.js';
 import { provenanceLabel } from './provenance.js';
 import { loadFxSnapshot, localPerBrl, resolveCurrencyRate } from './fx.service.js';
 import { createFlightsTab } from './drawer/flights.tab.js';
+import { createRegionsSection } from './drawer/regions.section.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 import { createTripStore } from './planner/trip.store.js';
 import { createTrip, updateTrip } from './planner/trip.model.js';
@@ -53,6 +54,7 @@ const elements = {
   tabPanels: [...document.querySelectorAll('[data-tab-panel]')],
   media: document.getElementById('country-media'),
   basics: document.getElementById('country-basics'),
+  regions: document.getElementById('country-regions'),
   currencyConverter: document.getElementById('currency-converter'),
   monthChart: document.getElementById('month-chart'),
   bestTime: document.getElementById('best-time-copy'),
@@ -148,6 +150,9 @@ const {
   openMilesForRoute,
   fetchExchangeRate,
 } = createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen, ensureMilesEngine });
+
+// Estados e cidades (só países com data/geo/<ISO2>.json).
+const regionsSection = createRegionsSection({ root: elements.regions, getMap: () => state.map, onWorld: () => home() });
 
 function savePersistentState() {
   writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
@@ -323,16 +328,16 @@ function renderMedia(countryKey, country) {
 }
 
 function renderBasics(country) {
+  // Só dados que ajudam a decidir a viagem; o fuso, com nota, ocupa a linha toda.
   const cards = [
     ['Capital', country.capital || '—'],
     ['Moeda', country.currency || '—'],
     ['Idioma', country.lang || '—'],
-    ['Fuso', country.timezoneLabel || '—', brasiliaTimezoneNote(country)],
     ['Voltagem', country.voltage || 'Confirmar'],
-    ['Código', country.alpha2 || '—']
+    ['Fuso', country.timezoneLabel || '—', brasiliaTimezoneNote(country), true]
   ];
-  elements.basics.innerHTML = cards.map(([label, value, note]) => `
-    <article class="info-card">
+  elements.basics.innerHTML = cards.map(([label, value, note, wide]) => `
+    <article class="info-card${wide ? ' info-card--wide' : ''}">
       <div class="info-card__value">${escapeHtml(value)}</div>
       ${note ? `<div class="info-card__note">${escapeHtml(note)}</div>` : ''}
       <div class="info-card__label">${escapeHtml(label)}</div>
@@ -557,6 +562,7 @@ function renderCountry(countryKey) {
 
   renderMedia(countryKey, country);
   renderBasics(country);
+  regionsSection.show(country);
   renderCurrencyConverter(country);
   renderMonths(country);
   renderEntry(country);
@@ -1120,7 +1126,7 @@ function renderTripsCount() {
   const count = tripStore.trips.length;
   elements.tripsCount.hidden = count === 0;
   elements.tripsCount.textContent = String(count);
-  elements.tripsLauncher.setAttribute('aria-label', count ? `Planner (${count} ${count === 1 ? 'viagem' : 'viagens'})` : 'Planner');
+  elements.tripsLauncher.setAttribute('aria-label', count ? `Viagens (${count} ${count === 1 ? 'salva' : 'salvas'})` : 'Viagens');
 }
 
 // Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
