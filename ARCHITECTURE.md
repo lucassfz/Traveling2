@@ -7,6 +7,8 @@
 - `js/provenance.js`: one label per money figure (verified, live, Traveling estimate, calculated, unverified).
 - `js/fx.service.js`: Banco Central do Brasil rates (PTAX API, then `data/fx-snapshot.json`).
 - `js/history.loader.js`: loads the four history datasets with `import()` when the History tab opens or the browser is idle; they are not part of `COUNTRIES`.
+- `js/planner/trip.model.js`, `js/planner/trip.store.js`: Planner v0 trips (pure model, validated by `scripts/validate-planner.js`) saved in localStorage under `traveling.trips`.
+- `js/planner/planner.ui.js`: planner side panel (loaded on first open), with sections from `flight.section.js` (flight estimate, destination costs from reviewed Discovery profiles, cash vs miles; math in `planner.estimates.js`) and `prep.section.js` (checklist progress shared with the drawer, entry summary with source).
 - `js/map.engine.js`: Three.js globe, progressive world build, raycasting and camera.
 - `js/geospatial.js`: authoritative WGS84 spherical transforms, Haversine and PIP.
 - `js/countries.dataset.js`: 196-entry catalog (sovereign states plus Kosovo, Taiwan and French Guiana) + curated/regional enrichment.

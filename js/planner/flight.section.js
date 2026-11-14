@@ -91,7 +91,10 @@ export function createFlightSection({ airportRepository, resolveDestinationAirpo
   async function suggestLocal(trip, ui, status) {
     status.textContent = 'Buscando faixa revisada…';
     const [{ discoveryCoverage }] = await Promise.all([import('../destination.discovery.js')]);
-    const profiles = discoveryCoverage(countries).profiles.filter(profile => profile.countryKey === trip.countryKey);
+    const countryProfiles = discoveryCoverage(countries).profiles.filter(profile => profile.countryKey === trip.countryKey);
+    // Viagem vinda da Descoberta: usa a região escolhida lá.
+    const chosen = countryProfiles.find(profile => profile.id === trip.profileId);
+    const profiles = chosen ? [chosen] : countryProfiles;
     const suggestion = localCostSuggestion(profiles, { days: tripDays(trip), travelers: trip.travelers });
     if (!suggestion) { status.textContent = 'Ainda não há faixa revisada de gastos para este destino. Preencha os valores manualmente.'; return; }
     const line = {

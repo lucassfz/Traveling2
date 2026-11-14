@@ -99,6 +99,11 @@ export class PlannerUI {
     this.unsubscribe?.();
   }
 
+  // Atualiza resumo e seções (ex.: checklist marcado no painel do país).
+  refresh() {
+    this.#refreshSummary();
+  }
+
   // Grava a viagem ativa com as mudanças informadas.
   update(changes) {
     const trip = this.trip;

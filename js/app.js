@@ -18,7 +18,7 @@ import { loadFxSnapshot, localPerBrl } from './fx.service.js';
 import { createFlightsTab } from './drawer/flights.tab.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 import { createTripStore } from './planner/trip.store.js';
-import { createTrip } from './planner/trip.model.js';
+import { createTrip, updateTrip } from './planner/trip.model.js';
 
 const MONTHS = Object.freeze(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']);
 const elements = {
@@ -674,6 +674,7 @@ function updateChecklistItem(button) {
   button.setAttribute('aria-pressed', String(Boolean(state.checklist[key])));
   button.querySelector('.checklist__box').textContent = state.checklist[key] ? '✓' : '';
   savePersistentState();
+  state.planner?.refresh();
   updateChecklistProgress();
 }
 
@@ -683,6 +684,7 @@ function setAllChecklistItems(complete) {
     state.checklist[button.dataset.checklistKey] = complete;
   }
   savePersistentState();
+  state.planner?.refresh();
   renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
 }
 
@@ -998,6 +1000,10 @@ function ensureDiscovery() {
         isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'
           && state.discovery.matches[state.discovery.index]?.profile.id === match.profile.id
       }),
+      onPlan: (match, preferences) => planTrip(match.countryKey, {
+        profileId: match.profile.id,
+        budgetBRL: Number.isFinite(preferences.budgetCeiling) ? preferences.budgetCeiling : null
+      }),
       onClose: () => closeFlightPreview(false)
     });
     return state.discovery;
@@ -1044,18 +1050,17 @@ let plannerPromise = null;
 function ensurePlanner() {
   plannerPromise ??= Promise.all([
     import('./planner/planner.ui.js'),
-    import('./planner/flight.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSection }]) => {
+    import('./planner/flight.section.js'),
+    import('./planner/prep.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSection }, { createPrepSection }]) => {
     state.planner = new PlannerUI({
       element: elements.plannerContent,
       store: tripStore,
       countries: COUNTRIES,
-      onShowCountry: countryKey => {
-        if (window.innerWidth < 1200) setPlannerOpen(false);
-        selectCountry(countryKey);
-      },
+      onShowCountry: countryKey => showCountryFromPlanner(countryKey),
       sections: [
-        createFlightSection({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES })
+        createFlightSection({ airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, countries: COUNTRIES }),
+        createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
       ]
     });
     return state.planner;
@@ -1064,6 +1069,14 @@ function ensurePlanner() {
     throw error;
   });
   return plannerPromise;
+}
+
+// Do planejador para o painel do país (opcionalmente numa aba). Em telas
+// menores os dois painéis não cabem juntos, então o planejador fecha.
+function showCountryFromPlanner(countryKey, tab = null) {
+  if (window.innerWidth < 1200) setPlannerOpen(false);
+  selectCountry(countryKey);
+  if (tab) switchTab(tab);
 }
 
 function isPlannerOpen() {
@@ -1092,7 +1105,8 @@ function setPlannerOpen(open, restoreFocus = false) {
 function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
   const existing = tripStore.findByCountry(countryKey);
-  if (existing) tripStore.setActive(existing.id);
+  if (existing && prefill.profileId && !existing.profileId) tripStore.save(updateTrip(existing, { profileId: prefill.profileId }));
+  else if (existing) tripStore.setActive(existing.id);
   else tripStore.save(createTrip({ countryKey, ...prefill }));
   if (isPlannerOpen()) ensurePlanner().then(planner => planner.render()).catch(() => {});
   else setPlannerOpen(true);
