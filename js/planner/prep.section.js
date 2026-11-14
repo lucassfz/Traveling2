@@ -1,4 +1,4 @@
-// Seção "Preparação" do planejador: progresso do checklist do país (o mesmo
+// Etapa "Preparação" do Planner: progresso do checklist do país (o mesmo
 // salvo pelo painel do país) e resumo das regras de entrada com fonte e data.
 import { escapeHtml } from '../core/html.js';
 import { provenanceLabel } from '../provenance.js';
@@ -29,7 +29,7 @@ export function createPrepSection({ countries, getChecklist, onOpenCountryTab })
         </div>
         <button class="secondary-button" type="button" data-prep-action="checklist">Abrir checklist</button>
       </div>
-      <div class="planner-meter" role="progressbar" aria-label="Checklist da viagem" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
+      <div class="planner-meter planner-meter--success" role="progressbar" aria-label="Checklist da viagem" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
         <span style="width:${(ratio * 100).toFixed(1)}%"></span>
       </div>`;
   }
@@ -55,15 +55,20 @@ export function createPrepSection({ countries, getChecklist, onOpenCountryTab })
 
   return {
     id: 'prep',
+    step: 5,
     render(trip) {
       return `
-        <section class="planner-section" id="planner-prep" aria-labelledby="planner-prep-title">
-          <div class="planner-section__head">
-            <h3 class="planner-section__title" id="planner-prep-title">Preparação</h3>
-          </div>
-          <div class="planner-subsection" id="planner-prep-checklist">${checklistHtml(trip)}</div>
-          <div class="planner-subsection" id="planner-prep-entry">${entryHtml(trip)}</div>
-        </section>`;
+        <div id="planner-prep">
+          <h4 class="planner-block-title">Documentos e entrada</h4>
+          <div class="planner-card" id="planner-prep-entry">${entryHtml(trip)}</div>
+          <label class="planner-confirm">
+            <input type="checkbox" data-planner-field="entryReviewed" ${trip.entryReviewed ? 'checked' : ''}>
+            <span><strong>Conferi as regras de entrada e meus documentos</strong>
+            <span class="planner-hint">Passaporte válido, visto ou autorização eletrônica, vacinas e seguro, conforme a fonte oficial.</span></span>
+          </label>
+          <h4 class="planner-block-title">Checklist da viagem</h4>
+          <div class="planner-card" id="planner-prep-checklist">${checklistHtml(trip)}</div>
+        </div>`;
     },
     bind(root, _trip, ui) {
       root.querySelector('#planner-prep')?.addEventListener('click', event => {

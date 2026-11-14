@@ -1,5 +1,4 @@
-const DEFAULT_PARTICLE_COUNT = 108;
-const FRAME_INTERVAL_MS = 66;
+const DEFAULT_PARTICLE_COUNT = 140;
 
 function randomBetween(minimum, maximum) {
   return minimum + Math.random() * (maximum - minimum);
@@ -8,6 +7,8 @@ function randomBetween(minimum, maximum) {
 /**
  * Lightweight ambient starfield. It is intentionally independent from Three.js:
  * the WebGL scene remains dedicated to geography and the stars are never raycast.
+ * The field is static: it is painted only on resize or theme change, so the
+ * page never wakes up just to animate the background.
  */
 export class StarfieldEngine {
   constructor(canvas, { particleCount = DEFAULT_PARTICLE_COUNT } = {}) {
@@ -15,22 +16,13 @@ export class StarfieldEngine {
     this.context = canvas?.getContext?.('2d', { alpha: true });
     this.particleCount = particleCount;
     this.particles = [];
-    this.frameId = 0;
     this.isDark = false;
     this.destroyed = false;
-    this.reducedMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    this.prefersReducedMotion = Boolean(this.reducedMotionQuery?.matches);
-
     this.onResize = () => this.#resize();
-    this.onReducedMotionChange = event => {
-      this.prefersReducedMotion = event.matches;
-      this.#scheduleFrame();
-    };
 
     if (!this.context) return;
     this.resizeObserver = new ResizeObserver(this.onResize);
     this.resizeObserver.observe(this.canvas);
-    this.reducedMotionQuery?.addEventListener?.('change', this.onReducedMotionChange);
     this.setTheme(document.documentElement.dataset.theme || 'dark');
   }
 
@@ -39,14 +31,10 @@ export class StarfieldEngine {
     this.canvas?.classList.toggle('starfield--visible', this.isDark);
     if (!this.context) return;
     if (!this.isDark) {
-      cancelAnimationFrame(this.frameId);
-      clearTimeout(this.frameTimer);
-      this.frameTimer = 0;
-      this.frameId = 0;
       this.context.clearRect(0, 0, this.width || 0, this.height || 0);
       return;
     }
-    this.#scheduleFrame();
+    this.#draw();
   }
 
   #resize() {
@@ -63,57 +51,27 @@ export class StarfieldEngine {
       this.particles = Array.from({ length: this.particleCount }, () => ({
         x: Math.random(),
         y: Math.random(),
-        radius: randomBetween(0.45, 1.2),
-        opacity: randomBetween(0.07, 0.24),
-        phase: randomBetween(0, Math.PI * 2),
-        speed: randomBetween(0.00035, 0.0011)
+        radius: randomBetween(0.35, 1.1),
+        opacity: randomBetween(0.06, 0.3)
       }));
     }
-    if (this.isDark) this.#draw(performance.now());
+    if (this.isDark) this.#draw();
   }
 
-  #scheduleFrame() {
-    if (!this.isDark || this.destroyed || this.frameId || this.frameTimer) return;
-    if (this.prefersReducedMotion) {
-      this.#draw(performance.now());
-      return;
-    }
-    // O cintilar tem ciclos de 6 a 18 s: ~15 quadros/s bastam e evitam acordar
-    // a página 60 vezes por segundo só para o fundo.
-    this.frameTimer = window.setTimeout(() => {
-      this.frameTimer = 0;
-      this.frameId = requestAnimationFrame(timestamp => this.#render(timestamp));
-    }, FRAME_INTERVAL_MS);
-  }
-
-  #render(timestamp) {
-    this.frameId = 0;
-    if (!this.isDark || this.destroyed) return;
-    this.#draw(timestamp);
-    this.#scheduleFrame();
-  }
-
-  #draw(timestamp) {
+  #draw() {
     if (!this.context || !this.width || !this.height) return;
     this.context.clearRect(0, 0, this.width, this.height);
     for (const particle of this.particles) {
-      const twinkle = this.prefersReducedMotion
-        ? 1
-        : 0.72 + Math.sin(timestamp * particle.speed + particle.phase) * 0.28;
       this.context.beginPath();
       this.context.arc(particle.x * this.width, particle.y * this.height, particle.radius, 0, Math.PI * 2);
-      this.context.fillStyle = `rgba(226, 232, 240, ${particle.opacity * twinkle})`;
+      this.context.fillStyle = `rgba(226, 232, 240, ${particle.opacity})`;
       this.context.fill();
     }
   }
 
   destroy() {
     this.destroyed = true;
-    cancelAnimationFrame(this.frameId);
-    clearTimeout(this.frameTimer);
-    this.frameTimer = 0;
     this.resizeObserver?.disconnect();
-    this.reducedMotionQuery?.removeEventListener?.('change', this.onReducedMotionChange);
     this.context?.clearRect(0, 0, this.width || 0, this.height || 0);
   }
 }

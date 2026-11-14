@@ -3,6 +3,16 @@
 // Valores sempre em reais (BRL). Datas como texto AAAA-MM-DD (sem fuso horário).
 
 export const TRIP_SCHEMA_VERSION = 1;
+
+// Etapas do Planner, na ordem do passo a passo.
+export const PLANNER_STEPS = Object.freeze([
+  { id: 'destination', label: 'Destino', title: 'Para onde você vai?' },
+  { id: 'dates', label: 'Datas', title: 'Quando e com quem?' },
+  { id: 'flight', label: 'Voo', title: 'Como você vai chegar?' },
+  { id: 'budget', label: 'Orçamento', title: 'Quanto vai custar?' },
+  { id: 'prep', label: 'Preparação', title: 'Está tudo pronto?' },
+  { id: 'summary', label: 'Resumo', title: 'Sua viagem' }
+]);
 export const MAX_TRAVELERS = 9;
 export const MAX_LINES = 60;
 const MAX_AMOUNT = 10_000_000;
@@ -59,6 +69,11 @@ function todayIso(now = new Date()) {
 function clampTravelers(value) {
   const number = Math.round(Number(value));
   return Number.isFinite(number) ? Math.min(MAX_TRAVELERS, Math.max(1, number)) : 1;
+}
+
+function clampStep(value) {
+  const number = Math.round(Number(value));
+  return Number.isFinite(number) ? Math.min(PLANNER_STEPS.length, Math.max(1, number)) : 1;
 }
 
 function airportCode(value) {
@@ -135,19 +150,39 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     travelers: clampTravelers(raw.travelers),
     budgetBRL: budget,
     lines,
+    step: clampStep(raw.step),
+    entryReviewed: raw.entryReviewed === true,
     ...(miles ? { miles } : {}),
     ...(text(raw.profileId, 60) ? { profileId: text(raw.profileId, 60) } : {})
   };
 }
 
-export function createTrip({ countryKey, origin = 'GRU', startDate = null, endDate = null, travelers = 1, budgetBRL = null, profileId = null, now = new Date(), idFactory = randomId } = {}) {
+export function createTrip({ countryKey, origin = 'GRU', startDate = null, endDate = null, travelers = 1, budgetBRL = null, profileId = null, step = 1, now = new Date(), idFactory = randomId } = {}) {
   const today = todayIso(now);
-  return normalizeTrip({ countryKey, origin, startDate, endDate, travelers, budgetBRL, profileId, lines: [], createdAt: today, updatedAt: today }, { idFactory });
+  return normalizeTrip({ countryKey, origin, startDate, endDate, travelers, budgetBRL, profileId, step, lines: [], createdAt: today, updatedAt: today }, { idFactory });
 }
 
 // Aplica mudanças e devolve uma viagem nova, normalizada e com updatedAt.
 export function updateTrip(trip, changes, { now = new Date() } = {}) {
   return normalizeTrip({ ...trip, ...changes, id: trip.id, createdAt: trip.createdAt, updatedAt: todayIso(now) });
+}
+
+/**
+ * Quais etapas estão concluídas (uma por item de PLANNER_STEPS) e qual é a
+ * próxima pendente. O resumo conta como concluído quando as anteriores estão.
+ */
+export function tripProgress(trip) {
+  const lines = trip?.lines ?? [];
+  const done = [
+    Boolean(trip?.countryKey),
+    Boolean(trip?.startDate && trip?.endDate),
+    lines.some(line => line.category === 'flights') || Boolean(trip?.miles?.fareBRL),
+    trip?.budgetBRL !== null && trip?.budgetBRL !== undefined || lines.some(line => line.category !== 'flights'),
+    trip?.entryReviewed === true
+  ];
+  done.push(done.every(Boolean));
+  const pending = done.findIndex(value => !value);
+  return { done, completed: done.slice(0, -1).filter(Boolean).length, total: done.length - 1, next: pending < 0 ? null : pending + 1 };
 }
 
 export function addLine(trip, line, options) {

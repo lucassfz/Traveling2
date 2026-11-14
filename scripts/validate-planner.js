@@ -135,3 +135,27 @@ assert.equal(compareCashAndMiles({ fareBRL: 3000, points: 40000, taxesBRL: 200 }
 assert.ok(compareCashAndMiles({ fareBRL: 300, points: 40000, taxesBRL: 500 }).error, 'taxas acima do preço');
 
 console.log('Planner: modelo, totais, normalização, armazenamento, sugestões e milhas verificados.');
+
+// Passo a passo: etapa salva e progresso.
+{
+  const { PLANNER_STEPS, tripProgress } = await import('../js/planner/trip.model.js');
+  assert.equal(PLANNER_STEPS.length, 6);
+  const fresh = createTrip({ countryKey: 'Japan', idFactory });
+  assert.equal(fresh.step, 1);
+  assert.equal(fresh.entryReviewed, false);
+  assert.equal(normalizeTrip({ countryKey: 'Japan', step: 99 }, { idFactory }).step, 6);
+  assert.equal(normalizeTrip({ countryKey: 'Japan', step: 'x' }, { idFactory }).step, 1);
+  assert.equal(normalizeTrip({ countryKey: 'Japan', entryReviewed: 'yes' }, { idFactory }).entryReviewed, false);
+  let progress = tripProgress(fresh);
+  assert.deepEqual(progress.done, [true, false, false, false, false, false]);
+  assert.equal(progress.next, 2);
+  assert.equal(progress.completed, 1);
+  let planned = updateTrip(fresh, { startDate: '2027-04-02', endDate: '2027-04-10', budgetBRL: 20000, entryReviewed: true, step: 4 });
+  planned = addLine(planned, { category: 'flights', amountBRL: 9000 });
+  progress = tripProgress(planned);
+  assert.deepEqual(progress.done, [true, true, true, true, true, true]);
+  assert.equal(progress.next, null);
+  assert.equal(planned.step, 4);
+  assert.equal(tripProgress(updateTrip(planned, { budgetBRL: null })).done[3], false, 'sem orçamento nem outros gastos');
+  console.log('Planner: passo a passo (etapas, progresso e etapa salva) verificado.');
+}

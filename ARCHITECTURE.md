@@ -7,8 +7,8 @@
 - `js/provenance.js`: one label per money figure (verified, live, Traveling estimate, calculated, unverified).
 - `js/fx.service.js`: Banco Central do Brasil rates (PTAX API, then `data/fx-snapshot.json`).
 - `js/history.loader.js`: loads the four history datasets with `import()` when the History tab opens or the browser is idle; they are not part of `COUNTRIES`.
-- `js/planner/trip.model.js`, `js/planner/trip.store.js`: Planner v0 trips (pure model, validated by `scripts/validate-planner.js`) saved in localStorage under `traveling.trips`.
-- `js/planner/planner.ui.js`: planner side panel (loaded on first open), with sections from `flight.section.js` (flight estimate, destination costs from reviewed Discovery profiles, cash vs miles; math in `planner.estimates.js`) and `prep.section.js` (checklist progress shared with the drawer, entry summary with source).
+- `js/planner/trip.model.js`, `js/planner/trip.store.js`: Planner trips (pure model with `PLANNER_STEPS`, `tripProgress`, the saved `step` and `entryReviewed`; validated by `scripts/validate-planner.js`) saved in localStorage under `traveling.trips`.
+- `js/planner/planner.ui.js`: the Planner side panel (loaded on first open). A trip list plus a six-step flow: Destino, Datas, Voo, Orçamento, Preparação, Resumo. Each trip remembers its step; finished steps get a check from `tripProgress`. Step bodies for Voo and part of Orçamento come from `flight.section.js` (flight estimate, cash vs miles, destination costs from reviewed Discovery profiles; math in `planner.estimates.js`); Preparação comes from `prep.section.js` (entry summary with source, checklist progress shared with the drawer). Countries from the old "Quero ir" list (`traveling.wishlist`, read only) appear as destination ideas with ranges from `planner/ideas.js`.
 - `js/map.engine.js`: Three.js globe, progressive world build, raycasting and camera.
 - `js/geospatial.js`: authoritative WGS84 spherical transforms, Haversine and PIP.
 - `js/countries.dataset.js`: 196-entry catalog (sovereign states plus Kosovo, Taiwan and French Guiana) + curated/regional enrichment.
@@ -53,6 +53,8 @@ All country meshes, borders, markers, fly-to camera targets, and fallback PIP us
 ## Loading behavior
 
 Startup loads the catalog, globe and drawer only. History (~160 KB), the Miles hub (~63 KB, plus its DOM) and Discovery (~60 KB) load with dynamic `import()` on first use, and are prefetched with `requestIdleCallback` once the interface is ready. Until the Miles hub loads, a placeholder keeps the latest route context. The globe renders on demand: `MapEngine.invalidate()` schedules frames only while something changes.
+
+The shell is a single header (brand, search with `/` or Ctrl+K, Descobrir, Planner, Milhas, theme) plus a bottom dock (visited count, continents, visa-free filter). Icons are one inline SVG sprite in `index.html`. The brand reveal plays for about 1 s once per browser session. The dark-mode starfield is painted once per resize or theme change, not animated.
 
 The application UI no longer waits for the world atlas. The interface becomes interactive first, while the globe reports progressive status. Network fetches have timeouts. A classic-script boot guard hides the global loader after 8 seconds even if ES-module/CDN loading fails before `app.js` executes.
 

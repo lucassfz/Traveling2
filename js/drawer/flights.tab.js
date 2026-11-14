@@ -173,7 +173,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       elements.flightPreviewAirports.dataset.airportCode = guideAirport?.iata || '';
       if (guideAirport) elements.flightPreviewAirports.textContent = `Ver guia do aeroporto · ${guideAirport.iata}`;
       state.routeReturnFocus = returnFocus || elements.flightPreviewButton;
-      state.routeObscured = [...document.querySelectorAll('.country-panel, .discovery-panel, .miles-hub, .miles-launcher, .app-header, .continent-nav, .navigation-trail')]
+      state.routeObscured = [...document.querySelectorAll('.country-panel, .discovery-panel, .miles-hub, .app-header, .dock')]
         .map(element => [element, element.inert]);
       for (const [element] of state.routeObscured) element.inert = true;
       document.body.classList.add('route-mode');
