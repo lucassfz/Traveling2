@@ -14,8 +14,16 @@ export function createTripStore({ countries = null, read = readJsonStorage, writ
     legacyChecklist: needsMigration ? read(STORAGE_KEYS.checklist, {}) : null
   });
   let persistent = true;
-  // Grava já o formato novo, para a migração acontecer uma vez só.
-  if (needsMigration) persistent = write(STORAGE_KEYS.trips, data) !== false;
+  if (needsMigration) {
+    // 1. Guarda o conjunto antigo, como estava, antes de qualquer escrita
+    //    (só se ainda não houver backup: abrir de novo não sobrescreve).
+    // 2. Só então grava o formato novo, para a migração acontecer uma vez só.
+    // Se o backup não puder ser gravado, a migração fica só na memória desta
+    // sessão e o conjunto antigo continua intacto no armazenamento.
+    const backedUp = read(STORAGE_KEYS.tripsBackupV1, null) !== null
+      || write(STORAGE_KEYS.tripsBackupV1, { savedAt: new Date().toISOString(), data: raw }) !== false;
+    persistent = backedUp && write(STORAGE_KEYS.trips, data) !== false;
+  }
   const listeners = new Set();
 
   function commit(next) {

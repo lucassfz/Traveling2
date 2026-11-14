@@ -10,6 +10,8 @@ export async function getCountryMedia(countryKey, _country, limit = 3) {
       url: item.media.url,
       name: item.name,
       city: item.city,
+      wikidataId: item.wikidataId,
+      coordinates: item.coordinates ?? null,
       sourcePage: item.media.sourcePage,
       author: item.media.author,
       license: item.media.license

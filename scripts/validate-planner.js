@@ -341,6 +341,22 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.deepEqual(store.trips[0].checklist, { 'Japan:0:0': true });
   assert.equal(JSON.parse(memory.get('traveling.trips')).version, TRIP_SCHEMA_VERSION, 'formato novo gravado');
   assert.ok(memory.has('traveling.checklist'), 'chave antiga preservada');
+  const backup = JSON.parse(memory.get('traveling.trips.backup-v1'));
+  assert.equal(backup.data.version, 1, 'backup guarda o conjunto antigo intacto');
+  assert.equal(backup.data.trips[0].id, a.id);
+  // Abrir de novo: já está na versão 2, não migra nem mexe no backup.
+  const backupBefore = memory.get('traveling.trips.backup-v1');
+  createTripStore(io);
+  assert.equal(memory.get('traveling.trips.backup-v1'), backupBefore, 'migração roda uma vez só');
+  // Backup bloqueado: nada é gravado, o conjunto antigo continua no armazenamento.
+  const locked = new Map([['traveling.trips', JSON.stringify({ version: 1, trips: [a] })]]);
+  const lockedStore = createTripStore({
+    countries: COUNTRIES,
+    read: (key, fallback) => locked.has(key) ? JSON.parse(locked.get(key)) : fallback,
+    write: key => key !== 'traveling.trips.backup-v1' && (locked.set(key, 'x'), true)
+  });
+  assert.equal(JSON.parse(locked.get('traveling.trips')).version, 1, 'sem backup, o formato antigo não é sobrescrito');
+  assert.equal(lockedStore.trips.length, 1, 'mas as viagens abrem normalmente na sessão');
 
   // Duplicar: id novo, logo depois da original, checklist e conferência zerados.
   store.save(updateTrip(store.trips[0], { entryReviewed: true }));

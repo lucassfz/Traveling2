@@ -1,9 +1,11 @@
 import { escapeHtml } from '../core/html.js';
 import { loadGeo } from '../geo/geo.repository.js';
+import { loadSummaries, summaryFor, summaryHtml, summaryImageHtml } from '../summaries.js';
 
 // Seção "Estados" da Visão geral: Mundo › País › Estado › Cidade.
 // Só aparece em países com data/geo/<ISO2>.json; nos outros fica oculta.
-// Mostra apenas fatos do arquivo (nome, sigla, região, capital, coordenadas).
+// Mostra fatos do arquivo (nome, sigla, região, capital, coordenadas) e, quando
+// existe, o resumo da Wikipédia ligado pelo código do estado ou do município.
 
 const CITY_DISTANCE = 1.7;
 
@@ -28,9 +30,11 @@ function sourcesNote(geo) {
  * @param {() => void} ctx.onWorld          Volta para o globo inteiro.
  * @param {(place: object, division: object) => void} [ctx.onPlace] "Ver no globo" de uma cidade.
  * @param {(place: object, division: object) => void} [ctx.onPlan]  "Planejar viagem" para uma cidade.
+ * @param {object} [ctx.saved] Destinos salvos: { state(place, division) → Promise<boolean>, toggle(place, division) → Promise<boolean> }.
  */
-export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan }) {
+export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan, saved }) {
   let geo = null;
+  let view = { level: 'country', id: null };
   let countryName = '';
   let countryKey = null;
   const STATE_DISTANCE = 2;
@@ -46,7 +50,19 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
     return `<nav class="geo-nav__breadcrumb" aria-label="Você está em"><ol>${items.join('')}</ol></nav>`;
   }
 
+  function back(label, attrs) {
+    return `<button type="button" class="geo-nav__back" ${attrs}>← ${escapeHtml(label)}</button>`;
+  }
+
+  // Resumos chegam depois da primeira pintura: redesenha a vista atual sem mexer no foco.
+  function rerenderKeepingFocus() {
+    if (!geo) return;
+    if (view.level === 'division') renderDivision(view.id, { focus: false });
+    else if (view.level === 'place') renderPlace(view.id, { focus: false });
+  }
+
   function renderCountry() {
+    view = { level: 'country', id: null };
     const groups = new Map();
     for (const division of geo.divisions) {
       const key = division.region || '';
@@ -70,15 +86,20 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
       </div>`;
   }
 
-  function renderDivision(divisionId) {
+  function renderDivision(divisionId, { focus = true } = {}) {
     const division = geo.division(divisionId);
     if (!division) return renderCountry();
+    view = { level: 'division', id: division.id };
+    const about = summaryFor('divisions', division.id);
     const capital = geo.capitalPlace(division.id);
     const places = geo.places(division.id);
     const ordered = capital ? [capital, ...places.filter(place => place !== capital)] : places;
     root.innerHTML = `
       ${breadcrumb([[countryName, 'data-geo-country'], [division.name]])}
+      ${back(countryName, 'data-geo-country')}
       <h3 class="geo-nav__title" tabindex="-1">${escapeHtml(division.name)}</h3>
+      ${summaryImageHtml(about, division.name)}
+      ${summaryHtml(about, { className: 'geo-nav__about' })}
       <div class="info-grid">
         <article class="info-card"><div class="info-card__value">${escapeHtml(division.capital.name)}</div><div class="info-card__label">Capital</div></article>
         <article class="info-card"><div class="info-card__value">${escapeHtml(division.region || '—')}</div><div class="info-card__label">Região</div></article>
@@ -93,17 +114,25 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
         </ul>
         ${ordered.length === 1 ? '<p class="geo-nav__note">Por enquanto, só a capital deste estado.</p>' : ''}` : ''}
       ${sourcesNote(geo)}`;
-    root.querySelector('.geo-nav__title')?.focus({ preventScroll: true });
+    if (focus) root.querySelector('.geo-nav__title')?.focus({ preventScroll: true });
   }
 
-  function renderPlace(placeId) {
+  function renderPlace(placeId, { focus = true } = {}) {
     const place = geo.place(placeId);
     const division = place && geo.division(place.division);
     if (!place || !division) return renderCountry();
+    view = { level: 'place', id: place.id };
+    const about = summaryFor('places', place.id);
     const isCapital = geo.capitalPlace(division.id) === place;
     root.innerHTML = `
       ${breadcrumb([[countryName, 'data-geo-country'], [division.name, `data-geo-division="${escapeHtml(division.id)}"`], [place.name]])}
-      <h3 class="geo-nav__title" tabindex="-1">${escapeHtml(place.name)}</h3>
+      ${back(division.name, `data-geo-division="${escapeHtml(division.id)}"`)}
+      <div class="geo-nav__title-row">
+        <h3 class="geo-nav__title" tabindex="-1">${escapeHtml(place.name)}</h3>
+        ${saved ? `<button type="button" class="save-toggle" data-geo-save="${escapeHtml(place.id)}" aria-pressed="false">Salvar</button>` : ''}
+      </div>
+      ${summaryImageHtml(about, `${place.name}, ${division.name}`)}
+      ${summaryHtml(about, { className: 'geo-nav__about' })}
       <div class="info-grid">
         <article class="info-card"><div class="info-card__value">${escapeHtml(division.name)}</div><div class="info-card__label">${isCapital ? 'Capital do estado' : 'Estado'}</div></article>
         <article class="info-card"><div class="info-card__value">${formatCoordinate(place.lat, 'N', 'S')}, ${formatCoordinate(place.lng, 'L', 'O')}</div><div class="info-card__label">Coordenadas</div></article>
@@ -112,9 +141,20 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
         <button type="button" class="secondary-button geo-nav__fly" data-geo-fly="${escapeHtml(place.id)}">Ver no globo</button>
         ${onPlan ? `<button type="button" class="primary-button" data-geo-plan="${escapeHtml(place.id)}">Planejar viagem para ${escapeHtml(place.name)}</button>` : ''}
       </div>
-      <p class="geo-nav__note">Guia de ${escapeHtml(place.name)} ainda não disponível.</p>
+      ${about ? '' : `<p class="geo-nav__note">Ainda não há resumo de ${escapeHtml(place.name)}.</p>`}
       ${sourcesNote(geo)}`;
-    root.querySelector('.geo-nav__title')?.focus({ preventScroll: true });
+    if (focus) root.querySelector('.geo-nav__title')?.focus({ preventScroll: true });
+    syncSaveButton(place, division);
+  }
+
+  async function syncSaveButton(place, division) {
+    const button = root.querySelector(`[data-geo-save="${CSS.escape(place.id)}"]`);
+    if (!button || !saved) return;
+    const isSaved = await saved.state(place, division);
+    if (!button.isConnected) return;
+    button.setAttribute('aria-pressed', String(isSaved));
+    button.textContent = isSaved ? '✓ Salvo' : 'Salvar';
+    button.setAttribute('aria-label', `${isSaved ? 'Remover dos salvos' : 'Salvar'}: ${place.name}`);
   }
 
   root.addEventListener('click', event => {
@@ -137,6 +177,11 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
       return renderDivision(target.dataset.geoDivision);
     }
     if (target.dataset.geoPlace) return renderPlace(target.dataset.geoPlace);
+    if (target.dataset.geoSave) {
+      const place = geo.place(target.dataset.geoSave);
+      if (place) saved?.toggle(place, geo.division(place.division)).then(() => syncSaveButton(place, geo.division(place.division)));
+      return;
+    }
     const placeId = target.dataset.geoFly || target.dataset.geoPlan;
     const place = placeId ? geo.place(placeId) : null;
     if (!place) return;
@@ -165,6 +210,25 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan })
       countryKey = country.key ?? null;
       renderCountry();
       root.hidden = false;
+      loadSummaries().then(() => { if (current === token) rerenderKeepingFocus(); });
+    },
+    // Abre direto um estado ou uma cidade (destinos salvos). Espera os dados do país.
+    async open({ divisionId = null, placeId = null } = {}) {
+      for (let tries = 0; !geo && tries < 50; tries += 1) await new Promise(resolve => setTimeout(resolve, 60));
+      if (!geo) return false;
+      await loadSummaries();
+      if (placeId && geo.place(placeId)) renderPlace(placeId);
+      else if (divisionId && geo.division(divisionId)) renderDivision(divisionId);
+      else return false;
+      root.scrollIntoView({ block: 'start' });
+      return true;
+    },
+    // O destino salvo mudou em outro lugar (painel de salvos): atualiza o botão.
+    refreshSaved() {
+      if (view.level === 'place' && geo) {
+        const place = geo.place(view.id);
+        if (place) syncSaveButton(place, geo.division(place.division));
+      }
     },
     clear() {
       token += 1;

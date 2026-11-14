@@ -613,7 +613,12 @@ export class PlannerUI {
         <label class="sr-only" for="planner-origin">Aeroporto de saída</label>
         <select class="form-field__control" id="planner-origin" data-planner-field="origin">
           ${airportOptions.map(([code, name]) => `<option value="${code}" ${code === trip.origin ? 'selected' : ''}>${escapeHtml(name)} (${code})</option>`).join('')}
-        </select>`)}`;
+        </select>
+        <label class="planner-origin-other" for="planner-origin-code">
+          <span class="planner-hint">Outro aeroporto, de qualquer país: digite o código IATA ou ICAO (ex.: LIS, MIA, SBRF).</span>
+          <input class="form-field__control" id="planner-origin-code" type="text" inputmode="latin" maxlength="4" autocomplete="off" spellcheck="false"
+            placeholder="Código" value="${ORIGIN_AIRPORTS.some(([code]) => code === trip.origin) ? '' : escapeHtml(trip.origin)}" data-planner-field="origin">
+        </label>`)}`;
   }
 
   // ---------- Etapa 3: voo ----------
@@ -804,7 +809,15 @@ export class PlannerUI {
     const target = event.target;
     const field = target.dataset.plannerField;
     if (!field || !this.trip || this.view !== 'trip') return;
-    const saved = this.update({ [field]: target.value });
+    if (field === 'origin' && !target.value.trim()) return;
+    const saved = this.update({ [field]: field === 'origin' ? target.value.trim().toUpperCase() : target.value });
+    if (saved && field === 'origin') {
+      // Lista e campo livre mostram a mesma origem.
+      const select = this.element.querySelector('#planner-origin');
+      const code = this.element.querySelector('#planner-origin-code');
+      if (select && [...select.options].some(option => option.value === saved.origin)) select.value = saved.origin;
+      if (code) code.value = ORIGIN_AIRPORTS.some(([value]) => value === saved.origin) ? '' : saved.origin;
+    }
     // Mostra o valor como foi guardado (datas trocadas, código em maiúsculas).
     if (saved) {
       for (const input of this.element.querySelectorAll('[data-planner-field="startDate"], [data-planner-field="endDate"]')) {

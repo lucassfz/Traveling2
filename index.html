@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.16">
+  <link rel="stylesheet" href="styles.css?v=2026.11.17">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -37,6 +37,7 @@
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4-6 4V4.8a1 1 0 0 1 1-1z"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.6c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></symbol>
   </svg>
 
@@ -81,6 +82,10 @@
       <button class="header-action" id="trips-launcher" type="button" aria-expanded="false" aria-controls="planner-panel" aria-label="Viagens" title="Planejar viagem">
         <svg class="icon" aria-hidden="true"><use href="#i-suitcase"/></svg><span class="header-action__label">Viagens</span>
         <span class="header-action__badge" id="trips-count" hidden>0</span>
+      </button>
+      <button class="header-action" id="saved-launcher" type="button" aria-expanded="false" aria-controls="saved-panel" aria-label="Destinos salvos" title="Destinos salvos">
+        <svg class="icon" aria-hidden="true"><use href="#i-bookmark"/></svg><span class="header-action__label">Salvos</span>
+        <span class="header-action__badge" id="saved-count" hidden>0</span>
       </button>
       <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
         <svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg><span class="header-action__label">Milhas</span>
@@ -157,10 +162,23 @@
     <div class="planner" id="planner-content"><p class="planner-empty">Carregando…</p></div>
   </aside>
 
+  <aside class="miles-hub saved-panel" id="saved-panel" aria-label="Destinos salvos" inert>
+    <header class="miles-hub__header">
+      <div>
+        <span class="eyebrow">Para ver depois</span>
+        <h2 class="miles-hub__title">Destinos salvos</h2>
+        <p class="miles-hub__subtitle">Países, cidades e lugares que chamaram sua atenção. Salvar não cria viagem.</p>
+      </div>
+      <button class="icon-button" id="saved-close-button" type="button" aria-label="Fechar destinos salvos"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="saved-list" id="saved-content"></div>
+  </aside>
+
   <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
     <header class="country-panel__toolbar">
       <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
       <span class="country-panel__spacer"></span>
+      <button class="visit-button save-toggle" id="country-save-button" type="button" aria-pressed="false">Salvar</button>
       <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
     </header>
 
@@ -185,6 +203,7 @@
 
     <div class="country-panel__content">
       <section class="country-tab country-tab--active" id="tab-overview" data-tab-panel="overview" role="tabpanel">
+        <div id="country-intro"></div>
         <div class="media-strip" id="country-media" aria-label="Lugares em destaque"></div>
         <div class="info-grid" id="country-basics"></div>
         <section class="content-section geo-nav" id="country-regions" aria-label="Estados e cidades" hidden></section>
@@ -252,6 +271,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.16"></script>
+  <script type="module" src="js/app.js?v=2026.11.17"></script>
 </body>
 </html>

@@ -3312,3 +3312,102 @@ body.route-mode .city-card { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .planner-trip-menu__list, .planner-dialog, .planner-toast { animation: none; }
 }
+
+/* ---------- Fase 2: descoberta geográfica e destinos salvos ---------- */
+
+/* Botão "Salvar" (país, cidade, lugar): discreto, com estado ligado. */
+.save-toggle {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
+}
+.save-toggle:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+.save-toggle[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+.save-toggle--small { min-height: 26px; padding: 0 9px; font-size: .68rem; font-weight: 600; }
+.country-panel__toolbar .save-toggle { margin-right: var(--space-2); }
+
+/* Introdução do país e resumos: texto curto com crédito ao lado. */
+.country-intro,
+.geo-nav__about {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: .9rem;
+  line-height: 1.6;
+}
+.summary__source {
+  margin-left: 4px;
+  color: var(--color-text-muted);
+  font-size: .72rem;
+  white-space: nowrap;
+}
+.summary__source::before { content: '· '; }
+.media-card__title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.media-card__about { margin: 4px 0 2px; color: var(--color-text-secondary); font-size: .74rem; font-weight: 400; line-height: 1.45; }
+.media-card__about .summary__source { font-size: .64rem; }
+
+/* Estados e cidades: voltar um nível, foto do artigo e título com "Salvar". */
+.geo-nav__back {
+  margin: 0 0 var(--space-2);
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.geo-nav__back:hover { color: var(--color-text); }
+.geo-nav__title-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.geo-nav__title-row .geo-nav__title { margin: 0; }
+.geo-photo { margin: 0 0 var(--space-3); overflow: hidden; border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); background: var(--color-background-elevated); }
+.geo-photo img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.geo-photo figcaption { padding: 6px 10px; font-size: .64rem; }
+.geo-photo figcaption a { color: var(--color-text-muted); }
+
+/* Cartão de cidade do globo: ferramentas à direita do título. */
+.city-card__tools { display: flex; align-items: center; gap: 6px; }
+
+/* Painel de destinos salvos (mesmo lugar do Planner e de Milhas). */
+.saved-list { padding: 0 0 var(--space-5); }
+.saved-items { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.saved-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-tint);
+}
+.saved-item__image { width: 72px; height: 72px; border-radius: var(--radius-xs); object-fit: cover; }
+.saved-item__flag { width: 48px; max-height: 36px; margin: 6px auto 0; border-radius: 4px; box-shadow: 0 0 0 1px var(--color-border-soft); }
+.saved-item__body { display: grid; gap: 2px; min-width: 0; }
+.saved-item__body strong { color: var(--color-text); font-size: .95rem; overflow-wrap: anywhere; }
+.saved-item__body small { color: var(--color-text-secondary); font-size: .78rem; }
+.saved-item__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-2); }
+.saved-item__actions .secondary-button { min-height: 32px; padding: 0 12px; font-size: .76rem; }
+.saved-empty { display: grid; gap: 6px; padding: var(--space-5); border: 1px dashed var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary); text-align: center; }
+.saved-empty strong { color: var(--color-text); }
+.saved-empty p { margin: 0; font-size: .85rem; }
+/* O rótulo "Salvos" só aparece com folga; abaixo disso fica o ícone (com nome acessível). */
+@media (max-width: 1439px) {
+  #saved-launcher .header-action__label { display: none; }
+  #saved-launcher { padding: 0 10px; }
+}
+/* Planner, etapa Voo: origem livre e rota no globo. */
+.planner-origin-other { display: grid; gap: 6px; margin-top: var(--space-3); }
+.planner-origin-other .form-field__control { max-width: 160px; text-transform: uppercase; }
+.planner-route-preview { margin-top: var(--space-3); }

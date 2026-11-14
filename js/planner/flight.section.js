@@ -19,9 +19,10 @@ export const CABINS = Object.freeze({ economy: 'Econômica', premium: 'Premium E
  * @param {(lat: number, lng: number) => Promise<object|null>} [deps.resolveCityAirport] Aeroporto de chegada de uma cidade.
  * @param {() => object|null} deps.getFx     Câmbio do dólar ({ rate, date, kind, label, source }).
  * @param {() => object} [deps.getRates]     Tabela de currency.rateTable().
+ * @param {(origin: object, destination: object, trip: object) => void} [deps.onPreviewRoute] Mostra a rota no globo.
  * @returns {object[]} Seções do passo a passo: { id, step, render, bind, refresh }.
  */
-export function createFlightSections({ airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, getFx, getRates = () => ({}) }) {
+export function createFlightSections({ airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, getFx, getRates = () => ({}), onPreviewRoute = null }) {
   let route = null;
 
   const usdRate = () => rateFor('USD', getRates()) ?? (getFx()?.rate > 0 ? getFx() : null);
@@ -39,7 +40,8 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
         .then(airport => airport ?? resolveDestinationAirport(trip.countryKey))
     ]);
     if (route.key !== key) return route;
-    if (!origin || !destination) route = { key, status: 'error', message: 'Ainda não há estimativa de voo para este destino.' };
+    if (!origin) route = { key, status: 'error', message: `Aeroporto de origem ${trip.origin} não encontrado. Confira o código na etapa Datas.` };
+    else if (!destination) route = { key, status: 'error', message: 'Ainda não há estimativa de voo para este destino.' };
     else if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) route = { key, status: 'error', message: 'Origem e destino são o mesmo aeroporto.' };
     else {
       const month = tripMonth(trip) ?? new Date().getMonth();
@@ -72,7 +74,8 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
         <small>${escapeHtml(codes(route))} · ${escapeHtml(CABINS[trip.cabin])}${trip.city ? ` · aeroporto que atende ${escapeHtml(trip.city.name)}` : ''}</small>
       </div>
       ${miles}
-      ${provenanceLabel('estimate', { detail: 'por distância, mês e cabine; não é cotação. Confira preço e disponibilidade na companhia ou no programa' })}`;
+      ${provenanceLabel('estimate', { detail: 'por distância, mês e cabine; não é cotação. Confira preço e disponibilidade na companhia ou no programa' })}
+      ${onPreviewRoute ? '<button class="secondary-button planner-route-preview" type="button" data-planner-preview-route>Ver rota no globo</button>' : ''}`;
   }
 
   function fill(root, trip) {
@@ -100,7 +103,13 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
         <h4 class="planner-block-title">Quanto custa, em média</h4>
         <div id="planner-flight-info" aria-live="polite">${infoHtml(trip)}</div>
       </div>`,
-    bind: (root, trip, ui) => update(root, trip, ui),
+    bind: (root, trip, ui) => {
+      root.querySelector('#planner-flight-info')?.addEventListener('click', event => {
+        if (!event.target.closest('[data-planner-preview-route]') || route?.status !== 'ready') return;
+        onPreviewRoute?.(route.origin, route.destination, ui.trip);
+      });
+      update(root, trip, ui);
+    },
     refresh: (root, trip, ui) => update(root, trip, ui)
   }];
 }

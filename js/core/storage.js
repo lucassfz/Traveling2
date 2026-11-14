@@ -8,6 +8,11 @@ export const STORAGE_KEYS = Object.freeze({
   checklist: 'traveling.checklist',
   theme: 'traveling.theme',
   trips: 'traveling.trips',
+  // Cópia intacta de traveling.trips no formato antigo, gravada uma vez antes da
+  // migração para a versão 2 (checklist por viagem). Nunca é apagada pelo app.
+  tripsBackupV1: 'traveling.trips.backup-v1',
+  // Destinos salvos (países, cidades, lugares), separados das viagens.
+  saved: 'traveling.saved',
   globeHint: 'traveling.globeHint'
 });
 

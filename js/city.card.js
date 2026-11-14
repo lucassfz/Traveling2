@@ -34,8 +34,9 @@ function coordinate(value, positive, negative) {
  * @param {(countryKey: string, city: object) => void} deps.onPlan
  * @param {(city: object) => void} deps.onZoom
  * @param {() => void} deps.onClose
+ * @param {object} [deps.saved]   { isSaved(city) → boolean, toggle(city, countryKey) → boolean }
  */
-export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose }) {
+export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, saved = null }) {
   const byAlpha2 = new Map(Object.entries(countries).map(([key, country]) => [country.alpha2, key]));
   let current = null;
   let clock = 0;
@@ -60,7 +61,10 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
           <h2 class="city-card__name" id="city-card-title" tabindex="-1">${escapeHtml(city.name)}</h2>
           <small>${escapeHtml([city.region, country?.namePt ?? city.country].filter(Boolean).join(' · '))}</small>
         </div>
-        <button class="icon-button city-card__close" type="button" data-city-action="close" aria-label="Fechar cidade">✕</button>
+        <div class="city-card__tools">
+          ${saved && countryKey ? `<button class="save-toggle" type="button" data-city-action="save" aria-pressed="false">Salvar</button>` : ''}
+          <button class="icon-button city-card__close" type="button" data-city-action="close" aria-label="Fechar cidade">✕</button>
+        </div>
       </div>
       <dl class="city-card__facts">
         ${facts.map(([label, value]) => `<div><dt>${label}</dt><dd ${label === 'Hora local' ? 'data-city-clock' : ''}>${escapeHtml(value)}</dd></div>`).join('')}
@@ -72,6 +76,16 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
       </div>
       <p class="city-card__source">Dados: GeoNames (CC BY 4.0)</p>`;
     root.dataset.countryKey = countryKey ?? '';
+    syncSave();
+  }
+
+  function syncSave() {
+    const button = root.querySelector('[data-city-action="save"]');
+    if (!button || !current) return;
+    const isSaved = saved.isSaved(current);
+    button.setAttribute('aria-pressed', String(isSaved));
+    button.textContent = isSaved ? '✓ Salvo' : 'Salvar';
+    button.setAttribute('aria-label', `${isSaved ? 'Remover dos salvos' : 'Salvar'}: ${current.name}`);
   }
 
   root.addEventListener('click', event => {
@@ -80,6 +94,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     const countryKey = root.dataset.countryKey;
     if (action === 'close') hide(true);
     if (action === 'zoom') onZoom(current);
+    if (action === 'save' && countryKey) { saved?.toggle(current, countryKey); syncSave(); }
     if (action === 'country' && countryKey) { hide(); onShowCountry(countryKey); }
     if (action === 'plan' && countryKey) { const city = current; hide(); onPlan(countryKey, city); }
   });
@@ -106,5 +121,5 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     if (notify) onClose?.();
   }
 
-  return { show, hide, get isOpen() { return !root.hidden; } };
+  return { show, hide, syncSave, get isOpen() { return !root.hidden; }, get city() { return current; } };
 }

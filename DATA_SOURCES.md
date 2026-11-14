@@ -119,3 +119,21 @@ Cada país com divisões tem um arquivo `data/geo/<ISO2>.json`, carregado só qu
 - Contornos urbanos (`data/admin/urban/<ISO2>.json`): [Natural Earth 1:10m Urban Areas (LandScan)](https://github.com/nvkelso/natural-earth-vector/tree/ca96624a56bd078437bca8184e78163e5039ad19) e Urban Areas (domínio público), simplificados a ~600 m. Cada mancha urbana pertence à maior cidade dentro dela (a metrópole não é atribuída aos subúrbios); cidades sem mancha mapeada ficam sem contorno, sem círculo inventado. É a área urbanizada, não o limite legal do município.
 - Estado de cada cidade: polígono do Natural Earth que contém o ponto (o menor, para enclaves como Berlim e o Distrito Federal), com o mesmo nome em português do mapa; sem polígono, o admin1 do GeoNames. Bairros e lugares históricos do GeoNames (PPLX, PPLH, PPLQ, PPLW, PPLCH, PPLR) são excluídos. Correções pontuais de nomes truncados do Natural Earth ficam em `NAME_FIXES` no script.
 - Gerado por `npm run build:admin` e auditado por `node scripts/validate-admin.js`.
+
+## Resumos e fotos de países, lugares, estados e cidades (`data/summaries.pt.json`)
+
+- Texto: a abertura (uma ou duas frases) do artigo da [Wikipédia em português](https://pt.wikipedia.org/), licença [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.pt-br), obtida pela API REST de resumo em 14/11/2026. Nada foi reescrito: só houve limpeza mecânica — parênteses de pronúncia e grafia original retirados, vírgulas do aposto ("Japão, oficialmente Estado do Japão, é") e parênteses soltos que a própria extração da Wikipédia deixa, e duplas grafias "português europeu / português brasileiro" reduzidas à forma brasileira. Cada resumo aparece com link para o artigo. Bangladesh ficou sem resumo porque a extração veio vazia.
+- Ligação por identificador, nunca pelo nome: países pelo código ISO alfa-2 (Wikidata P297); lugares em destaque pelo Wikidata que já estava em `js/landmarks.media.js`, e só quando o país do item no Wikidata (P17) é o mesmo do app; estados pelo código ISO 3166-2 (P300); municípios pelo código do IBGE (P1585).
+- Fotos de estados e cidades: a imagem principal do artigo, do [Wikimedia Commons](https://commons.wikimedia.org/), com autor e licença lidos da página do arquivo. Bandeiras, brasões, mapas, selos e arquivos SVG são descartados.
+- Lugares, países ou cidades sem artigo, sem correspondência no Wikidata ou com país divergente ficam sem resumo, sem texto genérico no lugar.
+
+## Capitais
+
+- Capitais exibidas em inglês ou espanhol foram trocadas pela forma portuguesa usada pela [API de Países do IBGE](https://servicodados.ibge.gov.br/api/docs/paises) (consulta em 14/11/2026): Cidade da Guatemala, Cidade do Panamá, Assunção, Montevidéu e Uagadugu.
+- O IBGE não foi aplicado em bloco: ele usa formas pouco correntes no Brasil (por exemplo "Bisqueque", "Nuaquechote") e tem dados desatualizados (Palau aparece com Melequeoque; a capital é Ngerulmud desde 2006). Essas capitais ficaram como estavam.
+
+## Identidade das cidades do globo (`data/admin/`)
+
+- O id usado no app ("BR-174") é a posição da cidade no arquivo, que segue a população do GeoNames e muda a cada regeneração. Ele não é identidade estável.
+- `scripts/build-admin.js` passa a gravar o geonameid como coluna 8 de cada cidade e a desempatar a ordem por ele. Os arquivos atuais ainda não têm essa coluna: ela aparece na próxima execução de `npm run build:admin` (requer Node.js).
+- Destinos salvos guardam nome, coordenadas e, quando existe, o geonameid. A cidade é reencontrada por `resolveCity` (`js/geo/cities.js`): geonameid primeiro; senão o id antigo, se ainda for a mesma cidade; senão a cidade de mesmo nome a até 3 km do ponto guardado. Sem correspondência segura, o app abre o país e mostra o ponto, sem adivinhar.

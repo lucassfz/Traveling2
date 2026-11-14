@@ -39,7 +39,13 @@ for (const file of files) {
   assert.ok(Array.isArray(data.zones) && Array.isArray(data.regions), `${file}: zones/regions`);
   for (const zone of data.zones) assert.ok(/^[A-Za-z_]+\/[A-Za-z0-9_/+-]+$/.test(zone), `${file}: fuso "${zone}"`);
   const flagged = new Set();
-  for (const [index, [name, y, x, population, rank, zone, region, urban]] of data.cities.entries()) {
+  const geonameIds = new Set();
+  for (const [index, [name, y, x, population, rank, zone, region, urban, geonameId]] of data.cities.entries()) {
+    // Coluna 8 (opcional até o arquivo ser regenerado): geonameid, a identidade estável da cidade.
+    if (geonameId !== undefined) {
+      assert.ok(Number.isInteger(geonameId) && geonameId > 0 && !geonameIds.has(geonameId), `${file}: geonameid inválido ou repetido (${name})`);
+      geonameIds.add(geonameId);
+    }
     assert.ok(urban === 0 || urban === 1, `${file}: marca de contorno (${name})`);
     if (urban) flagged.add(index);
     assert.ok(zone === -1 || (Number.isInteger(zone) && zone < data.zones.length), `${file}: índice de fuso (${name})`);

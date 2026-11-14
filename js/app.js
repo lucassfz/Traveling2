@@ -19,7 +19,9 @@ import { createRegionsSection } from './drawer/regions.section.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 import { createTripStore } from './planner/trip.store.js';
 import { createTrip } from './planner/trip.model.js';
-import { loadCities } from './geo/cities.js';
+import { loadCities, resolveCity } from './geo/cities.js';
+import { createSavedStore } from './saved.store.js';
+import { loadSummaries, summaryFor, summaryHtml } from './summaries.js';
 
 const MONTHS = Object.freeze(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']);
 const elements = {
@@ -44,6 +46,13 @@ const elements = {
   panel: document.getElementById('country-panel'),
   panelClose: document.getElementById('country-panel-close'),
   visitButton: document.getElementById('visit-button'),
+  countrySaveButton: document.getElementById('country-save-button'),
+  countryIntro: document.getElementById('country-intro'),
+  savedLauncher: document.getElementById('saved-launcher'),
+  savedCount: document.getElementById('saved-count'),
+  savedPanel: document.getElementById('saved-panel'),
+  savedClose: document.getElementById('saved-close-button'),
+  savedContent: document.getElementById('saved-content'),
   countryFlag: document.getElementById('country-flag'),
   countryRegion: document.getElementById('country-region'),
   countryName: document.getElementById('country-name'),
@@ -110,6 +119,7 @@ const state = {
 
 const airportRepository = new AirportRepository();
 const tripStore = createTripStore({ countries: COUNTRIES });
+const savedStore = createSavedStore({ countries: COUNTRIES });
 const {
   resolveDestinationAirport,
   primeDestinationAirport,
@@ -124,13 +134,26 @@ const {
 // Estados e cidades (só países com data/geo/<ISO2>.json).
 // "Ver no globo" destaca a mesma cidade da camada de cidades do globo (procurada
 // pelo nome dentro do estado); "Planejar" leva essa cidade para o Planner.
-async function matchGlobeCity(country, place, division) {
+// Par pelo GeoNames (data/geo guarda o geonameid) ou, sem ele no arquivo do
+// globo, pelo mesmo nome a até 3 km das coordenadas do IBGE/GeoNames.
+async function matchGlobeCity(country, place) {
   if (!country?.alpha2) return null;
   const cities = await loadCities(country.alpha2).catch(() => []);
-  const same = city => city.name.localeCompare(place.name, 'pt-BR', { sensitivity: 'base' }) === 0;
-  return cities.find(city => same(city) && city.region && division?.name
-    && city.region.localeCompare(division.name, 'pt-BR', { sensitivity: 'base' }) === 0)
-    ?? (cities.filter(same).length === 1 ? cities.find(same) : null);
+  return resolveCity(cities, { name: place.name, lat: place.lat, lng: place.lng, geonameId: place.ids?.geonames });
+}
+
+// Destino salvo que corresponde a esta cidade do globo (mesmo geonameId, ou
+// mesmo nome a até 3 km). Evita salvar a mesma cidade duas vezes depois que o
+// arquivo do globo for regenerado e os ids mudarem.
+const COUNTRY_BY_ALPHA2 = new Map(Object.entries(COUNTRIES).map(([key, country]) => [country.alpha2, key]));
+
+function savedEntryForCity(city, countryKey) {
+  return savedStore.items.find(item => item.type === 'city' && item.countryKey === countryKey
+    && resolveCity([city], savedCityRef(item)) === city) ?? null;
+}
+
+function savedCityRef(item) {
+  return { id: item.cityId, name: item.name, lat: item.lat, lng: item.lng, geonameId: item.geonameId };
 }
 
 const regionsSection = createRegionsSection({
@@ -149,8 +172,48 @@ const regionsSection = createRegionsSection({
     const countryKey = state.countryKey;
     const city = await matchGlobeCity(COUNTRIES[countryKey], place, division);
     planTrip(countryKey, { city });
+  },
+  saved: {
+    state: async (place, division) => Boolean(await savedRegionCity(place, division)),
+    toggle: async (place, division) => {
+      const existing = await savedRegionCity(place, division);
+      if (existing) return !savedStore.remove(existing.id);
+      return Boolean(savedStore.save(await regionCityEntry(place, division)));
+    }
   }
 });
+
+// Cidade dos Estados como destino salvo: usa o id da cidade no globo (o mesmo do
+// cartão de cidade e do Planner) quando há par; senão, o id do lugar em data/geo.
+async function savedRegionCity(place, division) {
+  const entry = await regionCityEntry(place, division);
+  return savedStore.get(entry.id)
+    ?? savedStore.items.find(item => item.type === 'city' && item.countryKey === entry.countryKey
+      && (item.placeId === place.id || (item.geonameId && item.geonameId === entry.geonameId)))
+    ?? null;
+}
+
+async function regionCityEntry(place, division) {
+  const countryKey = state.countryKey;
+  const country = COUNTRIES[countryKey];
+  const city = await matchGlobeCity(country, place, division);
+  const image = summaryFor('places', place.id)?.image?.url;
+  return {
+    id: `city:${city?.id ?? place.id}`, type: 'city', countryKey, name: place.name,
+    context: `${division?.name ?? ''} · ${country.namePt}`, lat: place.lat, lng: place.lng,
+    placeId: place.id, divisionId: division?.id, ...(city ? { cityId: city.id } : {}), ...(image ? { image } : {}),
+    ...(Number.isInteger(city?.geonameId ?? place.ids?.geonames) ? { geonameId: city?.geonameId ?? place.ids.geonames } : {})
+  };
+}
+
+function cityCardEntry(city, countryKey) {
+  return {
+    id: `city:${city.id}`, type: 'city', countryKey, name: city.name,
+    context: [city.region, COUNTRIES[countryKey]?.namePt].filter(Boolean).join(' · '),
+    lat: city.lat, lng: city.lng, cityId: city.id, ...(city.region ? { region: city.region } : {}),
+    ...(Number.isInteger(city.geonameId) ? { geonameId: city.geonameId } : {})
+  };
+}
 
 function savePersistentState() {
   writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
@@ -290,7 +353,7 @@ function clearMedia() {
 function renderMedia(countryKey, country) {
   clearMedia();
   elements.media.innerHTML = '<div class="media-empty">Carregando mídia…</div>';
-  getCountryMedia(countryKey, country).then(media => {
+  Promise.all([getCountryMedia(countryKey, country), loadSummaries()]).then(([media]) => {
     if (state.countryKey !== countryKey) return;
     if (!media.length) {
       elements.media.innerHTML = '<div class="media-empty">Imagem ainda não disponível para este destino.</div>';
@@ -299,7 +362,12 @@ function renderMedia(countryKey, country) {
     elements.media.innerHTML = media.map((item, index) => `
       <figure class="media-card ${index === 0 ? 'media-card--primary' : ''}" aria-busy="true">
         <div class="media-card__visual"><img class="media-card__image" ${index === 0 ? `src="${escapeHtml(item.url)}" loading="eager"` : `data-src="${escapeHtml(item.url)}" loading="lazy"`} alt="${escapeHtml(item.name)} em ${escapeHtml(item.city)}" decoding="async"></div>
-        <figcaption class="media-card__city"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.city)}</span><a href="${escapeHtml(item.sourcePage)}" target="_blank" rel="noopener noreferrer" aria-label="Crédito da imagem de ${escapeHtml(item.name)}">${escapeHtml(item.author)} · ${escapeHtml(item.license)}</a></figcaption>
+        <figcaption class="media-card__city">
+          <span class="media-card__title"><strong>${escapeHtml(item.name)}</strong>${landmarkSaveButton(countryKey, item)}</span>
+          <span>${escapeHtml(item.city)}</span>
+          ${summaryHtml(summaryFor('landmarks', item.wikidataId), { className: 'media-card__about' })}
+          <a href="${escapeHtml(item.sourcePage)}" target="_blank" rel="noopener noreferrer" aria-label="Crédito da imagem de ${escapeHtml(item.name)}">Foto: ${escapeHtml(item.author)} · ${escapeHtml(item.license)}</a>
+        </figcaption>
       </figure>
     `).join('');
     const deferred = [...elements.media.querySelectorAll('img[data-src]')];
@@ -319,6 +387,145 @@ function renderMedia(countryKey, country) {
     }, { root: elements.panel.querySelector('.country-panel__content'), rootMargin: '120px 0px' });
     for (const image of deferred) state.mediaObserver.observe(image);
   });
+}
+
+function landmarkEntry(countryKey, item) {
+  return {
+    id: `place:${item.wikidataId}`, type: 'place', countryKey, name: item.name,
+    context: `${item.city} · ${COUNTRIES[countryKey].namePt}`, placeId: item.wikidataId,
+    ...(Array.isArray(item.coordinates) ? { lat: item.coordinates[0], lng: item.coordinates[1] } : {}),
+    ...(item.url ? { image: item.url } : {})
+  };
+}
+
+function landmarkSaveButton(countryKey, item) {
+  if (!item.wikidataId) return '';
+  const saved = savedStore.has(`place:${item.wikidataId}`);
+  return `<button class="save-toggle save-toggle--small" type="button" data-save-landmark="${escapeHtml(item.wikidataId)}" aria-pressed="${saved}" aria-label="${saved ? 'Remover dos salvos' : 'Salvar'}: ${escapeHtml(item.name)}">${saved ? '✓ Salvo' : 'Salvar'}</button>`;
+}
+
+// Introdução do país (abertura do artigo da Wikipédia), quando existe.
+function renderIntro(countryKey, country) {
+  elements.countryIntro.innerHTML = '';
+  loadSummaries().then(() => {
+    if (state.countryKey !== countryKey) return;
+    elements.countryIntro.innerHTML = summaryHtml(summaryFor('countries', country.alpha2), { className: 'country-intro' });
+  });
+}
+
+function renderCountrySaved() {
+  const key = state.countryKey;
+  const saved = key ? savedStore.has(`country:${key}`) : false;
+  elements.countrySaveButton.setAttribute('aria-pressed', String(saved));
+  elements.countrySaveButton.textContent = saved ? '✓ Salvo' : 'Salvar';
+  elements.countrySaveButton.setAttribute('aria-label', `${saved ? 'Remover dos salvos' : 'Salvar'}: ${COUNTRIES[key]?.namePt ?? 'país'}`);
+}
+
+function toggleCountrySaved() {
+  const key = state.countryKey;
+  const country = COUNTRIES[key];
+  if (!country) return;
+  savedStore.toggle({ id: `country:${key}`, type: 'country', countryKey: key, name: country.namePt, context: country.region || CONTINENT_LABELS[country.continent] || '' });
+}
+
+// ---------- Destinos salvos ----------
+
+const SAVED_TYPES = { country: 'País', city: 'Cidade', place: 'Lugar' };
+
+function savedThumb(item) {
+  if (item.image) return `<img class="saved-item__image" src="${escapeHtml(item.image)}" alt="" loading="lazy" decoding="async">`;
+  const flag = flagImageUrl(COUNTRIES[item.countryKey]?.alpha2);
+  return flag ? `<img class="saved-item__flag" src="${flag}" alt="" loading="lazy" decoding="async">` : '<span class="saved-item__flag" aria-hidden="true"></span>';
+}
+
+function renderSaved() {
+  const items = savedStore.items;
+  elements.savedCount.hidden = items.length === 0;
+  elements.savedCount.textContent = String(items.length);
+  elements.savedLauncher.setAttribute('aria-label', items.length ? `Destinos salvos (${items.length})` : 'Destinos salvos');
+  if (!elements.savedPanel.classList.contains('miles-hub--open')) return;
+  elements.savedContent.innerHTML = items.length ? `
+    <ul class="saved-items">
+      ${items.map(item => `
+        <li class="saved-item">
+          ${savedThumb(item)}
+          <div class="saved-item__body">
+            <span class="eyebrow">${escapeHtml(SAVED_TYPES[item.type])}</span>
+            <strong>${escapeHtml(item.name)}</strong>
+            ${item.context ? `<small>${escapeHtml(item.context)}</small>` : ''}
+            <div class="saved-item__actions">
+              <button class="secondary-button" type="button" data-saved-open="${escapeHtml(item.id)}">Abrir</button>
+              <button class="secondary-button" type="button" data-saved-plan="${escapeHtml(item.id)}">Planejar viagem</button>
+              <button class="planner-text-button" type="button" data-saved-remove="${escapeHtml(item.id)}" aria-label="Remover ${escapeHtml(item.name)} dos salvos">Remover</button>
+            </div>
+          </div>
+        </li>`).join('')}
+    </ul>
+    ${savedStore.persistent ? '<p class="planner-saved">Salvo neste navegador. Remover daqui não mexe nas suas viagens.</p>' : '<p class="planner-saved planner-saved--warning" role="status">Este navegador não permite salvar. A lista fica só até fechar a página.</p>'}` : `
+    <div class="saved-empty">
+      <strong>Nada salvo ainda</strong>
+      <p>Toque em "Salvar" num país, numa cidade ou num lugar em destaque para guardar aqui.</p>
+    </div>`;
+}
+
+function isSavedOpen() {
+  return elements.savedPanel.classList.contains('miles-hub--open');
+}
+
+function setSavedOpen(open, restoreFocus = false) {
+  if (open === isSavedOpen()) return;
+  if (open) {
+    state.discovery?.close();
+    setPlannerOpen(false);
+    setMilesOpen(false);
+    if (window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
+  }
+  elements.savedPanel.classList.toggle('miles-hub--open', open);
+  elements.savedPanel.inert = !open;
+  elements.savedLauncher.setAttribute('aria-expanded', String(open));
+  if (open) {
+    renderSaved();
+    elements.savedClose.focus();
+  } else if (restoreFocus) elements.savedLauncher.focus();
+}
+
+// Cidade salva → cidade do globo. O id de data/admin é a posição no arquivo e
+// muda quando o arquivo é regenerado: resolveCity usa geonameId e, sem ele,
+// o mesmo nome a até 3 km das coordenadas guardadas. Sem correspondência
+// segura, devolve null (o app abre o país e voa até as coordenadas).
+async function findSavedCity(item) {
+  if (item.type !== 'city') return null;
+  const cities = await loadCities(COUNTRIES[item.countryKey]?.alpha2).catch(() => []);
+  return resolveCity(cities, savedCityRef(item));
+}
+
+async function openSaved(item) {
+  if (window.innerWidth < 1200) setSavedOpen(false);
+  if (item.type === 'city' && !item.placeId) {
+    // Cidade do globo: abre o cartão da cidade, como um clique no mapa.
+    const city = await findSavedCity(item);
+    if (city) return selectCity(city);
+    // Cidade não reencontrada com segurança: abre o país e mostra o ponto salvo.
+    selectCountry(item.countryKey);
+    if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, 1.7);
+    return;
+  }
+  selectCountry(item.countryKey);
+  if (item.type === 'city' && item.placeId) {
+    if (await regionsSection.open({ placeId: item.placeId, divisionId: item.divisionId })) {
+      const city = await findSavedCity(item);
+      if (city) state.map?.selectCity(city);
+      else if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, 1.7);
+    }
+  } else if (item.type === 'place' && Number.isFinite(item.lat)) {
+    state.map?.flyTo(item.lat, item.lng, 1.6);
+  }
+}
+
+async function planSaved(item) {
+  const city = await findSavedCity(item);
+  setSavedOpen(false);
+  planTrip(item.countryKey, { city });
 }
 
 function renderBasics(country) {
@@ -501,6 +708,8 @@ function renderCountry(countryKey) {
   elements.visitButton.classList.toggle('visit-button--active', state.visited.has(countryKey));
   elements.visitButton.textContent = state.visited.has(countryKey) ? '✓ Visitado' : 'Marcar visitado';
 
+  renderCountrySaved();
+  renderIntro(countryKey, country);
   renderMedia(countryKey, country);
   renderBasics(country);
   regionsSection.show(country);
@@ -526,7 +735,14 @@ function selectCity(city) {
     onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
     onPlan: (countryKey, city) => planTrip(countryKey, { city }),
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
-    onClose: () => state.map?.selectCity(null)
+    onClose: () => state.map?.selectCity(null),
+    saved: {
+      isSaved: city => Boolean(savedEntryForCity(city, COUNTRY_BY_ALPHA2.get(city.country))),
+      toggle: (city, countryKey) => {
+        const existing = savedEntryForCity(city, countryKey);
+        return existing ? !savedStore.remove(existing.id) : Boolean(savedStore.save(cityCardEntry(city, countryKey)));
+      }
+    }
   });
   state.map?.selectCity(city);
   cityCard.show(city);
@@ -607,6 +823,7 @@ function home() {
 function resetToGlobe() {
   setPlannerOpen(false);
   setMilesOpen(false);
+  setSavedOpen(false);
   home();
   elements.homeButton.focus({ preventScroll: true });
 }
@@ -655,6 +872,7 @@ function setMilesOpen(open, restoreFocus = false) {
   if (open) {
     state.discovery?.close();
     setPlannerOpen(false);
+    setSavedOpen(false);
     ensureMilesEngine().catch(() => {});
   }
   if (open && window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
@@ -751,6 +969,32 @@ function bindUiEvents() {
 
   elements.panelClose.addEventListener('click', resetToGlobe);
   elements.visitButton.addEventListener('click', toggleVisited);
+  elements.countrySaveButton.addEventListener('click', toggleCountrySaved);
+  elements.media.addEventListener('click', event => {
+    const button = event.target.closest('[data-save-landmark]');
+    if (!button || !state.countryKey) return;
+    getCountryMedia(state.countryKey, COUNTRIES[state.countryKey]).then(media => {
+      const item = media.find(entry => entry.wikidataId === button.dataset.saveLandmark);
+      if (item) savedStore.toggle(landmarkEntry(state.countryKey, item));
+    });
+  });
+  elements.savedLauncher.addEventListener('click', () => setSavedOpen(!isSavedOpen()));
+  elements.savedClose.addEventListener('click', resetToGlobe);
+  elements.savedContent.addEventListener('click', event => {
+    const open = event.target.closest('[data-saved-open]');
+    const plan = event.target.closest('[data-saved-plan]');
+    const remove = event.target.closest('[data-saved-remove]');
+    const id = (open || plan || remove)?.dataset[open ? 'savedOpen' : plan ? 'savedPlan' : 'savedRemove'];
+    const item = id ? savedStore.get(id) : null;
+    if (!item) return;
+    if (open) openSaved(item);
+    if (plan) planSaved(item);
+    if (remove) {
+      const next = remove.closest('li')?.nextElementSibling ?? remove.closest('li')?.previousElementSibling;
+      savedStore.remove(id);
+      (next?.querySelector('[data-saved-open]') ?? elements.savedClose).focus();
+    }
+  });
   elements.countryExploreButton.addEventListener('click', exploreDestination);
   elements.countryPlanButton.addEventListener('click', () => planTrip(state.countryKey));
   elements.tripsLauncher.addEventListener('click', () => setPlannerOpen(!isPlannerOpen()));
@@ -811,6 +1055,8 @@ function bindUiEvents() {
     }
     if (elements.milesHub.classList.contains('miles-hub--open')) {
       setMilesOpen(false, true);
+    } else if (isSavedOpen()) {
+      setSavedOpen(false, true);
     } else if (isPlannerOpen()) {
       setPlannerOpen(false, true);
     } else if (elements.panel.classList.contains('country-panel--open')) closeCountryPanel(true);
@@ -1008,13 +1254,22 @@ function ensurePlanner() {
       onShowCountry: countryKey => showCountryFromPlanner(countryKey),
       onDiscover: discoverDestination,
       // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
-      getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
+      // Países salvos (inclui a antiga lista "Quero ir") viram sugestões de destino.
+      getIdeas: () => savedStore.items.filter(item => item.type === 'country').map(item => item.countryKey),
       // Começa na etapa 1: depois do país, a pessoa escolhe a cidade.
       createTrip: (countryKey, extra = {}) => createTrip({ countryKey, step: 1, ...extra }),
       sections: [
         ...createFlightSections({
           airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
-          resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng)
+          resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng),
+          // A mesma prévia do "Ver rota no globo", com a origem e o destino da viagem.
+          onPreviewRoute: (origin, destination, trip) => openFlightPreview({
+            countryKey: trip.countryKey,
+            originCode: origin.iata || origin.icao,
+            airportCode: destination.iata || destination.icao,
+            returnFocus: elements.plannerContent.querySelector('[data-planner-preview-route]'),
+            isCurrent: () => isPlannerOpen()
+          }).catch(() => {})
         }),
         createPrepSection({ countries: COUNTRIES })
       ]
@@ -1043,6 +1298,7 @@ function setPlannerOpen(open, restoreFocus = false) {
   if (open) {
     state.discovery?.close();
     setMilesOpen(false);
+    setSavedOpen(false);
     if (window.innerWidth < 1200 && elements.panel.classList.contains('country-panel--open')) closeCountryPanel();
   }
   elements.plannerPanel.classList.toggle('miles-hub--open', open);
@@ -1106,6 +1362,18 @@ function initialize() {
   state.milesEngine = milesPlaceholder;
   renderTripsCount();
   tripStore.subscribe(renderTripsCount);
+  renderSaved();
+  savedStore.subscribe(() => {
+    renderSaved();
+    renderCountrySaved();
+    cityCard?.syncSave();
+    regionsSection.refreshSaved();
+    for (const button of elements.media.querySelectorAll('[data-save-landmark]')) {
+      const saved = savedStore.has(`place:${button.dataset.saveLandmark}`);
+      button.setAttribute('aria-pressed', String(saved));
+      button.textContent = saved ? '✓ Salvo' : 'Salvar';
+    }
+  });
   markInterfaceReady();
   prefetchDeferredModules();
   fetchExchangeRate().then(() => state.planner?.refresh()).catch(() => {});

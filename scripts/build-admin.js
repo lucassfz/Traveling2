@@ -226,7 +226,7 @@ function indexIn(list, value) {
 const DROPPED_FEATURE_CODES = new Set(['PPLX', 'PPLH', 'PPLQ', 'PPLW', 'PPLCH', 'PPLR']);
 
 function parseCities(text) {
-  // Colunas do GeoNames: 1 name, 4 lat, 5 lng, 7 feature code, 8 país,
+  // Colunas do GeoNames: 0 geonameid, 1 name, 4 lat, 5 lng, 7 feature code, 8 país,
   // 10 admin1, 14 população, 17 fuso horário.
   const byCountry = new Map();
   for (const line of text.split('\n')) {
@@ -241,7 +241,7 @@ function parseCities(text) {
     // 0 capital nacional, 1 sede de estado/província, 2 demais cidades.
     const rank = code === 'PPLC' ? 0 : code === 'PPLA' ? 1 : 2;
     if (!byCountry.has(country)) byCountry.set(country, []);
-    byCountry.get(country).push({ name: cells[1], lat, lng, population, rank, zone: cells[17], admin1: `${country}.${cells[10]}` });
+    byCountry.get(country).push({ geonameId: Number(cells[0]) || 0, name: cells[1], lat, lng, population, rank, zone: cells[17], admin1: `${country}.${cells[10]}` });
   }
   return byCountry;
 }
@@ -363,8 +363,11 @@ async function main() {
     for (const city of raw) expandBox(box, city.lng, city.lat);
     if (!Number.isFinite(box[0])) continue;
 
-    // Ordem final: capitais e sedes primeiro, depois por população.
-    raw.sort((a, b) => a.rank - b.rank || b.population - a.population);
+    // Ordem final: capitais e sedes primeiro, depois por população (empate pelo
+    // geonameid, para a ordem não depender da ordem do arquivo baixado).
+    // A posição NÃO é identidade estável: a população muda a cada extração.
+    // A identidade da cidade é o geonameid (coluna 8 de cada linha).
+    raw.sort((a, b) => a.rank - b.rank || b.population - a.population || a.geonameId - b.geonameId);
     const locate = regionLocator(features);
     const zones = [];
     const regions = [];
@@ -372,7 +375,8 @@ async function main() {
       city.name, round(city.lat), round(city.lng), city.population, city.rank,
       indexIn(zones, city.zone),
       indexIn(regions, locate(city.lng, city.lat) ?? geonamesRegions.get(city.admin1)),
-      0
+      0,
+      city.geonameId
     ]);
 
     // Contorno urbano: cada mancha pertence à maior cidade dentro dela.
