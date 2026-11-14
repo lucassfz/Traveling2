@@ -175,7 +175,7 @@ export class PlannerUI {
         <h3 class="planner-welcome__title">Planeje sua próxima viagem</h3>
         <p class="planner-welcome__lead">Em seis etapas curtas, do destino ao resumo final. Tudo fica salvo neste navegador.</p>
         <ol class="planner-welcome__steps">
-          ${PLANNER_STEPS.map((step, index) => `<li><span>${index + 1}</span><div><strong>${escapeHtml(step.label)}</strong><small>${escapeHtml(STEP_LEADS[step.id])}</small></div></li>`).join('')}
+          ${PLANNER_STEPS.map((step, index) => `<li><span>${index + 1}</span><div><strong>${escapeHtml(step.label)}</strong></div></li>`).join('')}
         </ol>
         <button class="primary-button planner-welcome__cta" type="button" data-planner-action="new">Começar a planejar</button>
       </div>`;
@@ -451,8 +451,8 @@ export class PlannerUI {
       </div>
       <div class="planner-summary" data-live="summary">${this.#summary(trip)}</div>
       ${sections}
-      ${this.linesBlock(trip, { exclude: ['flights'], title: 'Gastos da viagem', empty: 'Adicione hospedagem, alimentação, passeios e o que mais fizer parte da viagem.', quick: true })}
-      <p class="planner-hint">Marque como <strong>Cotação</strong> o preço que você encontrou e como <strong>Pago</strong> o que já está pago. As passagens ficam na etapa Voo.</p>`;
+      ${this.linesBlock(trip, { exclude: ['flights'], title: 'Gastos da viagem', empty: 'Nenhum gasto ainda. Use os atalhos abaixo.', quick: true })}
+      <p class="planner-hint"><strong>Cotação</strong>: preço que você encontrou · <strong>Pago</strong>: já pago · Passagens ficam na etapa Voo.</p>`;
   }
 
   #summary(trip) {

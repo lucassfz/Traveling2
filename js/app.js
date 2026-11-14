@@ -1102,7 +1102,7 @@ function renderTripsCount() {
   const count = tripStore.trips.length;
   elements.tripsCount.hidden = count === 0;
   elements.tripsCount.textContent = String(count);
-  elements.tripsLauncher.setAttribute('aria-label', count ? `Planner (${count} ${count === 1 ? 'viagem' : 'viagens'})` : 'Planner');
+  elements.tripsLauncher.setAttribute('aria-label', count ? `Viagens (${count} ${count === 1 ? 'salva' : 'salvas'})` : 'Viagens');
 }
 
 // Depois que a interface está pronta e o navegador fica ocioso, baixa (sem
