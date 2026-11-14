@@ -19,6 +19,7 @@ import { inflateRawSync } from 'node:zlib';
 const NE_COMMIT = 'ca96624a56bd078437bca8184e78163e5039ad19';
 const ADMIN1_URL = `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/${NE_COMMIT}/geojson/ne_10m_admin_1_states_provinces.geojson`;
 const CITIES_URL = 'https://download.geonames.org/export/dump/cities15000.zip';
+const ADMIN1_CODES_URL = 'https://download.geonames.org/export/dump/admin1CodesASCII.txt';
 const OUTPUT_DIR = new URL('../data/admin/', import.meta.url);
 // ~0.8 km: suficiente para o zoom máximo do globo, mantendo arquivos pequenos.
 const SIMPLIFY_TOLERANCE = 0.008;
@@ -185,8 +186,27 @@ function divisionName(properties) {
     .find(value => value && /^[\p{Lu}\d]/u.test(value)) ?? null;
 }
 
-function parseCities(text) {
-  // Colunas do GeoNames: 1 name, 4 lat, 5 lng, 7 feature code, 8 país, 14 população.
+// "BR.27" → "Sao Paulo" (nome do estado/província no GeoNames).
+function parseAdmin1Codes(text) {
+  const names = new Map();
+  for (const line of text.split('\n')) {
+    const [code, name] = line.split('\t');
+    if (code && name) names.set(code, name);
+  }
+  return names;
+}
+
+// Índice de um valor numa lista compartilhada do país (fusos, regiões).
+function indexIn(list, value) {
+  if (!value) return -1;
+  let position = list.indexOf(value);
+  if (position < 0) position = list.push(value) - 1;
+  return position;
+}
+
+function parseCities(text, admin1Names) {
+  // Colunas do GeoNames: 1 name, 4 lat, 5 lng, 7 feature code, 8 país,
+  // 10 admin1, 14 população, 17 fuso horário.
   const byCountry = new Map();
   for (const line of text.split('\n')) {
     if (!line) continue;
@@ -199,17 +219,19 @@ function parseCities(text) {
     // 0 capital nacional, 1 sede de estado/província, 2 demais cidades.
     const code = cells[7];
     const rank = code === 'PPLC' ? 0 : code === 'PPLA' ? 1 : 2;
-    if (!byCountry.has(country)) byCountry.set(country, []);
-    byCountry.get(country).push([cells[1], round(lat), round(lng), population, rank]);
+    if (!byCountry.has(country)) byCountry.set(country, { list: [], zones: [], regions: [] });
+    const entry = byCountry.get(country);
+    entry.list.push([cells[1], round(lat), round(lng), population, rank,
+      indexIn(entry.zones, cells[17]), indexIn(entry.regions, admin1Names.get(`${country}.${cells[10]}`))]);
   }
-  for (const list of byCountry.values()) list.sort((a, b) => a[4] - b[4] || b[3] - a[3]);
+  for (const { list } of byCountry.values()) list.sort((a, b) => a[4] - b[4] || b[3] - a[3]);
   return byCountry;
 }
 
 async function main() {
   console.log('Baixando Natural Earth admin-1 (~40 MB) e GeoNames cities15000…');
-  const [admin1, citiesZip] = await Promise.all([download(ADMIN1_URL), download(CITIES_URL, 'buffer')]);
-  const cities = parseCities(unzipSingle(citiesZip));
+  const [admin1, citiesZip, admin1Codes] = await Promise.all([download(ADMIN1_URL), download(CITIES_URL, 'buffer'), download(ADMIN1_CODES_URL, 'buffer')]);
+  const cities = parseCities(unzipSingle(citiesZip), parseAdmin1Codes(admin1Codes.toString('utf8')));
 
   const byCountry = new Map();
   for (const feature of admin1.features) {
@@ -236,7 +258,7 @@ async function main() {
         for (const [lng, lat] of polygon[0]) expandBox(box, lng, lat);
       }
     }
-    const places = cities.get(code) ?? [];
+    const { list: places, zones, regions } = cities.get(code) ?? { list: [], zones: [], regions: [] };
     for (const [, lat, lng] of places) expandBox(box, lng, lat);
     if (!Number.isFinite(box[0])) continue;
 
@@ -251,7 +273,7 @@ async function main() {
       ? innerLines(features).map(line => flatLine(simplify(line, SIMPLIFY_TOLERANCE))).filter(Boolean)
       : [];
 
-    const data = { country: code, divisions, lines, cities: places };
+    const data = { country: code, divisions, lines, cities: places, zones, regions };
     const json = JSON.stringify(data);
     totalBytes += json.length;
     await writeFile(new URL(`${code}.json`, OUTPUT_DIR), `${json}\n`);
@@ -263,10 +285,11 @@ async function main() {
     schema: 1,
     sources: [
       { id: 'natural-earth-admin1', name: 'Natural Earth — Admin 1 states/provinces 1:10m', url: `https://github.com/nvkelso/natural-earth-vector/tree/${NE_COMMIT}`, license: 'Domínio público', covers: ['divisions', 'lines'] },
-      { id: 'geonames-cities15000', name: 'GeoNames — cities15000', url: 'https://download.geonames.org/export/dump/', license: 'CC BY 4.0', retrievedAt, covers: ['cities'] }
+      { id: 'geonames-cities15000', name: 'GeoNames — cities15000 e admin1CodesASCII', url: 'https://download.geonames.org/export/dump/', license: 'CC BY 4.0', retrievedAt, covers: ['cities', 'zones', 'regions'] }
     ],
     // Linhas: [lng, lat, lng, lat, …]; divisões: [nome, lat, lng, tipo];
-    // cidades: [nome, lat, lng, população, 0 capital | 1 sede regional | 2 cidade].
+    // cidades: [nome, lat, lng, população, 0 capital | 1 sede regional | 2 cidade,
+    // índice em zones (fuso IANA) ou -1, índice em regions (estado GeoNames) ou -1].
     countries: index
   };
   await writeFile(new URL('index.json', OUTPUT_DIR), `${JSON.stringify(indexFile)}\n`);

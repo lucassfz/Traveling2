@@ -1,1 +1,1 @@
-{"country":"MH","divisions":[["Cadeia Railik",7.596,168.959,"Region"],["Cadeia Ratak",9.459,170.243,"Region"]],"lines":[],"cities":[["Majuro",7.09,171.38,25400,0],["Dalap-Uliga-Dorrit",7.087,171.377,20301,2]]}
+{"country":"MH","divisions":[["Cadeia Railik",7.596,168.959,"Region"],["Cadeia Ratak",9.459,170.243,"Region"]],"lines":[],"cities":[["Majuro",7.09,171.38,25400,0,0,0],["Dalap-Uliga-Dorrit",7.087,171.377,20301,2,0,0]],"zones":["Pacific/Majuro"],"regions":["Majuro Atoll"]}

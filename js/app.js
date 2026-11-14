@@ -1,4 +1,5 @@
 import { AirportRepository } from './airports.repository.js';
+import { createCityCard } from './city.card.js';
 import { STORAGE_KEYS, readJsonStorage, readStorage, writeJsonStorage, writeStorage } from './core/storage.js';
 import { escapeHtml } from './core/html.js';
 import {
@@ -579,9 +580,33 @@ function renderCountry(countryKey) {
   renderContinentState();
 }
 
+// Cidade clicada no globo: cartão próprio; o painel do país fica como está.
+let cityCard = null;
+function selectCity(city) {
+  if (!city) return;
+  cityCard ??= createCityCard({
+    root: document.getElementById('city-card'),
+    countries: COUNTRIES,
+    onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
+    onPlan: countryKey => { state.map?.selectCity(null); planTrip(countryKey); },
+    onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
+    onClose: () => state.map?.selectCity(null)
+  });
+  state.map?.selectCity(city);
+  cityCard.show(city);
+}
+
+function closeCityCard() {
+  if (!cityCard?.isOpen) return false;
+  cityCard.hide();
+  state.map?.selectCity(null);
+  return true;
+}
+
 function selectCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
+  closeCityCard();
   closeFlightPreview(false);
   state.discovery?.close();
   if (elements.milesHub.classList.contains('miles-hub--open')) setMilesOpen(false);
@@ -621,6 +646,7 @@ function selectContinent(continent) {
 }
 
 function home() {
+  closeCityCard();
   closeFlightPreview(false);
   state.discovery?.close();
   state.countryKey = null;
@@ -888,6 +914,7 @@ function bindUiEvents() {
 
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
+    if (closeCityCard()) return;
     if (state.routePreviewActive) {
       closeFlightPreview(true, true);
       return;
@@ -910,6 +937,7 @@ async function initializeMap() {
     state.map = new MapEngine(elements.globeStage, {
       onHover: showTooltip,
       onSelect: countryKey => selectCountry(countryKey),
+      onCitySelect: city => selectCity(city),
       onRouteArrived: () => {
         const countryKey = state.exploreRouteCountryKey;
         if (!countryKey || countryKey !== state.countryKey || !state.routePreviewActive) return;

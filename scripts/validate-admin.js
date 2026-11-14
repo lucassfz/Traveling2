@@ -32,7 +32,11 @@ for (const file of files) {
     assert.ok(line.length >= 4 && line.length % 2 === 0, `${file}: linha incompleta`);
     for (let i = 0; i < line.length; i += 2) assert.ok(lng(line[i]) && lat(line[i + 1]), `${file}: ponto inválido`);
   }
-  for (const [name, y, x, population, rank] of data.cities) {
+  assert.ok(Array.isArray(data.zones) && Array.isArray(data.regions), `${file}: zones/regions`);
+  for (const zone of data.zones) assert.ok(/^[A-Za-z_]+\/[A-Za-z0-9_/+-]+$/.test(zone), `${file}: fuso "${zone}"`);
+  for (const [name, y, x, population, rank, zone, region] of data.cities) {
+    assert.ok(zone === -1 || (Number.isInteger(zone) && zone < data.zones.length), `${file}: índice de fuso (${name})`);
+    assert.ok(region === -1 || (Number.isInteger(region) && region < data.regions.length), `${file}: índice de região (${name})`);
     assert.ok(typeof name === 'string' && name.trim(), `${file}: cidade sem nome`);
     assert.ok(lat(y) && lng(x), `${file}: cidade fora do globo (${name})`);
     assert.ok(Number.isInteger(population) && population >= 0, `${file}: população (${name})`);

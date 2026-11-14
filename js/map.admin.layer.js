@@ -4,10 +4,11 @@ import { geographicToCartesian } from './geospatial.js';
 // Camada "aproxime para ver mais", no estilo de um globo de mapas:
 //   distância ≤ STATE_ALL       → divisas e nomes de estados/províncias de todos os países à vista
 //   país selecionado            → as dele já aparecem a partir de STATE_SELECTED
-//   aproximando mais            → cidades, das maiores para as menores (ver CITY_TIERS)
-// Os dados vêm de data/admin/<ISO2>.json (scripts/build-admin.js), pedidos só
-// para países dentro do campo de visão. Rótulos são HTML sobre o canvas, com
-// prevenção de sobreposição; as divisas são linhas WebGL recortadas no horizonte.
+//   aproximando mais            → cidades: pontos para todas e nomes das maiores (CITY_TIERS)
+// Cidades e estados são clicáveis (pick), como os países. Os dados vêm de
+// data/admin/<ISO2>.json (scripts/build-admin.js), pedidos só para países no
+// campo de visão. Rótulos são HTML sobre o canvas, com prevenção de
+// sobreposição; divisas e pontos são WebGL recortados no horizonte.
 
 const INDEX_URL = new URL('../data/admin/index.json', import.meta.url);
 const countryUrl = code => new URL(`../data/admin/${code}.json`, import.meta.url);
@@ -16,15 +17,23 @@ const STATE_SELECTED = 2.15;
 const STATE_ALL = 1.8;
 const LINE_RADIUS = 1.0105;
 const LABEL_RADIUS = 1.008;
-const MAX_LABELS = 90;
+const DOT_RADIUS = 1.0095;
 const MAX_LOADED = 60;
-// [distância máxima, população mínima]; capitais nacionais e de estado têm faixa própria.
+const PICK_RADIUS_PX = 10;
+// [distância máxima, população mínima com nome]; capitais têm faixa própria.
 const CITY_TIERS = [
-  [1.1, 0],
-  [1.2, 60000],
-  [1.36, 200000],
+  [1.13, 0],
+  [1.22, 50000],
+  [1.36, 180000],
   [1.6, 800000],
   [1.85, 3000000]
+];
+// [distância máxima, população mínima com ponto]: pontos aparecem antes dos nomes.
+const DOT_TIERS = [
+  [1.22, 0],
+  [1.36, 40000],
+  [1.6, 150000],
+  [1.85, 600000]
 ];
 const CAPITAL_DISTANCE = 1.95;
 const STATE_CAPITAL_DISTANCE = 1.55;
@@ -34,8 +43,8 @@ const toVector = (lat, lng, radius) => {
   return new THREE.Vector3(p.x, p.y, p.z);
 };
 
-function cityMinPopulation(distance) {
-  for (const [maxDistance, population] of CITY_TIERS) if (distance <= maxDistance) return population;
+function tierPopulation(tiers, distance) {
+  for (const [maxDistance, population] of tiers) if (distance <= maxDistance) return population;
   return Infinity;
 }
 
@@ -60,17 +69,25 @@ function boxDistance(box, lat, lng) {
   return angularDistance(lat, lng, clampedLat, clampedLng);
 }
 
-const formatPopulation = value => (value >= 1e6
-  ? `${(value / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi hab.`
-  : `${Math.round(value / 1000).toLocaleString('pt-BR')} mil hab.`);
+// Textura redonda para os pontos de cidade (sem ela, WebGL desenha quadrados).
+function dotTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 32;
+  const context = canvas.getContext('2d');
+  context.beginPath();
+  context.arc(16, 16, 13, 0, Math.PI * 2);
+  context.fillStyle = '#fff';
+  context.fill();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 
 export class AdminLayer {
   constructor({ scene, camera, stage, clipPlane, invalidate }) {
     this.camera = camera;
     this.invalidate = invalidate;
-    this.clipPlane = clipPlane;
     this.group = new THREE.Group();
-    this.group.renderOrder = 4.2;
     scene.add(this.group);
     this.material = new THREE.LineBasicMaterial({
       transparent: true,
@@ -80,16 +97,30 @@ export class AdminLayer {
       clippingPlanes: [clipPlane]
     });
     this.selectedMaterial = this.material.clone();
+    this.dotMaterial = new THREE.PointsMaterial({
+      size: 5,
+      sizeAttenuation: false,
+      map: dotTexture(),
+      transparent: true,
+      alphaTest: 0.3,
+      depthWrite: false,
+      depthTest: true,
+      clippingPlanes: [clipPlane]
+    });
     this.overlay = document.createElement('div');
     this.overlay.className = 'globe-labels';
     this.overlay.setAttribute('aria-hidden', 'true');
     stage.appendChild(this.overlay);
     this.pool = [];
+    this.placed = [];
     this.index = null;
     this.indexPromise = null;
-    this.countries = new Map(); // ISO2 → { status, data, lines, cities, divisions, usedAt }
+    this.countries = new Map(); // ISO2 → { status, lines, dots, dotPopulations, cities, divisions, usedAt }
     this.selectedCode = null;
+    this.selectedCity = null;
+    this.hoveredItem = null;
     this.active = new Set();
+    this.distance = Infinity;
     this.size = { width: 1, height: 1 };
     this.projected = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -106,12 +137,25 @@ export class AdminLayer {
     this.invalidate();
   }
 
+  setSelectedCity(city) {
+    this.selectedCity = city ?? null;
+    this.invalidate();
+  }
+
+  setHovered(item) {
+    if (this.hoveredItem === item) return;
+    this.hoveredItem = item ?? null;
+    this.invalidate();
+  }
+
   setTheme() {
     const style = getComputedStyle(document.documentElement);
     const border = style.getPropertyValue('--color-land-border').trim() || '#888';
     const accent = style.getPropertyValue('--color-accent').trim() || border;
+    const text = style.getPropertyValue('--color-text-secondary').trim() || '#ccc';
     this.material.color.set(border);
     this.selectedMaterial.color.set(accent);
+    this.dotMaterial.color.set(text);
     this.invalidate();
   }
 
@@ -170,11 +214,31 @@ export class AdminLayer {
       this.group.add(record.lines);
     }
     record.divisions = data.divisions.map(([name, lat, lng, type]) => ({
-      name, type, kind: 'state', position: toVector(lat, lng, LABEL_RADIUS)
+      name, type, lat, lng, kind: 'state', country: code, position: toVector(lat, lng, LABEL_RADIUS)
     }));
-    record.cities = data.cities.map(([name, lat, lng, population, rank]) => ({
-      name, population, rank, kind: 'city', position: toVector(lat, lng, LABEL_RADIUS)
+    const zones = data.zones ?? [];
+    const regions = data.regions ?? [];
+    record.cities = data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1]) => ({
+      name, population, rank, lat, lng, kind: 'city', country: code,
+      timeZone: zones[zone] ?? null, region: regions[region] ?? null,
+      position: toVector(lat, lng, LABEL_RADIUS)
     }));
+    // Pontos de todas as cidades, da maior para a menor: o zoom só muda o drawRange.
+    const byPopulation = [...record.cities].sort((a, b) => b.population - a.population);
+    record.dotPopulations = byPopulation.map(city => city.population);
+    const dots = new Float32Array(byPopulation.length * 3);
+    byPopulation.forEach((city, index) => {
+      const p = geographicToCartesian(city.lat, city.lng, DOT_RADIUS);
+      dots.set([p.x, p.y, p.z], index * 3);
+    });
+    if (byPopulation.length) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(dots, 3));
+      record.dots = new THREE.Points(geometry, this.dotMaterial);
+      record.dots.renderOrder = 4.3;
+      record.dots.visible = false;
+      this.group.add(record.dots);
+    }
   }
 
   // Mantém no máximo MAX_LOADED países em memória, descartando os usados há mais tempo.
@@ -184,9 +248,10 @@ export class AdminLayer {
       .filter(([code, record]) => record.status === 'ready' && code !== this.selectedCode && !this.active.has(code))
       .sort((a, b) => a[1].usedAt - b[1].usedAt);
     for (const [code, record] of ready.slice(0, Math.max(0, this.countries.size - MAX_LOADED))) {
-      if (record.lines) {
-        this.group.remove(record.lines);
-        record.lines.geometry.dispose();
+      for (const object of [record.lines, record.dots]) {
+        if (!object) continue;
+        this.group.remove(object);
+        object.geometry.dispose();
       }
       this.countries.delete(code);
     }
@@ -206,9 +271,10 @@ export class AdminLayer {
   // Chamado a cada quadro desenhado pelo globo (antes do render).
   update() {
     const distance = this.camera.position.length();
+    this.distance = distance;
     const selectedActive = this.selectedCode && distance <= STATE_SELECTED;
     if (distance > STATE_ALL && !selectedActive) {
-      this.#hideAll();
+      this.hide();
       return;
     }
     if (!this.index) {
@@ -235,51 +301,76 @@ export class AdminLayer {
     const fade = (start, end) => THREE.MathUtils.clamp((start - distance) / (start - end), 0, 1);
     this.material.opacity = 0.22 + 0.33 * fade(STATE_ALL, 1.2);
     this.selectedMaterial.opacity = 0.35 + 0.35 * fade(STATE_SELECTED, 1.4);
+    this.dotMaterial.opacity = 0.55 + 0.4 * fade(1.85, 1.2);
+    const dotPopulation = tierPopulation(DOT_TIERS, distance);
     for (const [code, record] of this.countries) {
-      if (!record.lines) continue;
+      if (record.status !== 'ready') continue;
       const showAll = distance <= STATE_ALL && active.has(code);
       const isSelected = code === this.selectedCode && selectedActive;
-      record.lines.visible = showAll || isSelected;
-      record.lines.material = isSelected ? this.selectedMaterial : this.material;
+      if (record.lines) {
+        record.lines.visible = showAll || isSelected;
+        record.lines.material = isSelected ? this.selectedMaterial : this.material;
+      }
+      if (record.dots) {
+        // Populações em ordem decrescente: conta quantas passam do mínimo.
+        let count = 0;
+        if (showAll || isSelected) {
+          const list = record.dotPopulations;
+          let low = 0;
+          let high = list.length;
+          while (low < high) {
+            const mid = (low + high) >> 1;
+            if (list[mid] >= dotPopulation) low = mid + 1; else high = mid;
+          }
+          count = low;
+        }
+        record.dots.visible = count > 0;
+        record.dots.geometry.setDrawRange(0, count);
+      }
     }
     this.#placeLabels(distance, active);
   }
 
+  #visibleDot(item) {
+    return item.position.dot(this.cameraDirection) / LABEL_RADIUS >= 1 / this.distance + 0.012;
+  }
+
+  #project(item) {
+    this.projected.copy(item.position).project(this.camera);
+    if (Math.abs(this.projected.x) > 1.02 || Math.abs(this.projected.y) > 1.02) return null;
+    return { x: (this.projected.x + 1) / 2 * this.size.width, y: (1 - this.projected.y) / 2 * this.size.height };
+  }
+
   #placeLabels(distance, active) {
-    const { width, height } = this.size;
-    const minVisibleDot = 1 / distance + 0.012;
-    const minPopulation = cityMinPopulation(distance);
+    const minPopulation = tierPopulation(CITY_TIERS, distance);
+    const maxLabels = distance < 1.2 ? 130 : 90;
     const candidates = [];
     const consider = (item, priority) => {
-      const dot = item.position.dot(this.cameraDirection) / LABEL_RADIUS;
-      if (dot < minVisibleDot) return;
-      this.projected.copy(item.position).project(this.camera);
-      if (Math.abs(this.projected.x) > 1.02 || Math.abs(this.projected.y) > 1.02) return;
-      candidates.push({ item, priority, x: (this.projected.x + 1) / 2 * width, y: (1 - this.projected.y) / 2 * height });
+      if (!this.#visibleDot(item)) return;
+      const point = this.#project(item);
+      if (point) candidates.push({ item, priority, ...point });
     };
 
     for (const code of active) {
       const record = this.countries.get(code);
       if (record?.status !== 'ready') continue;
-      const isSelected = code === this.selectedCode;
-      const statesVisible = distance <= STATE_ALL || isSelected;
-      if (statesVisible && distance > 1.12) {
+      const statesVisible = distance <= STATE_ALL || code === this.selectedCode;
+      if (statesVisible && distance > 1.15) {
         // Estados competem com as cidades grandes; perto demais, cedem espaço às cidades.
         for (const division of record.divisions) consider(division, distance > 1.4 ? 2e7 : 1e5);
       }
       for (const city of record.cities) {
         const capital = city.rank === 0 && distance <= CAPITAL_DISTANCE;
         const stateCapital = city.rank === 1 && distance <= STATE_CAPITAL_DISTANCE;
-        if (!capital && !stateCapital && city.population < minPopulation) continue;
-        consider(city, (city.rank === 0 ? 1e9 : city.rank === 1 ? 2e6 : 0) + city.population);
+        if (!capital && !stateCapital && city.population < minPopulation && city !== this.selectedCity) continue;
+        consider(city, (city === this.selectedCity ? 1e12 : 0) + (city.rank === 0 ? 1e9 : city.rank === 1 ? 2e6 : 0) + city.population);
       }
     }
 
     candidates.sort((a, b) => b.priority - a.priority);
     const placed = [];
-    const boxes = [];
     for (const candidate of candidates) {
-      if (placed.length >= MAX_LABELS) break;
+      if (placed.length >= maxLabels) break;
       const { item } = candidate;
       const charWidth = item.kind === 'state' ? 6.6 : 6.9;
       const labelWidth = item.name.length * charWidth + (item.kind === 'city' ? 14 : 4);
@@ -287,11 +378,11 @@ export class AdminLayer {
       const box = item.kind === 'state'
         ? [candidate.x - labelWidth / 2, candidate.y - labelHeight / 2, candidate.x + labelWidth / 2, candidate.y + labelHeight / 2]
         : [candidate.x - 5, candidate.y - labelHeight / 2, candidate.x - 5 + labelWidth, candidate.y + labelHeight / 2];
-      if (box[2] < 0 || box[0] > width || box[3] < 0 || box[1] > height) continue;
-      if (boxes.some(other => box[0] < other[2] + 4 && box[2] + 4 > other[0] && box[1] < other[3] + 2 && box[3] + 2 > other[1])) continue;
-      boxes.push(box);
-      placed.push(candidate);
+      if (box[2] < 0 || box[0] > this.size.width || box[3] < 0 || box[1] > this.size.height) continue;
+      if (placed.some(({ box: other }) => box[0] < other[2] + 4 && box[2] + 4 > other[0] && box[1] < other[3] + 2 && box[3] + 2 > other[1])) continue;
+      placed.push({ ...candidate, box });
     }
+    this.placed = placed;
     this.#render(placed);
   }
 
@@ -303,33 +394,70 @@ export class AdminLayer {
     }
     placed.forEach(({ item, x, y }, index) => {
       const element = this.pool[index];
-      const className = item.kind === 'state'
+      let className = item.kind === 'state'
         ? 'globe-label globe-label--state'
         : `globe-label globe-label--city${item.rank === 0 ? ' globe-label--capital' : item.rank === 1 ? ' globe-label--seat' : ''}`;
+      if (item === this.selectedCity) className += ' globe-label--selected';
+      // Rótulos sobre o país selecionado (preenchimento de destaque): cores invertidas.
+      if (item.country === this.selectedCode) className += ' globe-label--on-selected';
+      if (item === this.hoveredItem) className += ' globe-label--hover';
       if (element.className !== className) element.className = className;
-      if (element.textContent !== item.name) {
-        element.textContent = item.name;
-        element.title = item.kind === 'city' && item.population ? `${item.name} · ${formatPopulation(item.population)}` : item.name;
-      }
+      if (element.textContent !== item.name) element.textContent = item.name;
       element.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
       element.hidden = false;
     });
     for (let index = placed.length; index < this.pool.length; index += 1) this.pool[index].hidden = true;
   }
 
-  hide() {
-    this.#hideAll();
+  /**
+   * Cidade ou estado sob o ponteiro (coordenadas relativas ao palco), ou null.
+   * Primeiro os rótulos visíveis; depois o ponto de cidade mais próximo.
+   */
+  pick(x, y) {
+    if (!this.placed.length && this.distance > STATE_ALL) return null;
+    for (let index = this.placed.length - 1; index >= 0; index -= 1) {
+      const { item, box } = this.placed[index];
+      if (x >= box[0] - 3 && x <= box[2] + 3 && y >= box[1] - 3 && y <= box[3] + 3) return item;
+    }
+    const dotPopulation = tierPopulation(DOT_TIERS, this.distance);
+    if (dotPopulation === Infinity) return null;
+    let best = null;
+    let bestDistance = PICK_RADIUS_PX ** 2;
+    for (const code of this.active) {
+      const record = this.countries.get(code);
+      if (record?.status !== 'ready') continue;
+      for (const city of record.cities) {
+        if (city.population < dotPopulation || !this.#visibleDot(city)) continue;
+        const point = this.#project(city);
+        if (!point) continue;
+        const squared = (point.x - x) ** 2 + (point.y - y) ** 2;
+        if (squared < bestDistance) {
+          bestDistance = squared;
+          best = city;
+        }
+      }
+    }
+    return best;
   }
 
-  #hideAll() {
-    for (const record of this.countries.values()) if (record.lines) record.lines.visible = false;
+  hide() {
+    this.placed = [];
+    for (const record of this.countries.values()) {
+      if (record.lines) record.lines.visible = false;
+      if (record.dots) record.dots.visible = false;
+    }
     for (const element of this.pool) element.hidden = true;
   }
 
   dispose() {
-    for (const record of this.countries.values()) record.lines?.geometry.dispose();
+    for (const record of this.countries.values()) {
+      record.lines?.geometry.dispose();
+      record.dots?.geometry.dispose();
+    }
     this.material.dispose();
     this.selectedMaterial.dispose();
+    this.dotMaterial.map?.dispose();
+    this.dotMaterial.dispose();
     this.group.parent?.remove(this.group);
     this.overlay.remove();
   }
