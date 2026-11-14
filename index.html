@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.15b">
+  <link rel="stylesheet" href="styles.css?v=2026.11.16">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -170,8 +170,8 @@
         <div class="country-panel__region" id="country-region">—</div>
         <h1 class="country-panel__name" id="country-name" tabindex="-1">—</h1>
         <div class="country-actions">
-          <button class="primary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>Explorar destino</button>
-          <button class="secondary-button country-plan-button" id="country-plan-button" type="button">Planejar viagem</button>
+          <button class="primary-button country-plan-button" id="country-plan-button" type="button">Planejar viagem</button>
+          <button class="secondary-button country-explore-button" id="country-explore-button" type="button" aria-describedby="country-explore-status" disabled>Ver rota no globo</button>
         </div>
         <p class="country-explore-status" id="country-explore-status" role="status" aria-live="polite"></p>
       </div>
@@ -179,16 +179,13 @@
 
     <div class="country-tabs" role="tablist" aria-label="Seções do guia">
       <button class="country-tabs__button country-tabs__button--active" type="button" role="tab" data-tab="overview" aria-selected="true">Visão geral</button>
-      <button class="country-tabs__button" type="button" role="tab" data-tab="entry" aria-selected="false">Entrada</button>
       <button class="country-tabs__button" type="button" role="tab" data-tab="culture" aria-selected="false">Cultura</button>
-      <button class="country-tabs__button" type="button" role="tab" data-tab="flights" aria-selected="false">Voos</button>
-      <button class="country-tabs__button" type="button" role="tab" data-tab="checklist" aria-selected="false">Checklist</button>
       <button class="country-tabs__button" type="button" role="tab" data-tab="history" aria-selected="false">História</button>
     </div>
 
     <div class="country-panel__content">
       <section class="country-tab country-tab--active" id="tab-overview" data-tab-panel="overview" role="tabpanel">
-        <div class="media-strip" id="country-media" aria-label="Fotos do destino"></div>
+        <div class="media-strip" id="country-media" aria-label="Lugares em destaque"></div>
         <div class="info-grid" id="country-basics"></div>
         <section class="content-section geo-nav" id="country-regions" aria-label="Estados e cidades" hidden></section>
         <div id="currency-converter" aria-live="polite"></div>
@@ -197,11 +194,6 @@
           <div class="month-chart" id="month-chart"></div>
           <p class="body-copy" id="best-time-copy"></p>
         </section>
-      </section>
-
-      <section class="country-tab" id="tab-entry" data-tab-panel="entry" role="tabpanel">
-        <div class="stack" id="entry-content"></div>
-        <p class="entry-reminder">Regras de entrada e saúde podem mudar. Confirme-as antes de viajar.</p>
       </section>
 
       <section class="country-tab" id="tab-culture" data-tab-panel="culture" role="tabpanel">
@@ -216,57 +208,6 @@
         <div class="tag-list" id="vibe-content"></div>
       </section>
 
-      <section class="country-tab" id="tab-flights" data-tab-panel="flights" role="tabpanel">
-        <div class="route-builder">
-          <div class="route-builder__airports">
-            <div><span class="eyebrow">Origem</span><strong id="route-origin-code">GRU</strong><small id="route-origin-city">São Paulo</small><button class="route-builder__change" id="change-origin-button" type="button">Alterar origem</button></div>
-            <div class="route-builder__line" aria-hidden="true"><span>✈</span></div>
-            <div><span class="eyebrow">Destino</span><strong id="route-destination-code">—</strong><small id="route-destination-city">—</small></div>
-          </div>
-          <p class="route-builder__destination-note" id="route-destination-note"></p>
-          <div class="flight-preview-action">
-            <button class="secondary-button" id="flight-preview-button" type="button" disabled>Visualizar voo no globo</button>
-            <p id="flight-preview-status" role="status" aria-live="polite">Aguarde o carregamento do globo e do aeroporto de destino.</p>
-          </div>
-
-          <div class="form-grid">
-            <label class="form-field form-field--wide">
-              <span class="form-field__label">Aeroporto de origem <span class="form-field__hint">IATA ou ICAO</span></span>
-              <input class="form-field__control" id="origin-airport-input" list="airport-suggestions" type="text" value="GRU" placeholder="GRU, JFK, LHR, RJTT..." autocomplete="off" aria-describedby="flight-preview-status">
-              <datalist id="airport-suggestions"></datalist>
-            </label>
-            <label class="form-field">
-              <span class="form-field__label">Cabine</span>
-              <select class="form-field__control" id="cabin-select">
-                <option value="economy">Econômica</option>
-                <option value="premium">Premium Economy</option>
-                <option value="business">Executiva</option>
-              </select>
-            </label>
-            <label class="form-field">
-              <span class="form-field__label">Mês</span>
-              <select class="form-field__control" id="travel-month-select"></select>
-            </label>
-          </div>
-
-          <button class="primary-button" id="calculate-route-button" type="button">Calcular rota</button>
-          <div class="route-result" id="route-result" aria-live="polite"></div>
-          <div class="route-airport-actions" id="route-airport-actions" hidden></div>
-        </div>
-      </section>
-
-      <section class="country-tab" id="tab-checklist" data-tab-panel="checklist" role="tabpanel">
-        <div class="checklist__header">
-          <div><strong>Pronto para viajar?</strong><span id="checklist-progress-text" aria-live="polite">0 de 0 itens</span></div>
-          <div class="checklist__meter" id="checklist-progress-meter" role="progressbar" aria-label="Preparação da viagem" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><span id="checklist-progress-fill"></span></div>
-        </div>
-        <label class="checklist__month" id="checklist-month-wrap" hidden>Mês da viagem <select id="checklist-month-select" aria-label="Mês da viagem"></select></label>
-        <div class="checklist" id="checklist-content"></div>
-        <div class="checklist__actions">
-          <button class="secondary-button" id="checklist-complete-button" type="button">Marcar tudo</button>
-          <button class="secondary-button" id="checklist-clear-button" type="button">Limpar</button>
-        </div>
-      </section>
       <section class="country-tab" id="tab-history" data-tab-panel="history" role="tabpanel">
         <div class="content-section"><div class="section-heading">Panorama histórico</div><div class="history-list" id="country-history"></div></div>
       </section>
@@ -311,6 +252,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.15b"></script>
+  <script type="module" src="js/app.js?v=2026.11.16"></script>
 </body>
 </html>

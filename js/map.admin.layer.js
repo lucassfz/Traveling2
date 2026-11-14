@@ -188,6 +188,9 @@ export class AdminLayer {
     this.dotMaterial.color.set(text);
     this.colors = { text, background: token('--color-background', '#05070c') };
     this.onSelectedFill = null;
+    // O contorno da cidade selecionada usa uma cor que depende do tema e de a
+    // cidade estar no país selecionado: refaz para não ficar com a cor antiga.
+    this.#refreshSelectedOutline();
     this.#touch();
   }
 

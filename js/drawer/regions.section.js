@@ -26,10 +26,14 @@ function sourcesNote(geo) {
  * @param {HTMLElement} ctx.root            Contêiner da seção (fica oculto sem dados).
  * @param {() => object|null} ctx.getMap    MapEngine atual, se o globo já carregou.
  * @param {() => void} ctx.onWorld          Volta para o globo inteiro.
+ * @param {(place: object, division: object) => void} [ctx.onPlace] "Ver no globo" de uma cidade.
+ * @param {(place: object, division: object) => void} [ctx.onPlan]  "Planejar viagem" para uma cidade.
  */
-export function createRegionsSection({ root, getMap, onWorld }) {
+export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan }) {
   let geo = null;
   let countryName = '';
+  let countryKey = null;
+  const STATE_DISTANCE = 2;
   let token = 0;
 
   function breadcrumb(parts) {
@@ -104,7 +108,10 @@ export function createRegionsSection({ root, getMap, onWorld }) {
         <article class="info-card"><div class="info-card__value">${escapeHtml(division.name)}</div><div class="info-card__label">${isCapital ? 'Capital do estado' : 'Estado'}</div></article>
         <article class="info-card"><div class="info-card__value">${formatCoordinate(place.lat, 'N', 'S')}, ${formatCoordinate(place.lng, 'L', 'O')}</div><div class="info-card__label">Coordenadas</div></article>
       </div>
-      <button type="button" class="secondary-button geo-nav__fly" data-geo-fly="${escapeHtml(place.id)}">Ver no globo</button>
+      <div class="geo-nav__actions">
+        <button type="button" class="secondary-button geo-nav__fly" data-geo-fly="${escapeHtml(place.id)}">Ver no globo</button>
+        ${onPlan ? `<button type="button" class="primary-button" data-geo-plan="${escapeHtml(place.id)}">Planejar viagem para ${escapeHtml(place.name)}</button>` : ''}
+      </div>
       <p class="geo-nav__note">Guia de ${escapeHtml(place.name)} ainda não disponível.</p>
       ${sourcesNote(geo)}`;
     root.querySelector('.geo-nav__title')?.focus({ preventScroll: true });
@@ -115,16 +122,28 @@ export function createRegionsSection({ root, getMap, onWorld }) {
     if (!target || !geo) return;
     if (target.hasAttribute('data-geo-world')) return onWorld?.();
     if (target.hasAttribute('data-geo-country')) {
+      // De volta ao país: a câmera também volta ao enquadramento do país.
+      getMap()?.selectCity(null);
+      if (countryKey) getMap()?.selectCountry(countryKey);
       renderCountry();
       root.querySelector('.geo-nav__chip')?.focus({ preventScroll: true });
       return;
     }
-    if (target.dataset.geoDivision) return renderDivision(target.dataset.geoDivision);
-    if (target.dataset.geoPlace) return renderPlace(target.dataset.geoPlace);
-    if (target.dataset.geoFly) {
-      const place = geo.place(target.dataset.geoFly);
-      if (place) getMap()?.flyTo(place.lat, place.lng, CITY_DISTANCE);
+    if (target.dataset.geoDivision) {
+      // Estado: aproxima da capital, num enquadramento regional.
+      const capital = geo.capitalPlace(target.dataset.geoDivision);
+      getMap()?.selectCity(null);
+      if (capital) getMap()?.flyTo(capital.lat, capital.lng, STATE_DISTANCE);
+      return renderDivision(target.dataset.geoDivision);
     }
+    if (target.dataset.geoPlace) return renderPlace(target.dataset.geoPlace);
+    const placeId = target.dataset.geoFly || target.dataset.geoPlan;
+    const place = placeId ? geo.place(placeId) : null;
+    if (!place) return;
+    const division = geo.division(place.division);
+    if (target.dataset.geoPlan) return onPlan?.(place, division);
+    if (onPlace) onPlace(place, division);
+    else getMap()?.flyTo(place.lat, place.lng, CITY_DISTANCE);
   });
 
   return {
@@ -143,6 +162,7 @@ export function createRegionsSection({ root, getMap, onWorld }) {
       if (current !== token || !data) return;
       geo = data;
       countryName = country.namePt;
+      countryKey = country.key ?? null;
       renderCountry();
       root.hidden = false;
     },

@@ -9,8 +9,6 @@ import {
 } from './countries.dataset.js';
 import { getCountryMedia } from './media.service.js';
 import { flagImageUrl, isVisaFreeForBrazil } from './country.exploration.js';
-import { entryPresentation } from './entry.presentation.js';
-import { checklistGroups, checklistProgress, hasSeasonalChecklist } from './checklist.engine.js';
 import { SplashEngine } from './splash.engine.js';
 import { StarfieldEngine } from './starfield.engine.js';
 import { brasiliaTimezoneNote } from './timezone.br.js';
@@ -20,7 +18,8 @@ import { createFlightsTab } from './drawer/flights.tab.js';
 import { createRegionsSection } from './drawer/regions.section.js';
 import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js';
 import { createTripStore } from './planner/trip.store.js';
-import { createTrip, updateTrip } from './planner/trip.model.js';
+import { createTrip } from './planner/trip.model.js';
+import { loadCities } from './geo/cities.js';
 
 const MONTHS = Object.freeze(['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']);
 const elements = {
@@ -59,40 +58,16 @@ const elements = {
   currencyConverter: document.getElementById('currency-converter'),
   monthChart: document.getElementById('month-chart'),
   bestTime: document.getElementById('best-time-copy'),
-  entry: document.getElementById('entry-content'),
   foods: document.getElementById('food-content'),
   etiquette: document.getElementById('etiquette-content'),
   vibe: document.getElementById('vibe-content'),
   historyCopy: document.getElementById('country-history'),
-  originInput: document.getElementById('origin-airport-input'),
-  changeOriginButton: document.getElementById('change-origin-button'),
-  airportSuggestions: document.getElementById('airport-suggestions'),
-  cabinSelect: document.getElementById('cabin-select'),
-  monthSelect: document.getElementById('travel-month-select'),
-  routeOriginCode: document.getElementById('route-origin-code'),
-  routeOriginCity: document.getElementById('route-origin-city'),
-  routeDestinationCode: document.getElementById('route-destination-code'),
-  routeDestinationCity: document.getElementById('route-destination-city'),
-  routeDestinationNote: document.getElementById('route-destination-note'),
-  flightPreviewButton: document.getElementById('flight-preview-button'),
-  flightPreviewStatus: document.getElementById('flight-preview-status'),
   flightPreviewPanel: document.getElementById('flight-preview-panel'),
   flightPreviewClose: document.getElementById('flight-preview-close'),
   flightPreviewTitle: document.getElementById('flight-preview-title'),
   flightPreviewCodes: document.getElementById('flight-preview-codes'),
   flightPreviewDetails: document.getElementById('flight-preview-details'),
-  routeButton: document.getElementById('calculate-route-button'),
-  routeResult: document.getElementById('route-result'),
-  routeAirportActions: document.getElementById('route-airport-actions'),
   flightPreviewAirports: document.getElementById('flight-preview-airports'),
-  checklist: document.getElementById('checklist-content'),
-  checklistProgressText: document.getElementById('checklist-progress-text'),
-  checklistProgressMeter: document.getElementById('checklist-progress-meter'),
-  checklistProgressFill: document.getElementById('checklist-progress-fill'),
-  checklistMonthWrap: document.getElementById('checklist-month-wrap'),
-  checklistMonthSelect: document.getElementById('checklist-month-select'),
-  checklistComplete: document.getElementById('checklist-complete-button'),
-  checklistClear: document.getElementById('checklist-clear-button'),
   milesLauncher: document.getElementById('miles-launcher'),
   milesHub: document.getElementById('miles-hub'),
   milesClose: document.getElementById('miles-close-button'),
@@ -110,7 +85,6 @@ const state = {
   continent: null,
   tab: 'overview',
   visited: new Set(readJsonStorage(STORAGE_KEYS.visited, [])),
-  checklist: readJsonStorage(STORAGE_KEYS.checklist, {}),
   isVisaFreeBRFilterActive: false,
   // { rate, date, kind, label, source } de js/fx.service.js, ou null.
   brlPerUsd: null,
@@ -124,7 +98,6 @@ const state = {
   planner: null,
   destinationAirport: null,
   originAirport: null,
-  originRequestId: 0,
   routePreviewActive: false,
   routeObscured: null,
   routeRequestId: 0,
@@ -132,8 +105,7 @@ const state = {
   exploreRouteCountryKey: null,
   exploreReturnTimer: null,
   discovery: null,
-  mediaObserver: null,
-  visibleChecklistGroups: []
+  mediaObserver: null
 };
 
 const airportRepository = new AirportRepository();
@@ -141,23 +113,47 @@ const tripStore = createTripStore({ countries: COUNTRIES });
 const {
   resolveDestinationAirport,
   primeDestinationAirport,
-  primeOriginAirport,
   updateFlightPreviewAvailability,
   closeFlightPreview,
   openFlightPreview,
   exploreDestination,
-  updateAirportSuggestions,
-  calculateRoute,
   openMilesForRoute,
   fetchExchangeRate,
 } = createFlightsTab({ elements, state, airportRepository, countries: COUNTRIES, setMilesOpen, ensureMilesEngine });
 
 // Estados e cidades (só países com data/geo/<ISO2>.json).
-const regionsSection = createRegionsSection({ root: elements.regions, getMap: () => state.map, onWorld: () => home() });
+// "Ver no globo" destaca a mesma cidade da camada de cidades do globo (procurada
+// pelo nome dentro do estado); "Planejar" leva essa cidade para o Planner.
+async function matchGlobeCity(country, place, division) {
+  if (!country?.alpha2) return null;
+  const cities = await loadCities(country.alpha2).catch(() => []);
+  const same = city => city.name.localeCompare(place.name, 'pt-BR', { sensitivity: 'base' }) === 0;
+  return cities.find(city => same(city) && city.region && division?.name
+    && city.region.localeCompare(division.name, 'pt-BR', { sensitivity: 'base' }) === 0)
+    ?? (cities.filter(same).length === 1 ? cities.find(same) : null);
+}
+
+const regionsSection = createRegionsSection({
+  root: elements.regions,
+  getMap: () => state.map,
+  onWorld: () => resetToGlobe(),
+  onPlace: async (place, division) => {
+    const countryKey = state.countryKey;
+    const city = await matchGlobeCity(COUNTRIES[countryKey], place, division);
+    if (state.countryKey !== countryKey) return;
+    // Sem par no globo, a câmera vai ao ponto do IBGE/GeoNames, sem destaque.
+    if (city) state.map?.selectCity(city);
+    else state.map?.flyTo(place.lat, place.lng, 1.7);
+  },
+  onPlan: async (place, division) => {
+    const countryKey = state.countryKey;
+    const city = await matchGlobeCity(COUNTRIES[countryKey], place, division);
+    planTrip(countryKey, { city });
+  }
+});
 
 function savePersistentState() {
   writeJsonStorage(STORAGE_KEYS.visited, [...state.visited]);
-  writeJsonStorage(STORAGE_KEYS.checklist, state.checklist);
 }
 
 function setTheme(theme) {
@@ -273,9 +269,6 @@ function switchTab(tabName) {
     panel.setAttribute('aria-labelledby', `country-tab-button-${panel.dataset.tabPanel}`);
   }
   if (tabName === 'history') ensureHistoryLoaded();
-  if (tabName === 'flights') {
-    airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
-  }
 }
 
 function ensureHistoryLoaded() {
@@ -443,28 +436,6 @@ function renderMonths(country) {
   elements.bestTime.textContent = country.bestTime || 'Consulte clima e sazonalidade antes da reserva.';
 }
 
-function renderEntry(country) {
-  const view = entryPresentation(country);
-  const preparation = view.preparation.length
-    ? `<ul class="entry-list">${view.preparation.map(([label, value]) => `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`).join('')}</ul>`
-    : '<div class="detail-card__value">Confirme os documentos exigidos para seu roteiro antes da viagem.</div>';
-  const notes = view.notes.length
-    ? `<article class="detail-card"><div class="detail-card__label">Atenção</div><ul class="entry-list">${view.notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul></article>`
-    : '';
-  const verified = /^\d{4}-\d{2}$/.test(view.verifiedAt || '') ? `${view.verifiedAt.slice(5)}/${view.verifiedAt.slice(0, 4)}` : null;
-  const sources = view.sources.map(([label, url]) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`).join(' · ');
-  elements.entry.innerHTML = `
-    <article class="detail-card detail-card--${view.status.tone}">
-      <div class="detail-card__label">Status de entrada</div>
-      <div class="detail-card__value"><strong class="entry-status__title">${escapeHtml(view.status.title)}</strong><span>${escapeHtml(view.status.detail)}</span></div>
-    </article>
-    <article class="detail-card"><div class="detail-card__label">Permanência</div><div class="detail-card__value">${escapeHtml(view.stay)}</div></article>
-    <article class="detail-card"><div class="detail-card__label">Antes de viajar</div>${preparation}</article>
-    ${notes}
-    ${verified || sources ? `<p class="entry-source">${verified ? `Verificado em ${escapeHtml(verified)}` : ''}${verified && sources ? ' · ' : ''}${sources}</p>` : ''}
-  `;
-}
-
 function renderCulture(country) {
   elements.foods.innerHTML = (country.foods ?? []).map(item => `
     <article class="culture-row">
@@ -514,37 +485,6 @@ function renderCountryHistory(countryKey, country) {
   elements.historyCopy.innerHTML = `<p class="body-copy">${escapeHtml(legacy)}</p>`;
 }
 
-function renderChecklist(countryKey, country) {
-  const groups = checklistGroups(countryKey, country, Number(elements.monthSelect.value));
-  state.visibleChecklistGroups = groups;
-  elements.checklistMonthWrap.hidden = !hasSeasonalChecklist(country);
-  elements.checklistMonthSelect.value = elements.monthSelect.value;
-  elements.checklist.innerHTML = groups.map(group => `
-    <section class="checklist__group">
-      <h3 class="checklist__title">${escapeHtml(group.group)}</h3>
-      ${group.items.map(item => {
-        const complete = Boolean(state.checklist[item.key]);
-        return `
-          <button class="checklist__item ${complete ? 'checklist__item--complete' : ''}" type="button" aria-pressed="${complete}" data-checklist-key="${escapeHtml(item.key)}">
-            <span class="checklist__box">${complete ? '✓' : ''}</span>
-            <span aria-hidden="true">${escapeHtml(item.icon || '•')}</span>
-            <span class="checklist__label">${escapeHtml(item.label)}</span>
-          </button>
-        `;
-      }).join('')}
-    </section>
-  `).join('');
-  updateChecklistProgress();
-}
-
-function updateChecklistProgress() {
-  const { done, total } = checklistProgress(state.visibleChecklistGroups, state.checklist);
-  elements.checklistProgressText.textContent = `${done} de ${total} ${total === 1 ? 'item' : 'itens'} concluídos`;
-  elements.checklistProgressMeter.setAttribute('aria-valuenow', String(done));
-  elements.checklistProgressMeter.setAttribute('aria-valuemax', String(total));
-  elements.checklistProgressFill.style.width = `${total ? (done / total) * 100 : 0}%`;
-}
-
 function renderCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
@@ -566,14 +506,10 @@ function renderCountry(countryKey) {
   regionsSection.show(country);
   renderCurrencyConverter(country);
   renderMonths(country);
-  renderEntry(country);
   renderCulture(country);
   renderCountryHistory(countryKey, country);
-  renderChecklist(countryKey, country);
   elements.countryExploreStatus.textContent = '';
   primeDestinationAirport(countryKey);
-  elements.routeResult.innerHTML = '';
-  elements.routeAirportActions.hidden = true;
   elements.panel.classList.add('country-panel--open');
   elements.panel.removeAttribute('inert');
   switchTab('overview');
@@ -588,7 +524,7 @@ function selectCity(city) {
     root: document.getElementById('city-card'),
     countries: COUNTRIES,
     onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
-    onPlan: (countryKey, city) => { state.map?.selectCity(null); planTrip(countryKey, { city }); },
+    onPlan: (countryKey, city) => planTrip(countryKey, { city }),
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => state.map?.selectCity(null)
   });
@@ -596,10 +532,12 @@ function selectCity(city) {
   cityCard.show(city);
 }
 
+// Fecha o cartão e tira o destaque da cidade no globo. O destaque também pode
+// ter vindo de "Ver no globo" (Estados), sem cartão aberto: limpa sempre.
 function closeCityCard() {
+  state.map?.selectCity(null);
   if (!cityCard?.isOpen) return false;
   cityCard.hide();
-  state.map?.selectCity(null);
   return true;
 }
 
@@ -624,6 +562,7 @@ function discoverDestination() {
 
 function closeCountryPanel(restoreFocus = false) {
   closeFlightPreview(false);
+  regionsSection.clear();
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
@@ -651,6 +590,7 @@ function home() {
   state.discovery?.close();
   state.countryKey = null;
   state.continent = null;
+  regionsSection.clear();
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
@@ -660,6 +600,15 @@ function home() {
     renderVisaFreeFilter();
   }
   renderContinentState();
+}
+
+// X do país ou do Planner: volta à tela inicial, com o globo inteiro e nenhum
+// painel, cartão ou seleção aberto. Viagens e dados salvos não mudam.
+function resetToGlobe() {
+  setPlannerOpen(false);
+  setMilesOpen(false);
+  home();
+  elements.homeButton.focus({ preventScroll: true });
 }
 
 function toggleVisited() {
@@ -673,36 +622,6 @@ function toggleVisited() {
   elements.visitButton.classList.remove('button--pulse');
   requestAnimationFrame(() => elements.visitButton.classList.add('button--pulse'));
   setTimeout(() => elements.visitButton.classList.remove('button--pulse'), 340);
-}
-
-function updateChecklistItem(button) {
-  const key = button.dataset.checklistKey;
-  if (!key) return;
-  state.checklist[key] = !state.checklist[key];
-  button.classList.toggle('checklist__item--complete', state.checklist[key]);
-  button.setAttribute('aria-pressed', String(Boolean(state.checklist[key])));
-  button.querySelector('.checklist__box').textContent = state.checklist[key] ? '✓' : '';
-  savePersistentState();
-  state.planner?.refresh();
-  updateChecklistProgress();
-}
-
-function setAllChecklistItems(complete) {
-  if (!state.countryKey) return;
-  for (const button of elements.checklist.querySelectorAll('[data-checklist-key]')) {
-    state.checklist[button.dataset.checklistKey] = complete;
-  }
-  savePersistentState();
-  state.planner?.refresh();
-  renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
-}
-
-function populateMonthSelect() {
-  const options = MONTHS.map((month, index) => `<option value="${index}">${month}</option>`).join('');
-  elements.monthSelect.innerHTML = options;
-  elements.checklistMonthSelect.innerHTML = options;
-  elements.monthSelect.value = String(new Date().getMonth());
-  elements.checklistMonthSelect.value = elements.monthSelect.value;
 }
 
 function showTooltip(countryKey, clientX, clientY) {
@@ -830,12 +749,12 @@ function bindUiEvents() {
     button.addEventListener('click', () => selectContinent(button.dataset.continent));
   }
 
-  elements.panelClose.addEventListener('click', () => closeCountryPanel(true));
+  elements.panelClose.addEventListener('click', resetToGlobe);
   elements.visitButton.addEventListener('click', toggleVisited);
   elements.countryExploreButton.addEventListener('click', exploreDestination);
   elements.countryPlanButton.addEventListener('click', () => planTrip(state.countryKey));
   elements.tripsLauncher.addEventListener('click', () => setPlannerOpen(!isPlannerOpen()));
-  elements.plannerClose.addEventListener('click', () => setPlannerOpen(false, true));
+  elements.plannerClose.addEventListener('click', resetToGlobe);
   for (const button of elements.tabButtons) button.addEventListener('click', () => switchTab(button.dataset.tab));
   elements.panel.querySelector('.country-tabs').addEventListener('keydown', event => {
     const current = elements.tabButtons.indexOf(event.target);
@@ -870,41 +789,8 @@ function bindUiEvents() {
     elements.countryFlag.innerHTML = `<span class="country-panel__flag-fallback">${escapeHtml(country?.alpha2 || '🌍')}</span>`;
   }, true);
 
-  elements.checklist.addEventListener('click', event => {
-    const button = event.target.closest('[data-checklist-key]');
-    if (button) updateChecklistItem(button);
-  });
-  elements.checklistComplete.addEventListener('click', () => setAllChecklistItems(true));
-  elements.checklistClear.addEventListener('click', () => setAllChecklistItems(false));
-  elements.checklistMonthSelect.addEventListener('change', () => {
-    elements.monthSelect.value = elements.checklistMonthSelect.value;
-    if (state.countryKey) renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
-  });
-  elements.monthSelect.addEventListener('change', () => {
-    elements.checklistMonthSelect.value = elements.monthSelect.value;
-    if (state.countryKey && hasSeasonalChecklist(COUNTRIES[state.countryKey])) renderChecklist(state.countryKey, COUNTRIES[state.countryKey]);
-  });
-
-  elements.originInput.addEventListener('input', () => updateAirportSuggestions(elements.originInput.value));
-  elements.originInput.addEventListener('input', primeOriginAirport);
-  elements.changeOriginButton.addEventListener('click', () => {
-    switchTab('flights');
-    elements.originInput.focus();
-    elements.originInput.select();
-  });
-  elements.originInput.addEventListener('focus', () => {
-    updateAirportSuggestions(elements.originInput.value);
-    airportRepository.loadAll().then(() => updateAirportSuggestions(elements.originInput.value)).catch(() => {});
-  });
-  elements.routeButton.addEventListener('click', calculateRoute);
-  elements.flightPreviewButton.addEventListener('click', openFlightPreview);
   elements.flightPreviewClose.addEventListener('click', () => closeFlightPreview(true, true));
   elements.flightPreviewAirports.addEventListener('click', () => openMilesForRoute(elements.flightPreviewAirports.dataset.airportCode));
-  elements.routeAirportActions.addEventListener('click', event => {
-    const airport = event.target.closest('[data-route-airport]');
-    if (airport) openMilesForRoute(airport.dataset.routeAirport);
-    else if (event.target.closest('[data-route-redemption]')) openMilesForRoute();
-  });
 
   elements.milesLauncher.addEventListener('click', () => {
     const open = !elements.milesHub.classList.contains('miles-hub--open');
@@ -997,6 +883,21 @@ function watchGlobeInset() {
   window.addEventListener('resize', syncGlobeInset);
 }
 
+// Cabeçalho em três regiões: as duas laterais recebem a largura da maior
+// (marca ou ações), para a busca ficar no centro geométrico da tela.
+function watchHeaderLayout() {
+  const header = document.querySelector('.app-header');
+  const sides = [elements.homeButton, document.querySelector('.app-header__actions')];
+  if (!header || !('ResizeObserver' in window)) return;
+  const sync = () => {
+    const widest = Math.ceil(Math.max(...sides.map(side => side.scrollWidth)));
+    header.style.setProperty('--header-side', `${widest}px`);
+  };
+  const observer = new ResizeObserver(sync);
+  for (const side of sides) observer.observe(side);
+  sync();
+}
+
 function markInterfaceReady() {
   window.__travelingBoot = window.__travelingBoot || {};
   window.__travelingBoot.interactive = true;
@@ -1018,9 +919,7 @@ function ensureDiscovery() {
         state.map?.selectCountry(match.countryKey);
         renderContinentState();
       },
-      onExplore: (match, preferences) => {
-        elements.monthSelect.value = String(preferences.month);
-        elements.checklistMonthSelect.value = String(preferences.month);
+      onExplore: match => {
         selectCountry(match.countryKey);
         elements.countryName.focus({ preventScroll: true });
       },
@@ -1111,13 +1010,13 @@ function ensurePlanner() {
       // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
       getIdeas: () => readJsonStorage(STORAGE_KEYS.wishlist, []).filter(key => COUNTRIES[key]),
       // Começa na etapa 1: depois do país, a pessoa escolhe a cidade.
-      createTrip: countryKey => createTrip({ countryKey, step: 1 }),
+      createTrip: (countryKey, extra = {}) => createTrip({ countryKey, step: 1, ...extra }),
       sections: [
         ...createFlightSections({
           airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
           resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng)
         }),
-        createPrepSection({ countries: COUNTRIES, getChecklist: () => state.checklist, onOpenCountryTab: showCountryFromPlanner })
+        createPrepSection({ countries: COUNTRIES })
       ]
     });
     return state.planner;
@@ -1128,12 +1027,11 @@ function ensurePlanner() {
   return plannerPromise;
 }
 
-// Do planejador para o painel do país (opcionalmente numa aba). Em telas
-// menores os dois painéis não cabem juntos, então o planejador fecha.
-function showCountryFromPlanner(countryKey, tab = null) {
+// Do planejador para o guia do país. Em telas menores os dois painéis não
+// cabem juntos, então o planejador fecha.
+function showCountryFromPlanner(countryKey) {
   if (window.innerWidth < 1200) setPlannerOpen(false);
   selectCountry(countryKey);
-  if (tab) switchTab(tab);
 }
 
 function isPlannerOpen() {
@@ -1150,6 +1048,7 @@ function setPlannerOpen(open, restoreFocus = false) {
   elements.plannerPanel.classList.toggle('miles-hub--open', open);
   elements.plannerPanel.inert = !open;
   elements.tripsLauncher.setAttribute('aria-expanded', String(open));
+  if (!open) state.planner?.dismissTransient();
   if (open) {
     elements.plannerClose.focus();
     ensurePlanner().then(planner => planner.render()).catch(() => {
@@ -1158,24 +1057,17 @@ function setPlannerOpen(open, restoreFocus = false) {
   } else if (restoreFocus) elements.tripsLauncher.focus();
 }
 
-// Abre (ou cria) a viagem do país e mostra o planejamento.
+// "Planejar viagem": abre o Planner com o destino (e a cidade, se houver)
+// preenchidos. Nada é criado até a pessoa confirmar na tela do Planner; se já
+// houver viagem para o país, ela aparece ali como opção.
 function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
-  const existing = tripStore.findByCountry(countryKey);
-  let trip;
   const city = prefill.city ? { id: prefill.city.id, name: prefill.city.name, lat: prefill.city.lat, lng: prefill.city.lng, region: prefill.city.region } : null;
-  if (existing) {
-    const changes = {};
-    if (prefill.profileId && !existing.profileId) changes.profileId = prefill.profileId;
-    if (city) changes.city = city;
-    trip = Object.keys(changes).length ? tripStore.save(updateTrip(existing, changes)) : existing;
-  }
-  // País e cidade escolhidos: começa nas datas. Só o país: começa na escolha da cidade.
-  else trip = tripStore.save(createTrip({ countryKey, ...prefill, city, step: city ? 2 : 1 }));
   ensurePlanner().then(planner => {
-    planner.openTrip(trip.id);
+    planner.startDraft(countryKey, { city, profileId: prefill.profileId ?? null, budgetBRL: prefill.budgetBRL ?? null });
     if (isPlannerOpen()) planner.render();
     else setPlannerOpen(true);
+    elements.plannerContent.querySelector('#wizard-title')?.focus({ preventScroll: true });
   }).catch(() => setPlannerOpen(true));
 }
 
@@ -1207,11 +1099,10 @@ function initialize() {
   state.starfield = new StarfieldEngine(elements.starfield);
   renderVisaFreeFilter();
   renderVisitedCount();
-  populateMonthSelect();
   state.originAirport = airportRepository.coreAirports.find(airport => airport.iata === 'GRU');
-  updateAirportSuggestions();
   bindUiEvents();
   watchGlobeInset();
+  watchHeaderLayout();
   state.milesEngine = milesPlaceholder;
   renderTripsCount();
   tripStore.subscribe(renderTripsCount);

@@ -270,7 +270,7 @@ export class MilesEngine {
     return findVerifiedLounges(AIRPORT_GUIDES, code).length > 0;
   }
 
-  // Usado pela aba Voos: o hub tem algo a mostrar para este aeroporto (salas verificadas).
+  // Usado pela prévia da rota no globo: o hub tem algo a mostrar para este aeroporto (salas verificadas).
   hasAirportGuide(code) {
     return this.hasVerifiedLounges(code);
   }

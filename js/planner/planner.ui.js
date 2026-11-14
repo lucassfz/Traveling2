@@ -7,7 +7,7 @@ import { flagImageUrl } from '../country.exploration.js';
 import {
   FLIGHT_PREFERENCES, INTERESTS, LOCAL_TRANSPORT, LODGING_LEVELS, MAX_TRAVELERS, ORIGIN_AIRPORTS, PAY_OPTIONS,
   PLANNER_STEPS, TRAVEL_GROUPS, TRAVEL_STYLES, TRIP_DURATIONS,
-  tripDays, tripMonth, tripProgress, updateTrip
+  tripDays, tripMonth, tripProgress, tripStatus, updateTrip
 } from './trip.model.js';
 import { parseBrazilianNumber } from '../miles.tools.js';
 import { formatBRL } from './money.js';
@@ -36,6 +36,8 @@ const HINTS = {
   lodging: { hostel: 'Quarto compartilhado', simple: 'Quarto privativo', comfort: 'Hotel 3–4★', superior: 'Hotel 4–5★' },
   transport: { public: 'Metrô, ônibus, trem', car: 'Liberdade para rodar', tours: 'Tudo organizado', mixed: 'Depende do dia' }
 };
+const STATUS_LABELS = { ongoing: 'Em andamento', completed: 'Concluída' };
+const UNDO_MS = 8000;
 const SHORT_LODGING = { hostel: 'Albergue', simple: 'Simples', comfort: 'Conforto', superior: 'Superior' };
 
 const STEP_LEADS = {
@@ -86,7 +88,10 @@ export class PlannerUI {
     Object.assign(this, { element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas, createTrip, sections });
     this.view = store.trips.length ? 'trip' : 'home';
     this.flash = '';
-    this.confirmingDelete = false;
+    this.pendingDelete = null;   // id da viagem aguardando confirmação de exclusão
+    this.openMenu = null;        // id da viagem com o menu ⋯ aberto
+    this.undo = null;            // { removed: { trip, index }, label, timer }
+    this.draft = null;           // { countryKey, city, profileId, budgetBRL } antes de criar a viagem
     this.changingDestination = false;
     this.showExactDates = false;
     this.changingCity = false;
@@ -113,13 +118,32 @@ export class PlannerUI {
   // ---------- API usada pelo app e pelas seções ----------
 
   render() {
-    this.confirmingDelete = false;
     const trip = this.trip;
     if (this.view === 'trip' && !trip) this.view = 'home';
+    if (this.view === 'draft' && !this.draft) this.view = 'home';
+    if (this.pendingDelete && !this.store.get(this.pendingDelete)) this.pendingDelete = null;
     if (this.view === 'new') this.element.innerHTML = this.#newTripView();
+    else if (this.view === 'draft') this.element.innerHTML = this.#draftView();
     else if (this.view === 'trip') this.element.innerHTML = this.#wizard(trip);
     else this.element.innerHTML = this.store.trips.length ? this.#homeList() : this.#welcome();
+    this.element.insertAdjacentHTML('beforeend', this.#dialog() + this.#undoToast());
     if (this.view === 'trip') for (const section of this.#stepSections()) section.bind?.(this.element, trip, this);
+  }
+
+  // "Planejar viagem" vindo do país, de uma cidade ou do Descobrir: mostra o
+  // destino escolhido e só cria a viagem quando a pessoa confirma.
+  startDraft(countryKey, { city = null, profileId = null, budgetBRL = null } = {}) {
+    if (!this.countries[countryKey]) return;
+    this.draft = { countryKey, city, profileId, budgetBRL };
+    this.view = 'draft';
+    this.openMenu = null;
+    this.pendingDelete = null;
+  }
+
+  // Fecha menus e diálogos abertos (o app chama ao fechar o painel).
+  dismissTransient() {
+    this.openMenu = null;
+    this.pendingDelete = null;
   }
 
   openTrip(id, { step = null } = {}) {
@@ -140,6 +164,7 @@ export class PlannerUI {
     this.element.removeEventListener('click', this.handleClick);
     this.element.removeEventListener('input', this.handleInput);
     this.element.removeEventListener('keydown', this.handleKeydown);
+    clearTimeout(this.undo?.timer);
     this.unsubscribe?.();
   }
 
@@ -186,13 +211,16 @@ export class PlannerUI {
     const cards = this.store.trips.map(trip => {
       const country = this.countries[trip.countryKey];
       const progress = tripProgress(trip);
+      const status = STATUS_LABELS[tripStatus(trip)];
+      const menuOpen = this.openMenu === trip.id;
+      const name = this.#tripName(trip);
       return `
-        <li>
+        <li class="planner-trip-item">
           <button class="planner-trip-card" type="button" data-planner-open="${escapeHtml(trip.id)}">
             ${this.#flag(country, 'planner-trip-card__flag')}
             <span class="planner-trip-card__body">
               <strong>${trip.city ? `${escapeHtml(trip.city.name)}, ` : ''}${escapeHtml(country?.namePt || trip.countryKey)}</strong>
-              <small>${escapeHtml(whenLabel(trip))} · ${escapeHtml(people(trip.travelers))}</small>
+              <small>${escapeHtml(whenLabel(trip))} · ${escapeHtml(people(trip.travelers))}${status ? ` · <span class="planner-status">${escapeHtml(status)}</span>` : ''}</small>
               <span class="planner-progress" aria-hidden="true"><span style="width:${(progress.completed / progress.total * 100).toFixed(0)}%"></span></span>
             </span>
             <span class="planner-trip-card__side">
@@ -200,6 +228,16 @@ export class PlannerUI {
               <small>${progress.next ? `Etapa ${progress.next}: ${escapeHtml(PLANNER_STEPS[progress.next - 1].label)}` : 'Pronta ✓'}</small>
             </span>
           </button>
+          <div class="planner-trip-menu">
+            <button class="icon-button planner-trip-menu__toggle" type="button" data-planner-menu="${escapeHtml(trip.id)}"
+              aria-haspopup="menu" aria-expanded="${menuOpen}" aria-label="Opções da viagem para ${escapeHtml(name)}">⋯</button>
+            ${menuOpen ? `
+              <div class="planner-trip-menu__list" role="menu" aria-label="Opções da viagem para ${escapeHtml(name)}">
+                <button type="button" role="menuitem" data-planner-trip-action="edit" data-trip-id="${escapeHtml(trip.id)}">Editar</button>
+                <button type="button" role="menuitem" data-planner-trip-action="duplicate" data-trip-id="${escapeHtml(trip.id)}">Duplicar</button>
+                <button type="button" role="menuitem" class="planner-trip-menu__danger" data-planner-trip-action="delete" data-trip-id="${escapeHtml(trip.id)}">Excluir</button>
+              </div>` : ''}
+          </div>
         </li>`;
     }).join('');
     return `
@@ -211,6 +249,97 @@ export class PlannerUI {
         <ul class="planner-trip-list">${cards}</ul>
         ${this.#savedNote()}
       </div>`;
+  }
+
+  #tripName(trip) {
+    const country = this.countries[trip.countryKey];
+    return `${trip.city ? `${trip.city.name}, ` : ''}${country?.namePt || trip.countryKey}`;
+  }
+
+  #draftView() {
+    const { countryKey, city } = this.draft;
+    const country = this.countries[countryKey];
+    const existing = this.store.filterByCountry?.(countryKey) ?? [];
+    return `
+      <div class="wizard planner-draft">
+        ${this.store.trips.length ? '<button class="planner-back" type="button" data-planner-action="home">← Suas viagens</button>' : ''}
+        <section class="wizard__step" aria-labelledby="wizard-title">
+          <span class="eyebrow">Nova viagem</span>
+          <h3 class="wizard__title" id="wizard-title" tabindex="-1">Planejar uma viagem para ${escapeHtml(city?.name || country.namePt)}?</h3>
+          <p class="wizard__lead">A viagem só é criada quando você confirmar. Depois dá para trocar destino, cidade e datas.</p>
+          <div class="planner-destination-card">
+            ${this.#flag(country, 'planner-destination-card__flag')}
+            <div class="planner-destination-card__body">
+              <span class="eyebrow">${escapeHtml(country.region || 'Destino')}</span>
+              <strong class="planner-destination-card__name">${escapeHtml(country.namePt)}</strong>
+              ${city ? `<small>Cidade: ${escapeHtml([city.name, city.region].filter(Boolean).join(' · '))}</small>` : ''}
+            </div>
+          </div>
+          ${existing.length ? `
+            <div class="planner-card planner-card--quiet">
+              <strong class="planner-card__title">Você já tem ${existing.length === 1 ? 'uma viagem' : `${existing.length} viagens`} para ${escapeHtml(country.namePt)}</strong>
+              <ul class="planner-draft__existing">
+                ${existing.map(trip => `<li><button class="planner-text-action" type="button" data-planner-open="${escapeHtml(trip.id)}">Abrir ${escapeHtml(this.#tripName(trip))} · ${escapeHtml(whenLabel(trip))}</button></li>`).join('')}
+              </ul>
+            </div>` : ''}
+          <div class="planner-actions">
+            <button class="primary-button" type="button" data-planner-action="draft-create">${existing.length ? 'Criar outra viagem' : 'Criar viagem'}</button>
+            <button class="secondary-button" type="button" data-planner-action="new">Escolher outro destino</button>
+          </div>
+        </section>
+      </div>`;
+  }
+
+  #dialog() {
+    const trip = this.pendingDelete ? this.store.get(this.pendingDelete) : null;
+    if (!trip) return '';
+    return `
+      <div class="planner-dialog" data-planner-dialog>
+        <div class="planner-dialog__box" role="alertdialog" aria-modal="true" aria-labelledby="planner-dialog-title" aria-describedby="planner-dialog-text">
+          <h3 class="planner-dialog__title" id="planner-dialog-title">Excluir a viagem para ${escapeHtml(this.#tripName(trip))}?</h3>
+          <p class="planner-dialog__text" id="planner-dialog-text">A viagem e o planejamento dela, inclusive o checklist, saem deste navegador. As outras viagens não mudam.</p>
+          <div class="planner-dialog__actions">
+            <button class="secondary-button" type="button" data-planner-action="delete-cancel">Cancelar</button>
+            <button class="secondary-button planner-delete__confirm" type="button" data-planner-action="delete-confirm">Excluir viagem</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  #undoToast() {
+    if (!this.undo) return '';
+    return `
+      <div class="planner-toast" role="status" aria-live="polite">
+        <span>Viagem para ${escapeHtml(this.undo.label)} excluída.</span>
+        <button class="planner-text-action" type="button" data-planner-action="undo-delete">Desfazer</button>
+      </div>`;
+  }
+
+  #askDelete(id) {
+    this.pendingDelete = id;
+    this.openMenu = null;
+    this.render();
+    this.element.querySelector('[data-planner-action="delete-cancel"]')?.focus();
+  }
+
+  #confirmDelete() {
+    const id = this.pendingDelete;
+    const trip = id ? this.store.get(id) : null;
+    this.pendingDelete = null;
+    if (!trip) return this.render();
+    const label = this.#tripName(trip);
+    const removed = this.store.remove(id);
+    clearTimeout(this.undo?.timer);
+    this.undo = removed ? { removed, label, timer: setTimeout(() => this.#clearUndo(), UNDO_MS) } : null;
+    this.view = 'home';
+    this.render();
+    (this.element.querySelector('[data-planner-action="undo-delete"]') || this.element.querySelector('[data-planner-action="new"]'))?.focus();
+  }
+
+  #clearUndo() {
+    clearTimeout(this.undo?.timer);
+    this.undo = null;
+    this.element.querySelector('.planner-toast')?.remove();
   }
 
   #newTripView() {
@@ -539,7 +668,7 @@ export class PlannerUI {
       <p class="planner-hint" data-planner-status role="status" aria-live="polite"></p>
       <div class="planner-footer">
         ${this.#savedNote()}
-        <div class="planner-delete" id="planner-delete">${this.#deleteControls()}</div>
+        <div class="planner-delete"><button class="planner-text-button" type="button" data-planner-action="delete">Excluir viagem</button></div>
       </div>`;
   }
 
@@ -582,16 +711,6 @@ export class PlannerUI {
     return this.store.persistent
       ? '<p class="planner-saved">Salvo neste navegador. Limpar os dados do navegador apaga as viagens.</p>'
       : '<p class="planner-saved planner-saved--warning" role="status">Este navegador não permite salvar. As viagens ficam disponíveis só até fechar a página.</p>';
-  }
-
-  #deleteControls() {
-    return this.confirmingDelete
-      ? `<p role="alert">Excluir esta viagem? Não dá para desfazer.</p>
-         <div class="planner-delete__actions">
-           <button class="secondary-button planner-delete__confirm" type="button" data-planner-action="delete-confirm">Excluir viagem</button>
-           <button class="secondary-button" type="button" data-planner-action="delete-cancel">Cancelar</button>
-         </div>`
-      : '<button class="planner-text-button" type="button" data-planner-action="delete">Excluir viagem</button>';
   }
 
   // Atualiza o que depende dos dados sem redesenhar a etapa (mantém o foco).
@@ -649,6 +768,26 @@ export class PlannerUI {
   }
 
   #keydown(event) {
+    if (event.key === 'Escape' && (this.pendingDelete || this.openMenu)) {
+      // Fecha só o diálogo ou o menu; o painel continua aberto.
+      event.stopPropagation();
+      const menuId = this.openMenu;
+      this.pendingDelete = null;
+      this.openMenu = null;
+      this.render();
+      this.element.querySelector(menuId ? `[data-planner-menu="${CSS.escape(menuId)}"]` : '[data-planner-action="delete"]')?.focus();
+      return;
+    }
+    if (event.key === 'Tab' && this.pendingDelete) {
+      // Foco preso no diálogo de confirmação.
+      const buttons = [...this.element.querySelectorAll('[data-planner-dialog] button')];
+      const index = buttons.indexOf(document.activeElement);
+      if (buttons.length && (index === -1 || (event.shiftKey ? index === 0 : index === buttons.length - 1))) {
+        event.preventDefault();
+        buttons[event.shiftKey ? buttons.length - 1 : 0].focus();
+      }
+      return;
+    }
     if (event.target.matches('[data-planner-city-search]') && event.key === 'Enter') {
       event.preventDefault();
       this.element.querySelector('#planner-city-results [data-planner-city]')?.click();
@@ -698,6 +837,50 @@ export class PlannerUI {
   }
 
   #click(event) {
+    if (this.pendingDelete) {
+      // Com o diálogo aberto, só os botões dele respondem.
+      const action = event.target.closest('[data-planner-dialog] [data-planner-action]')?.dataset.plannerAction;
+      if (action === 'delete-confirm') this.#confirmDelete();
+      else if (action === 'delete-cancel' || event.target.matches('[data-planner-dialog]')) {
+        this.pendingDelete = null;
+        this.render();
+      }
+      return;
+    }
+    const menuToggle = event.target.closest('[data-planner-menu]');
+    if (menuToggle) {
+      const id = menuToggle.dataset.plannerMenu;
+      this.openMenu = this.openMenu === id ? null : id;
+      this.render();
+      const reopened = this.element.querySelector(`[data-planner-menu="${CSS.escape(id)}"]`);
+      if (this.openMenu) reopened?.parentElement.querySelector('[role="menuitem"]')?.focus();
+      else reopened?.focus();
+      return;
+    }
+    const tripAction = event.target.closest('[data-planner-trip-action]');
+    if (tripAction) {
+      const id = tripAction.dataset.tripId;
+      const action = tripAction.dataset.plannerTripAction;
+      this.openMenu = null;
+      if (action === 'delete') return this.#askDelete(id);
+      if (action === 'duplicate') {
+        const copy = this.store.duplicate(id);
+        this.render();
+        if (copy) this.element.querySelector(`[data-planner-menu="${CSS.escape(copy.id)}"]`)?.focus();
+        return;
+      }
+      if (action === 'edit') {
+        this.openTrip(id, { step: 1 });
+        this.render();
+        return this.#focusTitle();
+      }
+    }
+    // Clique fora de um menu aberto: só fecha o menu.
+    if (this.openMenu && !event.target.closest('.planner-trip-menu')) {
+      this.openMenu = null;
+      this.render();
+      return;
+    }
     const pick = event.target.closest('[data-planner-pick]');
     if (pick) return this.#pickDestination(pick.dataset.plannerPick);
     const open = event.target.closest('[data-planner-open]');
@@ -726,6 +909,22 @@ export class PlannerUI {
       this.render();
     }
     if (action === 'discover') this.onDiscover?.();
+    if (action === 'undo-delete' && this.undo) {
+      const restored = this.store.restore(this.undo.removed);
+      this.#clearUndo();
+      this.render();
+      if (restored) this.element.querySelector(`[data-planner-menu="${CSS.escape(restored.id)}"]`)?.focus();
+      return;
+    }
+    if (action === 'draft-create' && this.draft) {
+      const { countryKey, city, profileId, budgetBRL } = this.draft;
+      // País e cidade escolhidos: começa nas datas. Só o país: começa na cidade.
+      this.store.save(this.createTrip(countryKey, { city, profileId, budgetBRL, step: city ? 2 : 1 }));
+      this.draft = null;
+      this.view = 'trip';
+      this.render();
+      return this.#focusTitle();
+    }
     if (!trip) return;
     if (action === 'next') this.#goTo(Math.min(PLANNER_STEPS.length, this.step + 1));
     if (action === 'prev') this.#goTo(Math.max(1, this.step - 1));
@@ -755,15 +954,6 @@ export class PlannerUI {
         .then(() => { if (status) status.textContent = 'Resumo copiado. Cole onde quiser compartilhar.'; })
         .catch(() => { if (status) status.textContent = 'Não foi possível copiar neste navegador.'; });
     }
-    if (action === 'delete' || action === 'delete-cancel') {
-      this.confirmingDelete = action === 'delete';
-      this.element.querySelector('#planner-delete').innerHTML = this.#deleteControls();
-      this.element.querySelector(this.confirmingDelete ? '.planner-delete__confirm' : '[data-planner-action="delete"]')?.focus();
-    }
-    if (action === 'delete-confirm') {
-      this.store.remove(trip.id);
-      this.view = 'home';
-      this.render();
-    }
+    if (action === 'delete') this.#askDelete(trip.id);
   }
 }

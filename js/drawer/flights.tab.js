@@ -1,34 +1,16 @@
-import { escapeHtml } from '../core/html.js';
-import { provenanceLabel } from '../provenance.js';
 import { resolveUsdRate } from '../fx.service.js';
 import { buildFlightRoute, estimatedTravelMinutes } from '../flight.route.js';
-import {
-  estimateFlightPricing,
-  formatDistance,
-  formatMiles,
-  formatMoney
-} from '../pricing.engine.js';
+import { estimateFlightPricing } from '../pricing.engine.js';
 
-// Aba Voos do painel do país: aeroportos de origem e destino, estimativa de
-// tarifa e milhas, prévia da rota no globo e atalhos para o hub de Milhas.
-// Extraída de app.js sem mudança de comportamento; o estado continua sendo o
-// objeto `state` do app, recebido por parâmetro.
+// Voos e rotas do app: aeroporto de destino do país aberto, prévia da rota no
+// globo ("Ver rota no globo" e Descobrir) e atalhos para o hub de Milhas.
+// A estimativa de passagem e milhas fica na etapa Voo do Planner (que usa
+// estimateRoute daqui); o painel do país não tem mais a calculadora de rota.
 
 // Estimativa de um trecho com o câmbio informado ({ rate } de fx.service.js).
-// Usada pela aba Voos e, depois, pelo planejador.
+// Usada pela etapa Voo do Planner.
 export function estimateRoute({ origin, destination, cabin = 'economy', month = new Date().getMonth(), fx = null }) {
   return estimateFlightPricing({ origin, destination, cabin, month, brlPerUsd: fx?.rate ?? null });
-}
-
-// Câmbio usado na estimativa, sempre explícito — inclusive quando falta.
-export function exchangeRateLabel(fx) {
-  if (!fx) return provenanceLabel('unverified', { label: 'Câmbio indisponível', detail: 'valores mostrados em dólar' });
-  return provenanceLabel(fx.kind, {
-    label: fx.label,
-    date: fx.date,
-    detail: `US$ 1 = R$ ${fx.rate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} (venda)`,
-    source: fx.source
-  });
 }
 
 /**
@@ -57,11 +39,8 @@ export function createFlightsTab({ elements, state, airportRepository, countries
     return airport;
   }
 
+  // Aeroporto de destino do país aberto, usado por "Ver rota no globo" e pelo hub de Milhas.
   async function primeDestinationAirport(countryKey) {
-    const country = COUNTRIES[countryKey];
-    elements.routeDestinationCode.textContent = country.flightUnavailable ? '—' : country.airport && country.airport !== '—' ? country.airport : '…';
-    elements.routeDestinationCity.textContent = country.airportCity || country.capital || country.namePt;
-    elements.routeDestinationNote.textContent = country.flightNote || (country.majorAirports?.length > 1 ? `Outros aeroportos no país: ${country.majorAirports.filter(code => code !== country.airport).join(', ')}.` : '');
     state.destinationAirport = null;
     state.milesEngine?.setRouteContext(null, null);
     updateFlightPreviewAvailability();
@@ -75,57 +54,21 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       state.destinationAirport = airport;
       elements.countryExploreStatus.textContent = '';
       state.milesEngine?.setRouteContext(state.originAirport, airport);
-      elements.routeDestinationCode.textContent = airport.iata || airport.icao || '—';
-      elements.routeDestinationCity.textContent = country.airportCity || airport.city || airport.name;
       updateFlightPreviewAvailability();
     } catch {
-      if (state.countryKey === countryKey) {
-        elements.routeDestinationCode.textContent = country.airport || '—';
-        elements.countryExploreStatus.textContent = 'Rota ainda não disponível para este destino.';
-      }
+      if (state.countryKey === countryKey) elements.countryExploreStatus.textContent = 'Rota ainda não disponível para este destino.';
       updateFlightPreviewAvailability();
     }
   }
 
-  async function primeOriginAirport() {
-    const code = elements.originInput.value.trim().toUpperCase();
-    const requestId = ++state.originRequestId;
-    state.originAirport = null;
-    state.milesEngine?.setRouteContext(null, null);
-    elements.routeOriginCode.textContent = code || '—';
-    elements.routeOriginCity.textContent = code ? 'Conferindo aeroporto…' : 'Informe uma origem';
-    elements.routeResult.innerHTML = '';
-    elements.routeAirportActions.hidden = true;
-    updateFlightPreviewAvailability();
-    if (!code || code.length < 3) return;
-    const airport = await airportRepository.resolve(code);
-    if (requestId !== state.originRequestId || elements.originInput.value.trim().toUpperCase() !== code) return;
-    state.originAirport = airport;
-    elements.routeOriginCode.textContent = airport?.iata || airport?.icao || code;
-    elements.routeOriginCity.textContent = airport?.city || (airport ? airport.name : 'Código não encontrado');
-    state.milesEngine?.setRouteContext(airport, state.destinationAirport);
-    updateFlightPreviewAvailability();
-  }
-
   function updateFlightPreviewAvailability() {
-    const sameAirport = state.originAirport && state.destinationAirport &&
-      (state.originAirport.iata || state.originAirport.icao) === (state.destinationAirport.iata || state.destinationAirport.icao);
-    const ready = Boolean(state.map?.ready && state.originAirport && state.destinationAirport && state.countryKey && !state.routePreviewActive && !sameAirport);
-    elements.flightPreviewButton.disabled = !ready;
-    // "Explorar destino" sempre parte de GRU. Quando o destino também é GRU
+    // "Ver rota no globo" sempre parte de GRU. Quando o destino também é GRU
     // (o Brasil, país de origem), não há rota a mostrar: explica e orienta.
     const exploreSameAirport = (state.destinationAirport?.iata || state.destinationAirport?.icao) === 'GRU';
     elements.countryExploreButton.disabled = !state.map?.ready || !state.countryKey || !state.destinationAirport || state.routePreviewActive || exploreSameAirport;
     if (exploreSameAirport && state.countryKey) {
-      elements.countryExploreStatus.textContent = 'A rota de demonstração parte de São Paulo (GRU), que já fica aqui. Para voos nacionais, use a aba Voos e escolha outra origem.';
+      elements.countryExploreStatus.textContent = 'A rota de demonstração parte de São Paulo (GRU), que já fica aqui. Para voos nacionais, planeje uma viagem e escolha outra origem.';
     }
-    const sameCode = sameAirport ? (state.originAirport.iata || state.originAirport.icao) : '';
-    elements.flightPreviewStatus.textContent = !state.map?.ready
-      ? 'Aguarde o carregamento do globo 3D.'
-      : !state.originAirport ? 'Escolha um aeroporto de origem válido.'
-      : !state.destinationAirport ? 'Aeroporto de destino indisponível para esta visualização.'
-        : sameAirport ? `Origem e destino são o mesmo aeroporto (${sameCode}). Escolha outra origem, por exemplo GIG, BSB ou SSA.`
-          : `Parte de ${state.originAirport.city || state.originAirport.name} (${state.originAirport.iata || state.originAirport.icao}).`;
   }
 
   function closeFlightPreview(restoreCamera = true, restoreFocus = false) {
@@ -142,7 +85,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
     for (const [element, wasInert] of state.routeObscured || []) element.inert = wasInert;
     state.routeObscured = null;
     updateFlightPreviewAvailability();
-    if (restoreFocus) (state.routeReturnFocus || elements.flightPreviewButton).focus({ preventScroll: true });
+    if (restoreFocus) (state.routeReturnFocus || elements.countryExploreButton).focus({ preventScroll: true });
     state.routeReturnFocus = null;
   }
 
@@ -150,12 +93,9 @@ export function createFlightsTab({ elements, state, airportRepository, countries
     if (!state.map?.ready || !countryKey || state.routePreviewActive) return false;
     const selectedKey = countryKey;
     const requestId = ++state.routeRequestId;
-    elements.flightPreviewButton.disabled = true;
-    elements.flightPreviewStatus.textContent = 'Preparando rota no globo…';
-    let failureMessage = null;
     try {
       const [origin, destination] = await Promise.all([
-        airportRepository.resolve(originCode || (airportCode ? 'GRU' : elements.originInput.value.trim())),
+        airportRepository.resolve(originCode || 'GRU'),
         airportCode ? airportRepository.resolve(airportCode) : resolveDestinationAirport(selectedKey)
       ]);
       if (requestId !== state.routeRequestId || !isCurrent()) return false;
@@ -177,7 +117,7 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       elements.flightPreviewAirports.hidden = !guideAirport;
       elements.flightPreviewAirports.dataset.airportCode = guideAirport?.iata || '';
       if (guideAirport) elements.flightPreviewAirports.textContent = `Ver salas VIP · ${guideAirport.iata}`;
-      state.routeReturnFocus = returnFocus || elements.flightPreviewButton;
+      state.routeReturnFocus = returnFocus || elements.countryExploreButton;
       state.routeObscured = [...document.querySelectorAll('.country-panel, .discovery-panel, .miles-hub, .app-header, .dock')]
         .map(element => [element, element.inert]);
       for (const [element] of state.routeObscured) element.inert = true;
@@ -188,11 +128,9 @@ export function createFlightsTab({ elements, state, airportRepository, countries
       return true;
     } catch (error) {
       if (airportCode) throw error;
-      failureMessage = error.message || 'Não foi possível visualizar esta rota.';
       return false;
     } finally {
       updateFlightPreviewAvailability();
-      if (failureMessage) elements.flightPreviewStatus.textContent = failureMessage;
     }
   }
 
@@ -219,96 +157,6 @@ export function createFlightsTab({ elements, state, airportRepository, countries
     }
   }
 
-  function updateAirportSuggestions(query = '') {
-    const matches = query.trim() ? airportRepository.search(query, 12) : airportRepository.coreAirports.slice(0, 12);
-    elements.airportSuggestions.innerHTML = matches.map(airport => {
-      const code = airport.iata || airport.icao;
-      const label = `${code} — ${airport.city}, ${airport.country}`;
-      return `<option value="${escapeHtml(code)}">${escapeHtml(label)}</option>`;
-    }).join('');
-  }
-
-  async function calculateRoute() {
-    if (!state.countryKey) return;
-    const originCode = elements.originInput.value.trim().toUpperCase();
-    if (!originCode) {
-      elements.routeResult.innerHTML = '<div class="route-error">Digite um código IATA ou ICAO de origem.</div>';
-      return;
-    }
-
-    elements.routeButton.disabled = true;
-    elements.routeButton.textContent = 'Calculando…';
-    elements.routeResult.innerHTML = '';
-
-    try {
-      const origin = await airportRepository.resolve(originCode);
-      if (!origin) throw new Error('Aeroporto não encontrado. Verifique o código IATA/ICAO ou sua conexão para carregar a base global.');
-      const destination = state.destinationAirport || await resolveDestinationAirport(state.countryKey);
-      if (!destination) throw new Error('Não foi possível determinar um aeroporto de destino para este país.');
-      if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) throw new Error(`Origem e destino são o mesmo aeroporto (${origin.iata || origin.icao}). Escolha outra origem, por exemplo GIG, BSB ou SSA.`);
-
-      state.destinationAirport = destination;
-      state.originAirport = origin;
-      state.milesEngine?.setRouteContext(origin, destination);
-      elements.routeOriginCode.textContent = origin.iata || origin.icao;
-      elements.routeOriginCity.textContent = origin.city || origin.name;
-      elements.routeDestinationCode.textContent = destination.iata || destination.icao;
-      elements.routeDestinationCity.textContent = destination.city || destination.name;
-
-      const estimate = estimateFlightPricing({
-        origin,
-        destination,
-        cabin: elements.cabinSelect.value,
-        month: Number(elements.monthSelect.value),
-        brlPerUsd: state.brlPerUsd?.rate ?? null
-      });
-
-      elements.routeResult.innerHTML = `
-        <div class="route-result__summary">
-          <article class="route-result__card">
-            <div class="route-result__label">Distância aproximada</div>
-            <div class="route-result__value">${escapeHtml(formatDistance(estimate.distanceKm))}</div>
-          </article>
-          <article class="route-result__card">
-            <div class="route-result__label">Passagem · faixa estimada por trecho</div>
-            <div class="route-result__value">${estimate.cash.brl
-              ? `${escapeHtml(formatMoney(estimate.cash.brl.low))}–${escapeHtml(formatMoney(estimate.cash.brl.high))}`
-              : `${escapeHtml(formatMoney(estimate.cash.usd.low, 'USD'))}–${escapeHtml(formatMoney(estimate.cash.usd.high, 'USD'))}`}</div>
-          </article>
-          <article class="route-result__card">
-            <div class="route-result__label">Cabine</div>
-            <div class="route-result__value route-result__value--accent">${escapeHtml(estimate.cabin)}</div>
-          </article>
-        </div>
-        <div class="route-result__programs">
-          ${Object.entries(estimate.awards).map(([program, range]) => `
-            <article class="route-result__card">
-              <div class="route-result__label">${escapeHtml(program)} · milhas estimadas por trecho</div>
-              <div class="route-result__value">${escapeHtml(formatMiles(range.low))}–${escapeHtml(formatMiles(range.high))}</div>
-            </article>
-          `).join('')}
-        </div>
-        ${provenanceLabel('estimate', {
-          detail: 'modelo por distância, mês e cabine',
-          className: 'route-result__provenance'
-        })}
-        ${exchangeRateLabel(state.brlPerUsd)}
-        <p class="route-result__disclaimer">${escapeHtml(estimate.disclaimer)}</p>
-      `;
-      const miles = await loadMiles();
-    const guideActions = [origin, destination].map((airport, index) => miles?.hasAirportGuide(airport.iata)
-        ? `<button type="button" data-route-airport="${escapeHtml(airport.iata)}">Salas VIP ${index ? 'no destino' : 'na origem'} · ${escapeHtml(airport.iata)}</button>` : '').join('');
-      elements.routeAirportActions.hidden = false;
-      elements.routeAirportActions.innerHTML = `${guideActions}<button type="button" data-route-redemption="true">Vale a pena usar milhas?</button>`;
-      updateFlightPreviewAvailability();
-    } catch (error) {
-      elements.routeResult.innerHTML = `<div class="route-error">${escapeHtml(error.message)}</div>`;
-    } finally {
-      elements.routeButton.disabled = false;
-      elements.routeButton.textContent = 'Calcular rota';
-    }
-  }
-
   function openMilesForRoute(airportCode = null) {
     if (state.routePreviewActive) closeFlightPreview(true);
     setMilesOpen(true);
@@ -324,13 +172,10 @@ export function createFlightsTab({ elements, state, airportRepository, countries
   return {
     resolveDestinationAirport,
     primeDestinationAirport,
-    primeOriginAirport,
     updateFlightPreviewAvailability,
     closeFlightPreview,
     openFlightPreview,
     exploreDestination,
-    updateAirportSuggestions,
-    calculateRoute,
     openMilesForRoute,
     fetchExchangeRate,
   };

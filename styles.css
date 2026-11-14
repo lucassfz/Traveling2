@@ -3189,3 +3189,126 @@ body.route-mode .city-card { visibility: hidden; }
 .planner-city__name small { color: var(--color-text-secondary); font-size: .76rem; }
 .discovery-cities { display: grid; gap: 6px; }
 .discovery-cities:empty { display: none; }
+
+/* ---------- Fase 1: descoberta × planejamento, viagens e cabeçalho ---------- */
+
+/* Cabeçalho em três regiões: a busca fica no centro geométrico. As laterais
+   têm a mesma largura (1fr) e nunca ficam menores que o próprio conteúdo, então
+   os botões da direita não invadem a busca quando a tela aperta. */
+.app-header {
+  /* --header-side: largura do lado maior (marca ou ações), medida em app.js.
+     As duas laterais usam o mesmo mínimo, então a busca fica no centro exato e
+     encolhe quando falta espaço. Sem o JS, cai no max-content de cada lado. */
+  grid-template-columns: minmax(var(--header-side, max-content), 1fr) minmax(0, 440px) minmax(var(--header-side, max-content), 1fr);
+}
+.app-header .search { width: 100%; }
+@media (max-width: 600px) {
+  .app-header { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/* Painel do país: ação principal de planejar, rota no globo como secundária. */
+.country-actions .country-explore-button:disabled { opacity: .55; }
+
+/* Estados e cidades: ações da cidade. */
+.geo-nav__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.geo-nav__actions .geo-nav__fly { margin-top: 0; }
+
+/* Lista de viagens: cartão + menu ⋯. */
+.planner-trip-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 6px; }
+.planner-trip-menu { position: relative; display: flex; align-items: center; }
+.planner-trip-menu__toggle { width: 36px; height: 36px; font-size: 1.15rem; line-height: 1; }
+.planner-trip-menu__list {
+  position: absolute;
+  top: calc(100% - 6px);
+  right: 0;
+  z-index: 5;
+  min-width: 168px;
+  display: grid;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-float);
+  animation: plannerMenuIn 140ms var(--ease-out);
+}
+.planner-trip-menu__list button {
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: .875rem;
+  text-align: left;
+  cursor: pointer;
+}
+.planner-trip-menu__list button:hover,
+.planner-trip-menu__list button:focus-visible { background: var(--color-surface-hover); }
+.planner-trip-menu__list .planner-trip-menu__danger { color: var(--color-danger); }
+.planner-status { color: var(--color-accent-strong); font-weight: 600; }
+@keyframes plannerMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* Confirmação de exclusão (modal sobre o painel). */
+.planner-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-background) 62%, transparent);
+  animation: plannerFadeIn 160ms var(--ease-out);
+}
+.planner-dialog__box {
+  width: min(400px, 100%);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-float);
+}
+.planner-dialog__title { margin: 0; color: var(--color-text); font-size: 1.05rem; font-weight: 600; line-height: 1.35; }
+.planner-dialog__text { margin: 0; color: var(--color-text-secondary); font-size: .875rem; line-height: 1.5; }
+.planner-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.planner-dialog .planner-delete__confirm {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
+  color: var(--color-danger);
+  font-weight: 600;
+}
+@keyframes plannerFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Aviso de exclusão com "Desfazer". */
+.planner-toast {
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-size: .875rem;
+  animation: plannerFadeIn 160ms var(--ease-out);
+}
+
+/* Confirmação antes de criar a viagem. */
+.planner-draft__existing { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 2px; }
+
+/* Preparação: regras de entrada e checklist dentro da viagem. */
+.planner-prep__details { margin-top: var(--space-3); }
+.planner-prep__details > summary { color: var(--color-accent-strong); font-size: .84rem; font-weight: 600; cursor: pointer; }
+.planner-prep__details[open] > summary { margin-bottom: var(--space-3); }
+.planner-checklist { margin-top: var(--space-4); }
+.planner-checklist .checklist__title { font-size: .75rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .planner-trip-menu__list, .planner-dialog, .planner-toast { animation: none; }
+}

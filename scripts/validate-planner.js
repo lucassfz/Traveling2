@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { COUNTRIES } from '../js/countries.dataset.js';
 import {
   BUDGET_CATEGORIES, LINE_STATUSES, MAX_LINES, MAX_TRAVELERS, TRIP_SCHEMA_VERSION,
-  addLine, createTrip, isEstimateLine, isoDate, normalizeLine, normalizeStore, normalizeTrip, removeLine, tripDays, tripMonth, tripTotals, updateLine, updateTrip
+  addLine, createTrip, duplicateTrip, isEstimateLine, isoDate, normalizeChecklist, normalizeLine, normalizeStore, normalizeTrip, removeLine,
+  setChecklistItems, tripDays, tripMonth, tripStatus, tripTotals, updateLine, updateTrip
 } from '../js/planner/trip.model.js';
 import { createTripStore } from '../js/planner/trip.store.js';
 import {
@@ -300,4 +301,75 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(normalizeTrip({ countryKey: 'Japan', city: { id: 'BR-3', name: 'Recife', lat: -8, lng: -35 } }, { countries: COUNTRIES, idFactory }).city, null, 'cidade de outro país é descartada');
   assert.equal(createTrip({ countryKey: 'Japan', city: { id: 'JP-3', name: 'Kyoto', lat: 35.02, lng: 135.75 }, idFactory }).city.id, 'JP-3');
   console.log('Planner: escolhas por toque verificadas.');
+}
+
+// ---------- Fase 1: checklist por viagem, duplicar, excluir e desfazer ----------
+{
+  // Checklist guardado na viagem: só chaves do próprio destino e só "true".
+  assert.deepEqual(normalizeChecklist({ 'Japan:0:1': true, 'Italy:0:1': true, 'Japan:x': 'sim' }, 'Japan'), { 'Japan:0:1': true });
+  assert.deepEqual(createTrip({ countryKey: 'Japan', idFactory }).checklist, {});
+
+  // Duas viagens ao mesmo país têm checklists independentes.
+  const a = createTrip({ countryKey: 'Japan', idFactory });
+  const b = createTrip({ countryKey: 'Japan', idFactory });
+  const aDone = setChecklistItems(a, ['Japan:0:0', 'Japan:0:1'], true);
+  assert.deepEqual(aDone.checklist, { 'Japan:0:0': true, 'Japan:0:1': true });
+  assert.deepEqual(b.checklist, {}, 'marcar na viagem A não marca na B');
+  assert.deepEqual(setChecklistItems(aDone, ['Japan:0:0'], false).checklist, { 'Japan:0:1': true });
+
+  // Migração da versão 1: cada viagem herda o progresso antigo do país dela;
+  // dados da versão 2 não são tocados.
+  const legacy = { 'Japan:0:0': true, 'Japan:0:1': false, 'Italy:1:0': true };
+  const migrated = normalizeStore({ version: 1, trips: [a, createTrip({ countryKey: 'Italy', idFactory })] }, { countries: COUNTRIES, legacyChecklist: legacy });
+  assert.equal(migrated.version, TRIP_SCHEMA_VERSION);
+  assert.deepEqual(migrated.trips[0].checklist, { 'Japan:0:0': true });
+  assert.deepEqual(migrated.trips[1].checklist, { 'Italy:1:0': true });
+  const current = normalizeStore({ version: 2, trips: [b] }, { countries: COUNTRIES, legacyChecklist: legacy });
+  assert.deepEqual(current.trips[0].checklist, {}, 'versão 2 não herda de novo');
+
+  // Store: migração grava o formato novo uma vez, sem apagar a chave antiga.
+  const memory = new Map([
+    ['traveling.trips', JSON.stringify({ version: 1, activeTripId: a.id, trips: [a] })],
+    ['traveling.checklist', JSON.stringify(legacy)]
+  ]);
+  const io = {
+    countries: COUNTRIES,
+    read: (key, fallback) => memory.has(key) ? JSON.parse(memory.get(key)) : fallback,
+    write: (key, value) => { memory.set(key, JSON.stringify(value)); return true; }
+  };
+  const store = createTripStore(io);
+  assert.deepEqual(store.trips[0].checklist, { 'Japan:0:0': true });
+  assert.equal(JSON.parse(memory.get('traveling.trips')).version, TRIP_SCHEMA_VERSION, 'formato novo gravado');
+  assert.ok(memory.has('traveling.checklist'), 'chave antiga preservada');
+
+  // Duplicar: id novo, logo depois da original, checklist e conferência zerados.
+  store.save(updateTrip(store.trips[0], { entryReviewed: true }));
+  const copy = store.duplicate(a.id);
+  assert.notEqual(copy.id, a.id);
+  assert.equal(store.trips.length, 2);
+  assert.equal(store.trips[1].id, copy.id);
+  assert.deepEqual(copy.checklist, {});
+  assert.equal(copy.entryReviewed, false);
+  assert.equal(copy.countryKey, 'Japan');
+  assert.equal(duplicateTrip(a, { idFactory }).id.startsWith('t_'), true);
+
+  // Excluir remove exatamente uma viagem; desfazer devolve na mesma posição.
+  const third = store.save(createTrip({ countryKey: 'Portugal', idFactory }));
+  const removed = store.remove(copy.id);
+  assert.equal(removed.trip.id, copy.id);
+  assert.equal(removed.index, 1);
+  assert.deepEqual(store.trips.map(item => item.id), [a.id, third.id], 'as outras viagens continuam');
+  assert.deepEqual(store.get(a.id).checklist, { 'Japan:0:0': true }, 'checklist da outra viagem intacto');
+  assert.equal(store.remove('t_naoexiste'), null);
+  store.restore(removed);
+  assert.deepEqual(store.trips.map(item => item.id), [a.id, copy.id, third.id]);
+  assert.equal(store.restore(removed), null, 'não duplica ao desfazer duas vezes');
+
+  // Situação pela data, só com ida e volta exatas.
+  const dated = createTrip({ countryKey: 'Japan', startDate: '2026-11-10', endDate: '2026-11-20', idFactory });
+  assert.equal(tripStatus(dated, new Date(2026, 10, 1)), 'planned');
+  assert.equal(tripStatus(dated, new Date(2026, 10, 15)), 'ongoing');
+  assert.equal(tripStatus(dated, new Date(2026, 10, 25)), 'completed');
+  assert.equal(tripStatus(createTrip({ countryKey: 'Japan', idFactory })), 'planned');
+  console.log('Planner: checklist por viagem, migração, duplicar, excluir e desfazer verificados.');
 }

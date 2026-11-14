@@ -97,7 +97,7 @@ Pontos de entrada ainda `needs-review` (31): Afeganistão, Bahrein, Bangladesh, 
 
 - Fonte única: Banco Central do Brasil. Estimativas de voo usam a [PTAX](https://www.bcb.gov.br/estabilidadefinanceira/historicocotacoes) do dólar (taxa de venda do último boletim de fechamento), consultada pela API Olinda do BCB e guardada durante a sessão.
 - Reserva e conversor: `data/fx-snapshot.json`, boletim de fechamento PTAX com 156 moedas (taxas de compra e venda em reais), gerado por `npm run build:fx`. A data do boletim aparece junto de cada valor.
-- Não há taxa fixa no código. Sem nenhuma cotação, a aba Voos mostra os valores em dólar e avisa que o câmbio está indisponível.
+- Não há taxa fixa no código. Sem nenhuma cotação, a etapa Voo do Planner avisa que o câmbio está indisponível em vez de mostrar uma estimativa.
 - As taxas são de referência: não incluem spread bancário, IOF ou tarifas de cartão e casas de câmbio.
 
 ## Marcos e mídia

@@ -2,7 +2,10 @@
 // novos, sem DOM nem armazenamento, para serem testadas em Node.
 // Valores sempre em reais (BRL). Datas como texto AAAA-MM-DD (sem fuso horário).
 
-export const TRIP_SCHEMA_VERSION = 1;
+// 2: cada viagem guarda o próprio checklist (antes era um só por país, em
+// traveling.checklist). Ver migrateLegacyChecklist.
+export const TRIP_SCHEMA_VERSION = 2;
+export const MAX_CHECKLIST_KEYS = 400;
 
 // Etapas do Planner, na ordem do passo a passo.
 export const PLANNER_STEPS = Object.freeze([
@@ -227,6 +230,7 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     seen.add(line.id);
   }
   const miles = normalizeMiles(raw.miles);
+  const checklist = normalizeChecklist(raw.checklist, countryKey);
   return {
     id: /^t_[a-z0-9]{4,20}$/i.test(raw.id ?? '') ? raw.id : idFactory('t'),
     createdAt: isoDate(raw.createdAt) ?? todayIso(),
@@ -248,6 +252,7 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     lines,
     step: clampStep(raw.step),
     entryReviewed: raw.entryReviewed === true,
+    checklist,
     month: Number.isInteger(raw.month) && raw.month >= 0 && raw.month <= 11 ? raw.month : null,
     duration: DURATION_DAYS.has(raw.duration) ? raw.duration : null,
     group: choice(TRAVEL_GROUPS, raw.group),
@@ -259,6 +264,55 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     ...(miles ? { miles } : {}),
     ...(text(raw.profileId, 60) ? { profileId: text(raw.profileId, 60) } : {})
   };
+}
+
+// Itens concluídos do checklist desta viagem: { chave: true }. Só chaves do
+// próprio destino (o formato vem de checklist.engine.js: "<país>:...").
+export function normalizeChecklist(raw, countryKey) {
+  const clean = {};
+  if (!raw || typeof raw !== 'object' || !countryKey) return clean;
+  for (const [key, value] of Object.entries(raw)) {
+    if (value !== true || typeof key !== 'string' || key.length > 200 || !key.startsWith(`${countryKey}:`)) continue;
+    clean[key] = true;
+    if (Object.keys(clean).length >= MAX_CHECKLIST_KEYS) break;
+  }
+  return clean;
+}
+
+// Marca ou desmarca itens do checklist desta viagem (outras viagens não mudam).
+export function setChecklistItems(trip, keys, complete, options) {
+  const checklist = { ...trip.checklist };
+  for (const key of keys) {
+    if (complete) checklist[key] = true;
+    else delete checklist[key];
+  }
+  return updateTrip(trip, { checklist }, options);
+}
+
+// Cópia independente: novo id, mesmas escolhas; checklist e conferência das
+// regras de entrada começam do zero, porque valem para outra viagem.
+export function duplicateTrip(trip, { now = new Date(), idFactory = randomId } = {}) {
+  const today = todayIso(now);
+  return normalizeTrip({
+    ...structuredCloneSafe(trip),
+    id: idFactory('t'),
+    createdAt: today,
+    updatedAt: today,
+    checklist: {},
+    entryReviewed: false
+  }, { idFactory });
+}
+
+function structuredCloneSafe(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+// Situação pela data: só com ida e volta exatas. Sem datas, fica "planejada".
+export function tripStatus(trip, now = new Date()) {
+  if (!trip?.startDate || !trip?.endDate) return 'planned';
+  const today = todayIso(now);
+  if (today < trip.startDate) return 'planned';
+  return today > trip.endDate ? 'completed' : 'ongoing';
 }
 
 export function createTrip({ countryKey, city = null, origin = 'GRU', startDate = null, endDate = null, travelers = 1, budgetBRL = null, profileId = null, step = 1, now = new Date(), idFactory = randomId } = {}) {
@@ -360,12 +414,15 @@ export function tripTotals(trip) {
 
 // Conjunto salvo: { version, activeTripId, trips }. Qualquer coisa inválida vira
 // um conjunto vazio, sem lançar exceção.
-export function normalizeStore(raw, { countries = null } = {}) {
+export function normalizeStore(raw, { countries = null, legacyChecklist = null } = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
+  // Conjuntos da versão 1 ainda não têm checklist por viagem: cada viagem herda
+  // o progresso que estava salvo para o país dela.
+  const migrate = Array.isArray(source.trips) && !(Number(source.version) >= 2) && legacyChecklist && typeof legacyChecklist === 'object';
   const trips = [];
   const ids = new Set();
   for (const item of Array.isArray(source.trips) ? source.trips : []) {
-    const trip = normalizeTrip(item, { countries });
+    const trip = normalizeTrip(migrate && item && typeof item === 'object' ? { ...item, checklist: legacyChecklist } : item, { countries });
     if (!trip || ids.has(trip.id)) continue;
     ids.add(trip.id);
     trips.push(trip);

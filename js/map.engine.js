@@ -348,6 +348,12 @@ function polygonBorder(polygon, material) {
 
 const HIGHLIGHTED_BORDER_STATES = new Set(['selected', 'visited', 'visa-free', 'visa-free-hover']);
 
+// Linguagem de movimento do globo (ms). Durações de referência; o voo ajusta
+// pelo ângulo percorrido, dentro dos limites.
+export const MOTION = Object.freeze({ camera: 850, cameraMin: 320, cameraMax: 1400, city: 700, zoom: 380 });
+const easeInOutCubic = t => (t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
 export class MapEngine {
   constructor(stageElement, callbacks = {}) {
     this.stage = stageElement;
@@ -1064,7 +1070,7 @@ export class MapEngine {
     this.adminLayer.setSelectedCity(city);
     if (!city || !fly) return;
     const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
-    this.flyTo(city.lat, city.lng, Math.min(distance, 1.3), 650);
+    this.flyTo(city.lat, city.lng, Math.min(distance, 1.3), MOTION.city);
   }
 
   // Aproxima (factor < 1) ou afasta (factor > 1) mantendo o mesmo ponto no centro.
@@ -1074,30 +1080,57 @@ export class MapEngine {
     const current = this.camera.position.distanceTo(GLOBE_ORIGIN);
     // A escala vale para a altitude (distância até a superfície), como num mapa.
     const altitude = THREE.MathUtils.clamp((current - 1) * factor, this.controls.minDistance - 1, this.controls.maxDistance - 1);
-    this.flyTo(latitude, longitude, 1 + altitude, 380);
+    this.flyTo(latitude, longitude, 1 + altitude, MOTION.zoom);
   }
 
-  flyTo(latitude, longitude, distance = 2.05, duration = 850) {
+  // Descarta a inércia que sobrou de um arraste. Sem isso, o giro guardado
+  // pelos controles era aplicado de uma vez quando o voo terminava, e a câmera
+  // "pulava" para longe da cidade ou do país escolhido.
+  #settleControls() {
+    const position = this.camera.position.clone();
+    const quaternion = this.camera.quaternion.clone();
+    const damping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    this.controls.enableDamping = damping;
+    this.camera.position.copy(position);
+    this.camera.quaternion.copy(quaternion);
+  }
+
+  /**
+   * Voo de câmera até um ponto. Só um voo controla a câmera: um novo pedido
+   * substitui o anterior a partir de onde a câmera está, sem parar (o novo voo
+   * já começa em movimento). A duração acompanha o ângulo percorrido e, entre
+   * pontos distantes vistos de perto, a câmera sobe um pouco no meio do caminho
+   * para manter o contexto do mapa.
+   */
+  flyTo(latitude, longitude, distance = 2.05, duration = MOTION.camera) {
     this.invalidate();
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    this.#settleControls();
+    if (this.reducedMotionQuery.matches) {
       this.cameraFlight = null;
-      this.controls.enabled = true;
+      this.controls.enabled = !this.routePreview;
       this.camera.position.copy(latLngToCartesian(latitude, longitude, distance, GLOBE_YAW, GLOBE_ORIGIN));
       this.camera.lookAt(GLOBE_ORIGIN);
       this.controls.target.copy(GLOBE_ORIGIN);
       this.controls.update();
       return;
     }
+    const interrupted = Boolean(this.cameraFlight);
     const startVector = this.camera.position.clone().sub(GLOBE_ORIGIN);
     const startDistance = startVector.length();
     const startDirection = startVector.normalize();
     const endDirection = latLngToCartesian(latitude, longitude, 1, GLOBE_YAW, GLOBE_ORIGIN)
       .sub(GLOBE_ORIGIN)
       .normalize();
+    const angle = startDirection.angleTo(endDirection);
     const rotation = new THREE.Quaternion().setFromUnitVectors(startDirection, endDirection);
+    const close = Math.max(startDistance, distance) < 1.9;
     this.cameraFlight = {
-      startedAt: performance.now(),
-      duration,
+      startedAt: null, // definido no primeiro quadro, no mesmo relógio do requestAnimationFrame
+      duration: THREE.MathUtils.clamp(duration * (0.75 + angle / 1.2), MOTION.cameraMin, MOTION.cameraMax),
+      ease: interrupted ? easeOutCubic : easeInOutCubic,
+      arc: close && angle > 0.12 ? Math.min(0.9, angle * 0.8) : 0,
       startDirection,
       startDistance,
       endDistance: distance,
@@ -1109,17 +1142,16 @@ export class MapEngine {
   #updateCameraFlight(timestamp) {
     if (!this.cameraFlight) return;
     const flight = this.cameraFlight;
+    flight.startedAt ??= timestamp;
     const linear = THREE.MathUtils.clamp((timestamp - flight.startedAt) / flight.duration, 0, 1);
-    const eased = linear < 0.5
-      ? 4 * linear ** 3
-      : 1 - Math.pow(-2 * linear + 2, 3) / 2;
+    const eased = flight.ease(linear);
     const partialRotation = new THREE.Quaternion().slerpQuaternions(
       new THREE.Quaternion(),
       flight.rotation,
       eased
     );
     const direction = flight.startDirection.clone().applyQuaternion(partialRotation).normalize();
-    const distance = THREE.MathUtils.lerp(flight.startDistance, flight.endDistance, eased);
+    const distance = THREE.MathUtils.lerp(flight.startDistance, flight.endDistance, eased) + flight.arc * Math.sin(Math.PI * eased);
     this.camera.position.copy(GLOBE_ORIGIN).add(direction.multiplyScalar(distance));
     this.camera.lookAt(GLOBE_ORIGIN);
     this.camera.updateMatrixWorld(true);
