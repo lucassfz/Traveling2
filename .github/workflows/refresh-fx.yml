@@ -1,0 +1,42 @@
+name: Refresh FX snapshot
+
+# Toda segunda-feira, baixa o boletim PTAX mais recente do Banco Central
+# (npm run build:fx), confere tudo (npm run validate) e só então versiona o
+# arquivo novo. Se o Banco Central falhar ou algo não passar, nada é enviado.
+on:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-fx
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Update data/fx-snapshot.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Download latest PTAX closing bulletin
+        run: npm run build:fx
+      - name: Validate everything
+        run: npm run validate
+      - name: Commit if the snapshot changed
+        run: |
+          if git diff --quiet -- data/fx-snapshot.json; then
+            echo "Cotações já estão em dia."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/fx-snapshot.json
+          git commit -m "Dados: cotações PTAX atualizadas automaticamente"
+          git push
