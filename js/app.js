@@ -1247,8 +1247,9 @@ function ensurePlanner() {
     import('./planner/flight.section.js'),
     import('./planner/prep.section.js'),
     import('./planner/currency.js'),
-    import('./planner/live.flights.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }, { createLiveFlightsSection }]) => {
+    import('./planner/live.flights.section.js'),
+    import('./planner/live.hotels.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }, { createLiveFlightsSection }, { createLiveHotelsSection }]) => {
     const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
     state.planner = new PlannerUI({
       getRates,
@@ -1295,6 +1296,8 @@ function ensurePlanner() {
             isCurrent: () => isPlannerOpen()
           }).catch(() => {})
         }),
+        // Hospedagem (fase 3.4): link do Booking.com sempre; busca com preços só com o backend ligado.
+        ...createLiveHotelsSection({ getRates }),
         createPrepSection({ countries: COUNTRIES })
       ]
     });

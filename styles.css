@@ -3654,3 +3654,11 @@ body.route-mode .city-card { visibility: hidden; }
   .live-offer__slice { grid-template-columns: auto minmax(12px, 1fr) auto; }
   .live-offer__tag { grid-column: 1 / -1; }
 }
+
+/* Hospedagem no Planner (js/planner/live.hotels.section.js). */
+.live-hotel__name { display: grid; gap: 2px; }
+.live-hotel__name small { color: var(--color-warning); letter-spacing: .08em; font-size: .78rem; }
+.live-hotel__facts { margin: 0; color: var(--color-text-secondary); font-size: .8rem; }
+.live-hotel__external { display: grid; gap: 6px; justify-items: start; margin: 0; }
+.live-hotel__external .secondary-button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; text-decoration: none; font-size: .82rem; }
+.live-hotel__external small { color: var(--color-text-muted); font-size: .74rem; }

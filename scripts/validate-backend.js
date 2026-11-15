@@ -376,3 +376,23 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
   ] }), 100);
   console.log('Backend: seção de voos do Planner (ordenação, resumo, total) verificada.');
 }
+
+// 10. Hospedagem no Planner: link do Booking.com e ordenação (funções puras).
+{
+  const { bookingSearchUrl, sortHotelOffers } = await import('../js/planner/live.hotels.section.js');
+  const trip = { startDate: '2027-04-03', endDate: '2027-04-10', travelers: 3, city: { name: 'Lisboa', lat: 38.72, lng: -9.14 } };
+  const url = new URL(bookingSearchUrl(trip));
+  assert.equal(url.origin + url.pathname, 'https://www.booking.com/searchresults.pt-br.html');
+  assert.deepEqual(Object.fromEntries(url.searchParams), { ss: 'Lisboa', checkin: '2027-04-03', checkout: '2027-04-10', group_adults: '3', group_children: '0', no_rooms: '2', lang: 'pt-br' });
+  assert.equal(new URL(bookingSearchUrl(trip, { aid: '123456' })).searchParams.get('aid'), '123456', 'código de afiliado só quando configurado');
+  assert.equal(bookingSearchUrl({ ...trip, city: null }), null);
+  assert.equal(bookingSearchUrl({ ...trip, endDate: null }), null);
+  const request = validateHotelSearch({ destination: { lat: 38.72, lng: -9.14 }, checkIn: '2027-04-03', checkOut: '2027-04-10', guests: { adults: 2 } }, { now: NOW });
+  const { properties, offers } = await mockHotels.searchHotels(request, { now: NOW });
+  const byId = new Map(properties.map(property => [property.propertyId, property]));
+  const byPrice = sortHotelOffers(offers, byId, 'price');
+  for (let index = 1; index < byPrice.length; index += 1) assert.ok(Number(byPrice[index - 1].price.total.amount) <= Number(byPrice[index].price.total.amount));
+  const byRating = sortHotelOffers(offers, byId, 'rating');
+  for (let index = 1; index < byRating.length; index += 1) assert.ok((byId.get(byRating[index - 1].propertyId).rating.stars) >= byId.get(byRating[index].propertyId).rating.stars);
+  console.log('Backend: hospedagem no Planner (link Booking.com, ordenação) verificada.');
+}

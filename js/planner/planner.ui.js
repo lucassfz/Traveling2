@@ -419,7 +419,7 @@ export class PlannerUI {
     if (stepId === 'destination') return this.#destinationStep(trip);
     if (stepId === 'dates') return this.#datesStep(trip);
     if (stepId === 'flight') return this.#flightStep(trip, sections);
-    if (stepId === 'budget') return this.#styleStep(trip);
+    if (stepId === 'budget') return this.#styleStep(trip, sections);
     if (stepId === 'prep') return sections;
     return this.#summaryStep(trip);
   }
@@ -633,10 +633,12 @@ export class PlannerUI {
 
   // ---------- Etapa 4: estilo ----------
 
-  #styleStep(trip) {
+  // Seções da etapa (hospedagem: link e busca) entram logo depois de "Onde quer ficar?".
+  #styleStep(trip, sections = '') {
     return `
       ${this.#question('Qual o seu estilo de viagem?', this.#choices('style', TRAVEL_STYLES, trip.style, { columns: 3 }))}
       ${this.#question('Onde quer ficar?', this.#choices('lodging', SHORT_LODGING, trip.lodging, { columns: 2 }))}
+      ${sections}
       ${this.#question('Como vai se locomover lá?', this.#choices('transport', LOCAL_TRANSPORT, trip.transport))}
       ${this.#question('O que você mais quer fazer?', this.#choices('interests', INTERESTS, trip.interests, { multi: true, columns: 2, hints: {} }), 'Escolha quantos quiser.')}`;
   }
