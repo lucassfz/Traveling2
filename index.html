@@ -45,7 +45,7 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.30">
+  <link rel="stylesheet" href="styles.css?v=2026.11.31">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -125,6 +125,7 @@
     <div class="globe__stage" id="globe-stage" aria-label="Globo 3D interativo"></div>
     <div class="globe__visual-overlay" aria-hidden="true"></div>
     <p class="sr-only" id="globe-announcer" aria-live="polite"></p>
+    <p class="globe-keys" aria-hidden="true"><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> girar · <kbd>+</kbd><kbd>−</kbd> aproximar · <kbd>Enter</kbd> escolher</p>
     <div class="globe__status" id="globe-status">
       <span class="globe__spinner" aria-hidden="true"></span>
       <span>Construindo países em 3D…</span>
@@ -296,6 +297,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.30"></script>
+  <script type="module" src="js/app.js?v=2026.11.31"></script>
 </body>
 </html>

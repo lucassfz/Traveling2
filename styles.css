@@ -3740,3 +3740,13 @@ body.route-mode .city-card { visibility: hidden; }
 .globe__stage:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
 .globe__stage:focus-visible::after,
 .globe__stage--keyboard::after { content: ''; position: absolute; z-index: 5; top: 50%; left: calc(50% - var(--globe-view-shift, 0px)); width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid var(--color-focus); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, .45); pointer-events: none; }
+
+/* Legenda dos comandos: aparece só quando o globo tem foco pelo teclado. */
+.globe-keys { position: absolute; z-index: 6; left: 50%; bottom: 92px; margin: 0; padding: 8px 14px; border: 1px solid var(--glass-edge, var(--color-border-soft)); border-radius: 999px; background: var(--glass-fill, var(--color-surface)); color: var(--color-text); font-size: .8rem; white-space: nowrap; opacity: 0; transform: translateX(-50%) translateY(6px); transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+.globe-keys kbd { display: inline-block; min-width: 1.6em; margin: 0 1px; padding: 1px 5px; border: 1px solid var(--color-border-soft); border-radius: 6px; font: 600 .74rem/1.4 inherit; text-align: center; }
+.globe__stage:focus-visible ~ .globe-keys,
+.globe__stage--keyboard ~ .globe-keys { opacity: 1; transform: translateX(-50%); }
+@media (prefers-reduced-motion: reduce) { .globe-keys { transition: none; } }
+.globe-keys { background: var(--color-surface, #0d121c); }
+.globe__stage:focus-visible ~ .globe-hint,
+.globe__stage--keyboard ~ .globe-hint { visibility: hidden; }
