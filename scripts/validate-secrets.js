@@ -40,7 +40,9 @@ for await (const path of walk(ROOT)) {
     continue;
   }
   if (!TEXT_EXTENSIONS.test(name) || (await stat(path)).size > MAX_BYTES) continue;
-  const text = await readFile(path, 'utf8');
+  // O token do Cloudflare Web Analytics é público (vai no HTML para todo
+  // visitante) e só identifica o site no painel; não é credencial.
+  const text = (await readFile(path, 'utf8')).replace(/data-cf-beacon=(['"])\{[^}]*\}\1/g, 'data-cf-beacon');
   scanned += 1;
   for (const [label, pattern] of PATTERNS) {
     const match = pattern.exec(text);

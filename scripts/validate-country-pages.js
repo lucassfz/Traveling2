@@ -24,7 +24,9 @@ for (const country of countries) {
   assert.match(html, /property="og:image" content="https:\/\//, `${country.namePt}: imagem https`);
   assert.ok(html.includes(`href="../../#/${country.alpha2}"`), `${country.namePt}: link para o globo`);
   assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}paises/${countrySlug(country.namePt)}/">`), `${country.namePt}: canonical`);
-  assert.ok(!/<script(?![^>]*application\/ld\+json)[^>]*src=/.test(html), `${country.namePt}: sem script externo`);
+  // Único script externo permitido: as estatísticas sem cookies da Cloudflare.
+  const scripts = html.match(/<script[^>]*src="[^"]*"/g) ?? [];
+  assert.ok(scripts.every(tag => tag.includes('src="https://static.cloudflareinsights.com/beacon.min.js"')), `${country.namePt}: script externo fora da lista`);
 }
 const sitemap = files['sitemap.xml'];
 assert.equal((sitemap.match(/<loc>/g) ?? []).length, countries.length + 4, 'sitemap: início, índice, países, parceiros e privacidade');
