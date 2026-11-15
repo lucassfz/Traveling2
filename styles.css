@@ -3845,3 +3845,10 @@ body:has(.tour) .globe-hint { visibility: hidden; }
 .compare--good { color: var(--color-success); font-weight: 600; }
 .compare--warn { color: var(--color-warning); font-weight: 600; }
 .compare--bad { color: var(--color-danger); font-weight: 600; }
+
+/* "Quando ir": meses acima da barra de baixo */
+.season-picker { position: fixed; z-index: 101; left: 50%; bottom: calc(var(--space-5) + 64px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(6, auto); gap: 6px; padding: 12px; border: 1px solid var(--color-border); border-radius: 18px; background: var(--color-background-elevated, var(--color-background)); box-shadow: var(--shadow-float); transform: translateX(-50%); }
+.season-picker[hidden] { display: none; }
+.season-picker .planner-text-action { grid-column: 1 / -1; justify-self: center; }
+.season-filter { white-space: nowrap; }
+@media (max-width: 600px) { .season-picker { grid-template-columns: repeat(4, auto); } }

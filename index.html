@@ -60,7 +60,7 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.12.11">
+  <link rel="stylesheet" href="styles.css?v=2026.12.12">
   <!-- Cloudflare Web Analytics: contagem de visitas sem cookies (ver privacidade.html). -->
   <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "bfcf66c2cb9f4a45ad35f88e629235c6"}'></script>
 </head>
@@ -182,7 +182,12 @@
       <span class="visa-filter__label">Sem visto</span>
       <strong class="visa-filter__count" id="visa-free-count">0</strong>
     </button>
+    <button class="visa-filter season-filter" id="season-filter" type="button" aria-pressed="false" aria-expanded="false" aria-controls="season-picker" aria-label="Quando ir: destacar países em ótima época num mês">
+      <span aria-hidden="true">📅</span>
+      <span class="visa-filter__label" id="season-label">Quando ir</span>
+    </button>
   </div>
+  <div class="season-picker" id="season-picker" role="group" aria-label="Escolha o mês da viagem" hidden></div>
 
   <aside class="miles-hub" id="miles-hub" aria-label="Milhas e aeroportos" inert>
     <header class="miles-hub__header">
@@ -321,6 +326,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.12.11"></script>
+  <script type="module" src="js/app.js?v=2026.12.12"></script>
 </body>
 </html>

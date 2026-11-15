@@ -265,7 +265,29 @@ function renderVisaFreeFilter() {
       ? `Desativar filtro de ${eligibleCountries.length} destinos sem visto prévio nem autorização eletrônica para brasileiros`
       : `Mostrar ${eligibleCountries.length} destinos sem visto prévio nem autorização eletrônica para brasileiros`
   );
-  state.map?.setVisaFreeFilter(state.isVisaFreeBRFilterActive, eligibleCountries);
+  // "Quando ir" usa o mesmo destaque do globo; os dois filtros não ficam ligados juntos.
+  if (Number.isInteger(state.seasonMonth)) state.map?.setVisaFreeFilter(true, seasonCountryKeys(state.seasonMonth));
+  else state.map?.setVisaFreeFilter(state.isVisaFreeBRFilterActive, eligibleCountries);
+  renderSeasonFilter();
+}
+
+// "Quando ir": países com ótima época (months[m] === 2) no mês escolhido.
+const SEASON_MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+function seasonCountryKeys(month) {
+  return Object.entries(COUNTRIES).filter(([, country]) => Array.isArray(country.months) && country.months[month] === 2).map(([key]) => key);
+}
+
+function renderSeasonFilter() {
+  const button = document.getElementById('season-filter');
+  const picker = document.getElementById('season-picker');
+  if (!button || !picker) return;
+  const month = state.seasonMonth;
+  const active = Number.isInteger(month);
+  button.classList.toggle('visa-filter--active', active);
+  button.setAttribute('aria-pressed', String(active));
+  document.getElementById('season-label').textContent = active ? `Ótimo em ${SEASON_MONTHS[month]} · ${seasonCountryKeys(month).length}` : 'Quando ir';
+  picker.innerHTML = `${SEASON_MONTHS.map((label, index) => `<button class="discovery-chip" type="button" data-season-month="${index}" aria-pressed="${index === month}">${label}</button>`).join('')}
+    ${active ? '<button class="planner-text-action" type="button" data-season-month="off">Limpar</button>' : ''}`;
 }
 
 function setSearchOpen(open) {
@@ -1029,7 +1051,25 @@ function bindUiEvents() {
   elements.discoverButton.addEventListener('click', discoverDestination);
   elements.visaFreeFilter.addEventListener('click', () => {
     state.isVisaFreeBRFilterActive = !state.isVisaFreeBRFilterActive;
+    if (state.isVisaFreeBRFilterActive) state.seasonMonth = null;
     renderVisaFreeFilter();
+  });
+  const seasonButton = document.getElementById('season-filter');
+  const seasonPicker = document.getElementById('season-picker');
+  seasonButton?.addEventListener('click', () => {
+    seasonPicker.hidden = !seasonPicker.hidden;
+    seasonButton.setAttribute('aria-expanded', String(!seasonPicker.hidden));
+    renderSeasonFilter();
+  });
+  seasonPicker?.addEventListener('click', event => {
+    const value = event.target.closest('[data-season-month]')?.dataset.seasonMonth;
+    if (value === undefined) return;
+    state.seasonMonth = value === 'off' || Number(value) === state.seasonMonth ? null : Number(value);
+    if (Number.isInteger(state.seasonMonth)) state.isVisaFreeBRFilterActive = false;
+    seasonPicker.hidden = true;
+    seasonButton.setAttribute('aria-expanded', 'false');
+    renderVisaFreeFilter();
+    seasonButton.focus({ preventScroll: true });
   });
 
   elements.currencyConverter.addEventListener('input', event => {
