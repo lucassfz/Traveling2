@@ -3852,3 +3852,6 @@ body:has(.tour) .globe-hint { visibility: hidden; }
 .season-picker .planner-text-action { grid-column: 1 / -1; justify-self: center; }
 .season-filter { white-space: nowrap; }
 @media (max-width: 600px) { .season-picker { grid-template-columns: repeat(4, auto); } }
+/* Alto contraste: botões com borda sólida também sobre o efeito de vidro. */
+html[data-contrast='high'] { --glass-edge: var(--color-border-strong); --glass-hairline: var(--color-border); }
+html[data-contrast='high'] :is(.visit-button, .secondary-button, .icon-button, .header-action, .discovery-chip, .partner-link, .choice) { border: 1px solid var(--color-border-strong) !important; }
