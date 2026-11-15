@@ -34,6 +34,7 @@
 |---|---|
 | "Quanto vai custar" no resumo: passagens, hospedagem e gastos no destino por faixa; cotação anexada substitui a estimativa da categoria; cotação vencida aparece como "Preço expirado" com "Atualizar preço"; gastos anotados; comparação com o orçamento; entra no "Copiar resumo" | `js/planner/cost.section.js` |
 | Estimativa de rota compartilhada entre a etapa Voo e o resumo (um cálculo por viagem) | `createRouteEstimator` em `js/planner/flight.section.js` |
+| Filtro inicial pela escolha "Onde quer ficar?" (Conforto = 3–4★, Superior = 4–5★), com botão para ver todas; sem estrelas informadas, mostra todas (§11.2) | `filterByLodging` em `js/planner/live.hotels.section.js` |
 | Métricas por fornecedor (chamadas, taxa de erro, prazos estourados, latência p50/p95) em `/providers/status`; disjuntor separado por tipo (voos × hotéis) | `ProviderMetrics` em `backend/src/reliability.js` |
 
 Para publicar (precisa das contas, que são do responsável pelo projeto): criar a conta Cloudflare e rodar `npx wrangler deploy` em `backend/`; criar conta na Duffel e `npx wrangler secret put DUFFEL_TOKEN` com o token de **teste**; acrescentar `duffel` a `FLIGHT_PROVIDERS`; e incluir `<meta name="traveling-api" content="https://<worker>/api/v1">` no `index.html`. Travelpayouts, LiteAPI e afiliados Booking.com dependem do cadastro em cada programa.

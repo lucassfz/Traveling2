@@ -392,7 +392,7 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
 
 // 10. Hospedagem no Planner: link do Booking.com e ordenação (funções puras).
 {
-  const { bookingSearchUrl, sortHotelOffers } = await import('../js/planner/live.hotels.section.js');
+  const { bookingSearchUrl, sortHotelOffers, filterByLodging } = await import('../js/planner/live.hotels.section.js');
   const trip = { startDate: '2027-04-03', endDate: '2027-04-10', travelers: 3, city: { name: 'Lisboa', lat: 38.72, lng: -9.14 } };
   const url = new URL(bookingSearchUrl(trip));
   assert.equal(url.origin + url.pathname, 'https://www.booking.com/searchresults.pt-br.html');
@@ -407,5 +407,14 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
   for (let index = 1; index < byPrice.length; index += 1) assert.ok(Number(byPrice[index - 1].price.total.amount) <= Number(byPrice[index].price.total.amount));
   const byRating = sortHotelOffers(offers, byId, 'rating');
   for (let index = 1; index < byRating.length; index += 1) assert.ok((byId.get(byRating[index - 1].propertyId).rating.stars) >= byId.get(byRating[index].propertyId).rating.stars);
-  console.log('Backend: hospedagem no Planner (link Booking.com, ordenação) verificada.');
+  const comfort = filterByLodging(offers, byId, 'comfort');
+  assert.ok(comfort.applied);
+  assert.ok(comfort.offers.length && comfort.offers.every(offer => [3, 4].includes(byId.get(offer.propertyId).rating.stars)), 'estilo Conforto = 3–4★');
+  assert.equal(filterByLodging(offers, byId, 'simple').applied, false, 'quarto simples não filtra por estrelas');
+  const unrated = new Map([...byId].map(([key, property]) => [key, { ...property, rating: null }]));
+  const fallback = filterByLodging(offers, unrated, 'superior');
+  assert.equal(fallback.applied, false);
+  assert.equal(fallback.empty, true);
+  assert.equal(fallback.offers, offers, 'sem estrelas informadas, mostra todas');
+  console.log('Backend: hospedagem no Planner (link Booking.com, ordenação, filtro pelo estilo) verificada.');
 }

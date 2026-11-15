@@ -47,6 +47,24 @@ export function sortHotelOffers(offers, properties, sort) {
   return [...offers].sort((a, b) => (sort === 'rating' ? stars(b) - stars(a) : 0) || price(a) - price(b));
 }
 
+// A escolha "Onde quer ficar?" vira o filtro inicial dos resultados.
+export const LODGING_STARS = Object.freeze({ comfort: Object.freeze([3, 4]), superior: Object.freeze([4, 5]) });
+
+/**
+ * Ofertas do estilo de hospedagem da viagem. Hotel sem estrelas informadas não
+ * entra no filtro (não dá para saber). Sem nenhuma oferta no estilo, devolve
+ * todas, para nunca mostrar uma lista vazia por causa do filtro.
+ */
+export function filterByLodging(offers, properties, lodging) {
+  const range = LODGING_STARS[lodging];
+  if (!range) return { offers, range: null, applied: false };
+  const matching = offers.filter(offer => {
+    const stars = properties.get(offer.propertyId)?.rating?.stars;
+    return Number.isFinite(stars) && stars >= range[0] && stars <= range[1];
+  });
+  return matching.length ? { offers: matching, range, applied: true } : { offers, range, applied: false, empty: true };
+}
+
 export function createLiveHotelsSection({ getRates = () => ({}) } = {}) {
   const state = new Map();
   const tripKey = trip => [trip.city?.id ?? '', trip.startDate, trip.endDate, trip.travelers].join('|');
@@ -55,7 +73,7 @@ export function createLiveHotelsSection({ getRates = () => ({}) } = {}) {
     let current = state.get(trip.id);
     if (!current || current.key !== tripKey(trip)) {
       current?.controller?.abort();
-      current = { key: tripKey(trip), status: 'idle', result: null, error: null, sort: 'price', controller: null };
+      current = { key: tripKey(trip), status: 'idle', result: null, error: null, sort: 'price', styleOnly: true, controller: null };
       state.set(trip.id, current);
     }
     return current;
@@ -107,11 +125,17 @@ export function createLiveHotelsSection({ getRates = () => ({}) } = {}) {
     const { offers, properties, warnings, providers } = current.result;
     if (!offers.length) return '<p class="planner-hint" role="status">Nenhuma hospedagem encontrada para essas datas.</p>';
     const byId = new Map(properties.map(property => [property.propertyId, property]));
+    const style = filterByLodging(offers, byId, trip.lodging);
+    const shown = current.styleOnly && style.applied ? style.offers : offers;
+    const stars = style.range ? `${style.range[0]}–${style.range[1]}★` : '';
     return `
-      <div class="live-search__toolbar" role="group" aria-label="Ordenar hospedagens">
+      <div class="live-search__toolbar" role="group" aria-label="Ordenar e filtrar hospedagens">
         ${Object.entries(SORTS).map(([id, label]) => `<button type="button" class="discovery-chip" data-hotel-sort="${id}" aria-pressed="${current.sort === id}">${label}</button>`).join('')}
+        ${style.applied ? `<button type="button" class="discovery-chip" data-hotel-style aria-pressed="${current.styleOnly}">Só ${stars}</button>` : ''}
       </div>
-      <ul class="live-offers">${sortHotelOffers(offers, byId, current.sort).slice(0, 12).map(offer => offerCard(offer, byId.get(offer.propertyId), trip)).join('')}</ul>
+      ${style.applied && current.styleOnly && shown.length < offers.length ? `<p class="planner-hint">${shown.length} de ${offers.length} opções no seu estilo (${stars}).</p>` : ''}
+      ${style.empty ? `<p class="planner-hint">Nenhuma opção ${stars} informada nesta busca; mostrando todas.</p>` : ''}
+      <ul class="live-offers">${sortHotelOffers(shown, byId, current.sort).slice(0, 12).map(offer => offerCard(offer, byId.get(offer.propertyId), trip)).join('')}</ul>
       ${warnings.map(warning => `<p class="planner-hint">${escapeHtml(warning)}</p>`).join('')}
       <p class="planner-hint">Fonte: ${escapeHtml(providers.filter(provider => provider.status === 'ok').map(provider => provider.id).join(', '))}. Disponibilidade e preço confirmados só na reserva.</p>`;
   }
@@ -221,6 +245,12 @@ export function createLiveHotelsSection({ getRates = () => ({}) } = {}) {
         const sortButton = event.target.closest('[data-hotel-sort]');
         if (sortButton) {
           entry(ui.trip).sort = sortButton.dataset.hotelSort;
+          fill(root, ui.trip);
+          return;
+        }
+        if (event.target.closest('[data-hotel-style]')) {
+          const current = entry(ui.trip);
+          current.styleOnly = !current.styleOnly;
           fill(root, ui.trip);
           return;
         }
