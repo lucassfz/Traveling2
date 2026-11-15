@@ -10,6 +10,7 @@ import { localCostBreakdown, flightSuggestion } from './planner.estimates.js';
 import { tripDays, tripNights, BUDGET_CATEGORIES } from './trip.model.js';
 import { rateFor } from './currency.js';
 import { formatBRL } from './money.js';
+import { cheapestFlight, pricePeriod } from '../api/prices.client.js';
 
 const roundTo = (value, step) => Math.round(value / step) * step;
 const CATEGORY_LABELS = Object.fromEntries(BUDGET_CATEGORIES.map(category => [category.id, category.label]));
@@ -60,7 +61,7 @@ function quoteState(line, now) {
  * @param {Date} [input.now]
  * @returns {{ rows: object[], low: number, high: number, perPersonLow: number, perPersonHigh: number, incomplete: string[], budget: object | null }}
  */
-export function tripCostSummary({ trip, flight = null, local = null, now = new Date() }) {
+export function tripCostSummary({ trip, flight = null, seen = null, local = null, now = new Date() }) {
   const travelers = Math.max(1, trip.travelers || 1);
   const offers = category => trip.lines.filter(line => line.source?.kind === 'provider-offer' && line.category === category);
   const rows = [];
@@ -74,7 +75,12 @@ export function tripCostSummary({ trip, flight = null, local = null, now = new D
 
   const flightOffers = offers('flights');
   if (flightOffers.length) quoted('flights', 'Passagens', 3, flightOffers);
-  else if (flight && flight.high > 0) {
+  else if (seen && seen.amount > 0) {
+    // Preço visto recentemente (Travelpayouts) para a rota e o período: mais
+    // perto da realidade que a estimativa por distância.
+    const total = Math.round(seen.amount * travelers);
+    rows.push({ id: 'flights', label: 'Passagens', step: 3, kind: 'seen', low: total, high: total, foundOn: seen.foundOn ?? null });
+  } else if (flight && flight.high > 0) {
     rows.push({ id: 'flights', label: 'Passagens', step: 3, kind: 'estimate', low: roundTo(flight.low * travelers, 10), high: roundTo(flight.high * travelers, 10) });
   } else incomplete.push('Passagens');
 
@@ -124,7 +130,7 @@ export function costSummaryText(summary) {
   if (!summary.rows.length) return [];
   return [
     `Custo estimado: ${range(summary.low, summary.high)}${summary.perPersonHigh !== summary.high ? ` (${range(summary.perPersonLow, summary.perPersonHigh)} por pessoa)` : ''}`,
-    ...summary.rows.map(row => `- ${row.label}: ${range(row.low, row.high)}${row.kind === 'quote' ? ' (cotação, pode ter mudado)' : row.kind === 'estimate' ? ' (estimativa)' : ''}`)
+    ...summary.rows.map(row => `- ${row.label}: ${range(row.low, row.high)}${row.kind === 'quote' ? ' (cotação, pode ter mudado)' : row.kind === 'seen' ? ' (preço visto recentemente, pode ter mudado)' : row.kind === 'estimate' ? ' (estimativa)' : ''}`)
   ];
 }
 
@@ -136,6 +142,8 @@ function rowHtml(row) {
     label = expired
       ? provenanceLabel('unverified', { tag: 'span', label: 'Preço expirado', detail: 'busque de novo para confirmar' })
       : provenanceLabel(QUOTE_KIND[first.dataSource] ?? 'cached', { tag: 'span', detail: `cotação de ${shortDate(first.fetchedAt)} · pode ter mudado` });
+  } else if (row.kind === 'seen') {
+    label = provenanceLabel('cached', { tag: 'span', detail: `${row.foundOn ? `visto em ${row.foundOn.split('-').reverse().slice(0, 2).join('/')}` : 'visto recentemente'} · ida e volta · pode ter mudado` });
   } else if (row.kind === 'estimate') {
     label = provenanceLabel('estimate', { tag: 'span', detail: 'não é cotação' });
   } else {
@@ -203,9 +211,31 @@ export function createCostSection({ routes, getRates, getFx = () => null, profil
     return suggestion ? { low: suggestion.perLegLow * 2, high: suggestion.perLegHigh * 2 } : null;
   }
 
+  // Preço de passagem visto recentemente, por rota e período (cache do cliente).
+  const seenPrices = new Map();
+  const seenKey = (trip, route) => {
+    const period = pricePeriod(trip);
+    return route?.status === 'ready' && period ? [trip.origin, route.destination.iata, period.departure, period.return ?? ''].join('|') : null;
+  };
+
+  function loadSeen(root, trip, ui) {
+    const route = routes.get(trip);
+    const key = seenKey(trip, route);
+    if (!key || seenPrices.has(key)) return;
+    const period = pricePeriod(trip);
+    seenPrices.set(key, null);
+    cheapestFlight({ origin: trip.origin, destination: route.destination.iata, departure: period.departure, return: period.return }).then(offer => {
+      if (!offer) return;
+      seenPrices.set(key, { amount: Number(offer.price.amount), foundOn: offer.foundOn });
+      const current = ui.trip;
+      if (current && root.isConnected && seenKey(current, routes.get(current)) === key) fill(root, current);
+    }).catch(() => {});
+  }
+
   function summaryFor(trip) {
     const local = localCostRange(profiles, trip);
-    return { local, summary: tripCostSummary({ trip, flight: flightRange(trip), local }) };
+    const seen = seenPrices.get(seenKey(trip, routes.get(trip))) ?? null;
+    return { local, summary: tripCostSummary({ trip, flight: flightRange(trip), seen, local }) };
   }
 
   function fill(root, trip) {
@@ -219,11 +249,17 @@ export function createCostSection({ routes, getRates, getFx = () => null, profil
   function update(root, trip, ui) {
     fill(root, trip);
     const known = routes.get(trip);
-    if (known && known.status !== 'loading') return;
+    if (known && known.status !== 'loading') {
+      loadSeen(root, trip, ui);
+      return;
+    }
     const key = routes.key(trip);
     routes.load(trip).then(() => {
       const current = ui.trip;
-      if (current && routes.key(current) === key && root.isConnected) fill(root, current);
+      if (current && routes.key(current) === key && root.isConnected) {
+        fill(root, current);
+        loadSeen(root, current, ui);
+      }
     });
   }
 

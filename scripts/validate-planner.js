@@ -518,3 +518,16 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.ok(saved);
   console.log('Planner: backup das viagens (exportar e importar) verificado.');
 }
+
+// Custo: preço de passagem visto recentemente entra no lugar da estimativa.
+{
+  const { tripCostSummary } = await import('../js/planner/cost.section.js');
+  const base = createTrip({ countryKey: 'Portugal', travelers: 2, startDate: '2027-04-03', endDate: '2027-04-10' });
+  const withSeen = tripCostSummary({ trip: base, flight: { low: 4000, high: 6000 }, seen: { amount: 4608, foundOn: '2026-11-13' } });
+  const flights = withSeen.rows.find(row => row.id === 'flights');
+  assert.equal(flights.kind, 'seen');
+  assert.equal(flights.low, 9216, 'preço visto × viajantes');
+  const estimateOnly = tripCostSummary({ trip: base, flight: { low: 4000, high: 6000 } });
+  assert.equal(estimateOnly.rows.find(row => row.id === 'flights').kind, 'estimate', 'sem preço visto, estimativa');
+  console.log('Planner: custo com passagem vista recentemente verificado.');
+}
