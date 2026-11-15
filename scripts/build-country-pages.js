@@ -455,6 +455,89 @@ export async function capitalsWithPages(countries) {
   return list;
 }
 
+/**
+ * 404.html (o GitHub Pages serve para qualquer endereço inexistente): sugere o
+ * guia de nome mais parecido com o fim do endereço ("paises/portugall" →
+ * Portugal). Links absolutos, porque a página aparece em qualquer caminho.
+ */
+export function notFoundPage(countries, capitals = []) {
+  const pages = [
+    ...countries.map(country => [`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/`, country.namePt]),
+    ...capitals.map(({ country }) => [capitalPagePath(country), `${country.capital} (${country.namePt})`])
+  ];
+  const title = 'Página não encontrada | Traveling';
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="robots" content="noindex">
+  ${THEME_SCRIPT}
+  <style>${STYLE}
+    .suggest { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .suggest a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="${SITE_URL}">← Traveling: explore o mundo</a>
+    <h1>Página não encontrada</h1>
+    <p class="lead">Esse endereço não existe (ou mudou de lugar).</p>
+    <div id="suggest" hidden>
+      <h2>Você quis dizer…</h2>
+      <ul class="suggest"></ul>
+    </div>
+    <a class="cta" href="${SITE_URL}">Abrir o globo 3D</a>
+    <p><a href="${SITE_URL}${COUNTRY_PAGES_DIR}/">Ver os guias de todos os países</a></p>
+  </main>
+  <script>
+    (function () {
+      var site = ${JSON.stringify(SITE_URL)};
+      var pages = ${JSON.stringify(pages).replaceAll('<', '\\u003c')};
+      var slug = function (text) {
+        return String(text || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      };
+      var distance = function (a, b) {
+        var row = [];
+        for (var j = 0; j <= b.length; j++) row[j] = j;
+        for (var i = 1; i <= a.length; i++) {
+          var previous = row[0];
+          row[0] = i;
+          for (var k = 1; k <= b.length; k++) {
+            var current = row[k];
+            row[k] = Math.min(row[k] + 1, row[k - 1] + 1, previous + (a[i - 1] === b[k - 1] ? 0 : 1));
+            previous = current;
+          }
+        }
+        return row[b.length];
+      };
+      var parts = decodeURIComponent(location.pathname).split('/').filter(Boolean);
+      var wanted = slug(parts[parts.length - 1] === 'index.html' ? parts[parts.length - 2] : parts[parts.length - 1]);
+      if (wanted.length < 3) return;
+      var scored = pages.map(function (page) {
+        var name = page[0].split('/')[1];
+        var score = name.indexOf(wanted) === 0 || wanted.indexOf(name) === 0 ? 0 : distance(wanted, name) / Math.max(wanted.length, name.length);
+        return [score, page];
+      }).filter(function (item) { return item[0] <= 0.4; }).sort(function (a, b) { return a[0] - b[0]; }).slice(0, 3);
+      if (!scored.length) return;
+      var list = document.querySelector('#suggest ul');
+      scored.forEach(function (item) {
+        var link = document.createElement('a');
+        link.href = site + item[1][0];
+        link.textContent = item[1][1];
+        var li = document.createElement('li');
+        li.appendChild(link);
+        list.appendChild(li);
+      });
+      document.getElementById('suggest').hidden = false;
+    })();
+  </script>
+</body>
+</html>
+`;
+}
+
 export function sitemap(countries, capitals = []) {
   const entry = (path, changefreq, priority) => `  <url><loc>${SITE_URL}${path}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -478,7 +561,7 @@ export async function buildAll() {
     .sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR'));
   const capitals = await capitalsWithPages(countries);
   const capitalPaths = new Map(capitals.map(({ country }) => [country.alpha2, `../../${CITY_PAGES_DIR}/${capitalSlug(country)}/`]));
-  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries), 'sitemap.xml': sitemap(countries, capitals) };
+  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries), 'sitemap.xml': sitemap(countries, capitals), '404.html': notFoundPage(countries, capitals) };
   for (const country of countries) {
     files[`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/index.html`] = countryPage(country, summaries.countries?.[country.alpha2], capitalPaths.get(country.alpha2));
   }

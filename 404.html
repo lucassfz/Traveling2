@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Página não encontrada | Traveling</title>
+  <meta name="robots" content="noindex">
+  <script>
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+    } catch (error) { /* armazenamento bloqueado */ }
+  </script>
+  <style>
+    :root { color-scheme: dark; --bg: #05070c; --surface: #0d121c; --text: #e8edf3; --muted: #9aa8b8; --accent: #7cc9f5; --border: rgba(255, 255, 255, .1); --cta: #e8edf3; --cta-text: #05070c; }
+    @media (prefers-color-scheme: light) { :root:not([data-theme='dark']) { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; --cta: #0b1220; --cta-text: #ffffff; } }
+    [data-theme='light'] { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; --cta: #0b1220; --cta-text: #ffffff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 20px; font-size: .9rem; text-decoration: none; }
+    .identity { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+    .identity img { width: 56px; height: 42px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); }
+    .eyebrow { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font: 600 2.2rem/1.15 'Playfair Display', Georgia, serif; }
+    h2 { margin: 32px 0 10px; font-size: 1.15rem; }
+    .cta { display: inline-flex; align-items: center; min-height: 48px; margin: 18px 0 8px; padding: 0 22px; border-radius: 999px; background: var(--cta); color: var(--cta-text); font-weight: 600; text-decoration: none; }
+    .lead { font-size: 1.05rem; }
+    .muted, small { color: var(--muted); }
+    .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; margin: 20px 0 0; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--border); }
+    .facts div { padding: 12px 14px; background: var(--surface); }
+    .facts dt { color: var(--muted); font-size: .78rem; }
+    .facts dd { margin: 2px 0 0; font-weight: 600; }
+    .note { padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .places { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; padding: 0; list-style: none; }
+    .places li { overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .places img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--border); }
+    .places div { padding: 10px 12px 12px; }
+    .places strong { display: block; }
+    .foods { padding-left: 18px; }
+    .faq h3 { margin: 18px 0 4px; font-size: 1rem; }
+    .faq p { margin: 0; color: var(--muted); }
+    .price { margin-top: 28px; padding: 4px 18px 8px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .price h2 { margin-top: 16px; }
+    .price__value { font-size: 1.8rem; }
+    .partners { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .partners a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); text-decoration: none; font-weight: 600; }
+    .list { columns: 2 180px; padding-left: 18px; }
+    footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: .85rem; }
+    .suggest { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .suggest a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="https://lucassfz.github.io/Traveling2/">← Traveling: explore o mundo</a>
+    <h1>Página não encontrada</h1>
+    <p class="lead">Esse endereço não existe (ou mudou de lugar).</p>
+    <div id="suggest" hidden>
+      <h2>Você quis dizer…</h2>
+      <ul class="suggest"></ul>
+    </div>
+    <a class="cta" href="https://lucassfz.github.io/Traveling2/">Abrir o globo 3D</a>
+    <p><a href="https://lucassfz.github.io/Traveling2/paises/">Ver os guias de todos os países</a></p>
+  </main>
+  <script>
+    (function () {
+      var site = "https://lucassfz.github.io/Traveling2/";
+      var pages = [["paises/afeganistao/","Afeganistão"],["paises/africa-do-sul/","África do Sul"],["paises/albania/","Albânia"],["paises/alemanha/","Alemanha"],["paises/andorra/","Andorra"],["paises/angola/","Angola"],["paises/antigua-e-barbuda/","Antígua e Barbuda"],["paises/arabia-saudita/","Arábia Saudita"],["paises/argelia/","Argélia"],["paises/argentina/","Argentina"],["paises/armenia/","Armênia"],["paises/australia/","Austrália"],["paises/austria/","Áustria"],["paises/azerbaijao/","Azerbaijão"],["paises/bahamas/","Bahamas"],["paises/bangladesh/","Bangladesh"],["paises/barbados/","Barbados"],["paises/barein/","Barein"],["paises/belgica/","Bélgica"],["paises/belize/","Belize"],["paises/benin/","Benin"],["paises/bielorrussia/","Bielorrússia"],["paises/bolivia/","Bolívia"],["paises/bosnia-e-herzegovina/","Bósnia e Herzegovina"],["paises/botsuana/","Botsuana"],["paises/brasil/","Brasil"],["paises/brunei/","Brunei"],["paises/bulgaria/","Bulgária"],["paises/burquina-faso/","Burquina Faso"],["paises/burundi/","Burundi"],["paises/butao/","Butão"],["paises/cabo-verde/","Cabo Verde"],["paises/camaroes/","Camarões"],["paises/camboja/","Camboja"],["paises/canada/","Canadá"],["paises/catar/","Catar"],["paises/cazaquistao/","Cazaquistão"],["paises/chade/","Chade"],["paises/chile/","Chile"],["paises/china/","China"],["paises/chipre/","Chipre"],["paises/colombia/","Colômbia"],["paises/comores/","Comores"],["paises/congo-kinshasa/","Congo - Kinshasa"],["paises/coreia-do-norte/","Coreia do Norte"],["paises/coreia-do-sul/","Coreia do Sul"],["paises/costa-do-marfim/","Costa do Marfim"],["paises/costa-rica/","Costa Rica"],["paises/croacia/","Croácia"],["paises/cuba/","Cuba"],["paises/dinamarca/","Dinamarca"],["paises/djibuti/","Djibuti"],["paises/dominica/","Dominica"],["paises/egito/","Egito"],["paises/el-salvador/","El Salvador"],["paises/emirados-arabes-unidos/","Emirados Árabes Unidos"],["paises/equador/","Equador"],["paises/eritreia/","Eritreia"],["paises/eslovaquia/","Eslováquia"],["paises/eslovenia/","Eslovênia"],["paises/espanha/","Espanha"],["paises/essuatini/","Essuatíni"],["paises/estados-unidos/","Estados Unidos"],["paises/estonia/","Estônia"],["paises/etiopia/","Etiópia"],["paises/fiji/","Fiji"],["paises/filipinas/","Filipinas"],["paises/finlandia/","Finlândia"],["paises/franca/","França"],["paises/gabao/","Gabão"],["paises/gambia/","Gâmbia"],["paises/gana/","Gana"],["paises/georgia/","Geórgia"],["paises/granada/","Granada"],["paises/grecia/","Grécia"],["paises/guatemala/","Guatemala"],["paises/guiana/","Guiana"],["paises/guiana-francesa/","Guiana Francesa"],["paises/guine/","Guiné"],["paises/guine-equatorial/","Guiné Equatorial"],["paises/guine-bissau/","Guiné-Bissau"],["paises/haiti/","Haiti"],["paises/honduras/","Honduras"],["paises/hungria/","Hungria"],["paises/iemen/","Iêmen"],["paises/ilhas-marshall/","Ilhas Marshall"],["paises/ilhas-salomao/","Ilhas Salomão"],["paises/india/","Índia"],["paises/indonesia/","Indonésia"],["paises/ira/","Irã"],["paises/iraque/","Iraque"],["paises/irlanda/","Irlanda"],["paises/islandia/","Islândia"],["paises/israel/","Israel"],["paises/italia/","Itália"],["paises/jamaica/","Jamaica"],["paises/japao/","Japão"],["paises/jordania/","Jordânia"],["paises/kosovo/","Kosovo"],["paises/kuwait/","Kuwait"],["paises/laos/","Laos"],["paises/lesoto/","Lesoto"],["paises/letonia/","Letônia"],["paises/libano/","Líbano"],["paises/liberia/","Libéria"],["paises/libia/","Líbia"],["paises/liechtenstein/","Liechtenstein"],["paises/lituania/","Lituânia"],["paises/luxemburgo/","Luxemburgo"],["paises/macedonia-do-norte/","Macedônia do Norte"],["paises/madagascar/","Madagascar"],["paises/malasia/","Malásia"],["paises/malaui/","Malaui"],["paises/maldivas/","Maldivas"],["paises/mali/","Mali"],["paises/malta/","Malta"],["paises/marrocos/","Marrocos"],["paises/mauricio/","Maurício"],["paises/mauritania/","Mauritânia"],["paises/mexico/","México"],["paises/mianmar-birmania/","Mianmar (Birmânia)"],["paises/micronesia/","Micronésia"],["paises/mocambique/","Moçambique"],["paises/moldavia/","Moldávia"],["paises/monaco/","Mônaco"],["paises/mongolia/","Mongólia"],["paises/montenegro/","Montenegro"],["paises/namibia/","Namíbia"],["paises/nauru/","Nauru"],["paises/nepal/","Nepal"],["paises/nicaragua/","Nicarágua"],["paises/niger/","Níger"],["paises/nigeria/","Nigéria"],["paises/noruega/","Noruega"],["paises/nova-zelandia/","Nova Zelândia"],["paises/oma/","Omã"],["paises/paises-baixos/","Países Baixos"],["paises/palau/","Palau"],["paises/panama/","Panamá"],["paises/papua-nova-guine/","Papua-Nova Guiné"],["paises/paquistao/","Paquistão"],["paises/paraguai/","Paraguai"],["paises/peru/","Peru"],["paises/polonia/","Polônia"],["paises/portugal/","Portugal"],["paises/quenia/","Quênia"],["paises/quirguistao/","Quirguistão"],["paises/quiribati/","Quiribati"],["paises/reino-unido/","Reino Unido"],["paises/republica-centro-africana/","República Centro-Africana"],["paises/republica-do-congo/","República do Congo"],["paises/republica-dominicana/","República Dominicana"],["paises/romenia/","Romênia"],["paises/ruanda/","Ruanda"],["paises/russia/","Rússia"],["paises/samoa/","Samoa"],["paises/san-marino/","San Marino"],["paises/santa-lucia/","Santa Lúcia"],["paises/sao-cristovao-e-nevis/","São Cristóvão e Névis"],["paises/sao-tome-e-principe/","São Tomé e Príncipe"],["paises/sao-vicente-e-granadinas/","São Vicente e Granadinas"],["paises/seicheles/","Seicheles"],["paises/senegal/","Senegal"],["paises/serra-leoa/","Serra Leoa"],["paises/servia/","Sérvia"],["paises/singapura/","Singapura"],["paises/siria/","Síria"],["paises/somalia/","Somália"],["paises/sri-lanka/","Sri Lanka"],["paises/sudao/","Sudão"],["paises/sudao-do-sul/","Sudão do Sul"],["paises/suecia/","Suécia"],["paises/suica/","Suíça"],["paises/suriname/","Suriname"],["paises/tadjiquistao/","Tadjiquistão"],["paises/tailandia/","Tailândia"],["paises/taiwan/","Taiwan"],["paises/tanzania/","Tanzânia"],["paises/tchequia/","Tchéquia"],["paises/timor-leste/","Timor-Leste"],["paises/togo/","Togo"],["paises/tonga/","Tonga"],["paises/trinidad-e-tobago/","Trinidad e Tobago"],["paises/tunisia/","Tunísia"],["paises/turcomenistao/","Turcomenistão"],["paises/turquia/","Turquia"],["paises/tuvalu/","Tuvalu"],["paises/ucrania/","Ucrânia"],["paises/uganda/","Uganda"],["paises/uruguai/","Uruguai"],["paises/uzbequistao/","Uzbequistão"],["paises/vanuatu/","Vanuatu"],["paises/venezuela/","Venezuela"],["paises/vietna/","Vietnã"],["paises/zambia/","Zâmbia"],["paises/zimbabue/","Zimbábue"],["cidades/berlim-alemanha/","Berlim (Alemanha)"],["cidades/buenos-aires-argentina/","Buenos Aires (Argentina)"],["cidades/viena-austria/","Viena (Áustria)"],["cidades/baku-azerbaijao/","Baku (Azerbaijão)"],["cidades/nassau-bahamas/","Nassau (Bahamas)"],["cidades/bridgetown-barbados/","Bridgetown (Barbados)"],["cidades/manama-barein/","Manama (Barein)"],["cidades/bruxelas-belgica/","Bruxelas (Bélgica)"],["cidades/bandar-seri-begawan-brunei/","Bandar Seri Begawan (Brunei)"],["cidades/doha-catar/","Doha (Catar)"],["cidades/pyongyang-coreia-do-norte/","Pyongyang (Coreia do Norte)"],["cidades/seul-coreia-do-sul/","Seul (Coreia do Sul)"],["cidades/san-jose-costa-rica/","San José (Costa Rica)"],["cidades/havana-cuba/","Havana (Cuba)"],["cidades/copenhague-dinamarca/","Copenhague (Dinamarca)"],["cidades/san-salvador-el-salvador/","San Salvador (El Salvador)"],["cidades/asmara-eritreia/","Asmara (Eritreia)"],["cidades/bratislava-eslovaquia/","Bratislava (Eslováquia)"],["cidades/tallinn-estonia/","Tallinn (Estônia)"],["cidades/helsinque-finlandia/","Helsinque (Finlândia)"],["cidades/paris-franca/","Paris (França)"],["cidades/st-george-s-granada/","St. George's (Granada)"],["cidades/atenas-grecia/","Atenas (Grécia)"],["cidades/caiena-guiana-francesa/","Caiena (Guiana Francesa)"],["cidades/conacri-guine/","Conacri (Guiné)"],["cidades/budapeste-hungria/","Budapeste (Hungria)"],["cidades/majuro-ilhas-marshall/","Majuro (Ilhas Marshall)"],["cidades/dublin-irlanda/","Dublin (Irlanda)"],["cidades/reykjavik-islandia/","Reykjavík (Islândia)"],["cidades/roma-italia/","Roma (Itália)"],["cidades/cidade-do-kuwait-kuwait/","Cidade do Kuwait (Kuwait)"],["cidades/vientiane-laos/","Vientiane (Laos)"],["cidades/riga-letonia/","Riga (Letônia)"],["cidades/vaduz-liechtenstein/","Vaduz (Liechtenstein)"],["cidades/luxemburgo-luxemburgo/","Luxemburgo (Luxemburgo)"],["cidades/kuala-lumpur-malasia/","Kuala Lumpur (Malásia)"],["cidades/male-maldivas/","Malé (Maldivas)"],["cidades/valeta-malta/","Valeta (Malta)"],["cidades/cidade-do-mexico-mexico/","Cidade do México (México)"],["cidades/catmandu-nepal/","Catmandu (Nepal)"],["cidades/oslo-noruega/","Oslo (Noruega)"],["cidades/mascate-oma/","Mascate (Omã)"],["cidades/amsterda-paises-baixos/","Amsterdã (Países Baixos)"],["cidades/cidade-do-panama-panama/","Cidade do Panamá (Panamá)"],["cidades/port-moresby-papua-nova-guine/","Port Moresby (Papua-Nova Guiné)"],["cidades/assuncao-paraguai/","Assunção (Paraguai)"],["cidades/varsovia-polonia/","Varsóvia (Polônia)"],["cidades/lisboa-portugal/","Lisboa (Portugal)"],["cidades/londres-reino-unido/","Londres (Reino Unido)"],["cidades/brazzaville-republica-do-congo/","Brazzaville (República do Congo)"],["cidades/santo-domingo-republica-dominicana/","Santo Domingo (República Dominicana)"],["cidades/kigali-ruanda/","Kigali (Ruanda)"],["cidades/moscou-russia/","Moscou (Rússia)"],["cidades/san-marino-san-marino/","San Marino (San Marino)"],["cidades/kingstown-sao-vicente-e-granadinas/","Kingstown (São Vicente e Granadinas)"],["cidades/belgrado-servia/","Belgrado (Sérvia)"],["cidades/singapura-singapura/","Singapura (Singapura)"],["cidades/damasco-siria/","Damasco (Síria)"],["cidades/juba-sudao-do-sul/","Juba (Sudão do Sul)"],["cidades/estocolmo-suecia/","Estocolmo (Suécia)"],["cidades/paramaribo-suriname/","Paramaribo (Suriname)"],["cidades/taipe-taiwan/","Taipé (Taiwan)"],["cidades/praga-tchequia/","Praga (Tchéquia)"],["cidades/dili-timor-leste/","Díli (Timor-Leste)"],["cidades/port-of-spain-trinidad-e-tobago/","Port of Spain (Trinidad e Tobago)"],["cidades/funafuti-tuvalu/","Funafuti (Tuvalu)"],["cidades/kyiv-ucrania/","Kyiv (Ucrânia)"]];
+      var slug = function (text) {
+        return String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      };
+      var distance = function (a, b) {
+        var row = [];
+        for (var j = 0; j <= b.length; j++) row[j] = j;
+        for (var i = 1; i <= a.length; i++) {
+          var previous = row[0];
+          row[0] = i;
+          for (var k = 1; k <= b.length; k++) {
+            var current = row[k];
+            row[k] = Math.min(row[k] + 1, row[k - 1] + 1, previous + (a[i - 1] === b[k - 1] ? 0 : 1));
+            previous = current;
+          }
+        }
+        return row[b.length];
+      };
+      var parts = decodeURIComponent(location.pathname).split('/').filter(Boolean);
+      var wanted = slug(parts[parts.length - 1] === 'index.html' ? parts[parts.length - 2] : parts[parts.length - 1]);
+      if (wanted.length < 3) return;
+      var scored = pages.map(function (page) {
+        var name = page[0].split('/')[1];
+        var score = name.indexOf(wanted) === 0 || wanted.indexOf(name) === 0 ? 0 : distance(wanted, name) / Math.max(wanted.length, name.length);
+        return [score, page];
+      }).filter(function (item) { return item[0] <= 0.4; }).sort(function (a, b) { return a[0] - b[0]; }).slice(0, 3);
+      if (!scored.length) return;
+      var list = document.querySelector('#suggest ul');
+      scored.forEach(function (item) {
+        var link = document.createElement('a');
+        link.href = site + item[1][0];
+        link.textContent = item[1][1];
+        var li = document.createElement('li');
+        li.appendChild(link);
+        list.appendChild(li);
+      });
+      document.getElementById('suggest').hidden = false;
+    })();
+  </script>
+</body>
+</html>
