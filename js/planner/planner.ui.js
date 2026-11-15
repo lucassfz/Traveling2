@@ -84,8 +84,8 @@ export class PlannerUI {
    * @param {(countryKey: string) => object} options.createTrip
    * @param {object[]} [options.sections]   Seções por etapa: { id, step, render(trip, ui), bind?, refresh? }.
    */
-  constructor({ element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas = () => [], createTrip, sections = [] }) {
-    Object.assign(this, { element, store, countries, searchCountries, onShowCountry, onDiscover, getIdeas, createTrip, sections });
+  constructor({ element, store, countries, searchCountries, onShowCountry, onDiscover, onShareTrip = null, getIdeas = () => [], createTrip, sections = [] }) {
+    Object.assign(this, { element, store, countries, searchCountries, onShowCountry, onDiscover, onShareTrip, getIdeas, createTrip, sections });
     this.view = store.trips.length ? 'trip' : 'home';
     this.flash = '';
     this.pendingDelete = null;   // id da viagem aguardando confirmação de exclusão
@@ -682,6 +682,7 @@ export class PlannerUI {
       </div>
       <div class="planner-actions">
         <button class="secondary-button" type="button" data-planner-action="copy">Copiar resumo</button>
+        ${this.onShareTrip ? '<button class="secondary-button" type="button" data-planner-action="share-trip">Compartilhar viagem</button>' : ''}
         <button class="secondary-button" type="button" data-planner-action="print">Imprimir / salvar PDF</button>
         <button class="secondary-button" type="button" data-planner-action="show-country">Ver guia de ${escapeHtml(country?.namePt || 'destino')}</button>
       </div>
@@ -999,6 +1000,7 @@ export class PlannerUI {
     if (action === 'next') this.#goTo(Math.min(PLANNER_STEPS.length, this.step + 1));
     if (action === 'prev') this.#goTo(Math.max(1, this.step - 1));
     if (action === 'show-country') this.onShowCountry?.(trip.countryKey);
+    if (action === 'share-trip' && trip) this.onShareTrip?.(trip, button);
     if (action === 'change-destination' || action === 'cancel-change') {
       this.changingDestination = action === 'change-destination';
       this.render();

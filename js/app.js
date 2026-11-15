@@ -881,8 +881,51 @@ async function shareFrom(button, { title, text, hash = '', url = hash ? shareUrl
   button.shareTimer = setTimeout(() => { target.textContent = label; button.classList.remove('share-button--done'); }, 2000);
 }
 
+// Viagem compartilhada por link: #/viagem/<dados>. Leva destino, datas e
+// escolhas; não leva gastos anotados, checklist nem milhas (são pessoais).
+const TRIP_SHARE_PREFIX = '#/viagem/';
+const SHARED_TRIP_FIELDS = ['countryKey', 'city', 'origin', 'startDate', 'endDate', 'month', 'days', 'travelers', 'group', 'cabin', 'payWith', 'flightPreference', 'style', 'lodging', 'transport', 'interests', 'budgetBRL'];
+function tripShareUrl(trip) {
+  const payload = Object.fromEntries(SHARED_TRIP_FIELDS.filter(key => trip[key] !== undefined && trip[key] !== null).map(key => [key, trip[key]]));
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  const data = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  return pageUrl(`${TRIP_SHARE_PREFIX}${data}`);
+}
+
+function readSharedTrip(hash) {
+  if (!hash.startsWith(TRIP_SHARE_PREFIX) || hash.length > 4000) return null;
+  try {
+    const base64 = hash.slice(TRIP_SHARE_PREFIX.length).replaceAll('-', '+').replaceAll('_', '/');
+    const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+    const raw = JSON.parse(new TextDecoder().decode(bytes));
+    if (!raw || typeof raw !== 'object' || !COUNTRIES[raw.countryKey]) return null;
+    return Object.fromEntries(SHARED_TRIP_FIELDS.filter(key => key in raw).map(key => [key, raw[key]]));
+  } catch {
+    return null;
+  }
+}
+
+function openSharedTrip(payload) {
+  setHash('');
+  // A mesma viagem já está aqui (ex.: a pessoa abriu o próprio link): só abre.
+  const same = tripStore.trips.find(trip => trip.countryKey === payload.countryKey && (trip.city?.id ?? null) === (payload.city?.id ?? null)
+    && trip.startDate === (payload.startDate ?? null) && trip.endDate === (payload.endDate ?? null) && trip.travelers === (payload.travelers ?? 1));
+  let target = same;
+  if (!target) {
+    const before = new Set(tripStore.trips.map(trip => trip.id));
+    tripStore.importData({ trips: [{ ...payload, step: 1 }] });
+    target = tripStore.trips.find(trip => !before.has(trip.id));
+  }
+  if (!target) return;
+  tripStore.setActive(target.id);
+  setPlannerOpen(true);
+  ensurePlanner().then(planner => { planner.view = 'trip'; planner.render(); }).catch(() => {});
+}
+
 // Link recebido (#/PT ou #/PT/c123): abre o país e, se houver, a cidade.
 async function openFromHash() {
+  const sharedTrip = readSharedTrip(location.hash);
+  if (sharedTrip) return openSharedTrip(sharedTrip);
   const target = parseHash(location.hash);
   const countryKey = target ? COUNTRY_BY_ALPHA2.get(target.alpha2) : null;
   if (!countryKey) return;
@@ -1590,6 +1633,7 @@ function ensurePlanner() {
       searchCountries,
       onShowCountry: countryKey => showCountryFromPlanner(countryKey),
       onDiscover: discoverDestination,
+      onShareTrip: (trip, button) => shareFrom(button, { title: `Viagem para ${COUNTRIES[trip.countryKey]?.namePt ?? 'o destino'}`, text: `Olha o roteiro da viagem para ${COUNTRIES[trip.countryKey]?.namePt ?? 'o destino'} no Traveling`, url: tripShareUrl(trip) }),
       // Países salvos na antiga lista "Quero ir" viram sugestões de destino.
       // Países salvos (inclui a antiga lista "Quero ir") viram sugestões de destino.
       getIdeas: () => savedStore.items.filter(item => item.type === 'country').map(item => item.countryKey),
