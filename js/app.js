@@ -1248,9 +1248,16 @@ function ensurePlanner() {
     import('./planner/prep.section.js'),
     import('./planner/currency.js'),
     import('./planner/live.flights.section.js'),
-    import('./planner/live.hotels.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }, { createLiveFlightsSection }, { createLiveHotelsSection }]) => {
+    import('./planner/live.hotels.section.js'),
+    import('./planner/cost.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSections, createRouteEstimator }, { createPrepSection }, { rateTable, rateFor }, { createLiveFlightsSection }, { createLiveHotelsSection }, { createCostSection }]) => {
     const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
+    // Uma estimativa de rota por viagem, usada pela etapa Voo e pelo custo no resumo.
+    const routes = createRouteEstimator({
+      airportRepository, resolveDestinationAirport,
+      resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng),
+      usdRate: () => rateFor('USD', getRates()) ?? (state.brlPerUsd?.rate > 0 ? state.brlPerUsd : null)
+    });
     state.planner = new PlannerUI({
       getRates,
       ensureRate: ensurePlannerRate,
@@ -1267,7 +1274,7 @@ function ensurePlanner() {
       createTrip: (countryKey, extra = {}) => createTrip({ countryKey, step: 1, ...extra }),
       sections: [
         ...createFlightSections({
-          airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
+          routes, airportRepository, resolveDestinationAirport, getFx: () => state.brlPerUsd, getRates, countries: COUNTRIES,
           resolveCityAirport: (lat, lng) => airportRepository.findGateway(lat, lng),
           // A mesma prévia do "Ver rota no globo", com a origem e o destino da viagem.
           onPreviewRoute: (origin, destination, trip) => openFlightPreview({
@@ -1298,7 +1305,9 @@ function ensurePlanner() {
         }),
         // Hospedagem (fase 3.4): link do Booking.com sempre; busca com preços só com o backend ligado.
         ...createLiveHotelsSection({ getRates }),
-        createPrepSection({ countries: COUNTRIES })
+        createPrepSection({ countries: COUNTRIES }),
+        // Resumo: quanto vai custar (estimativas, cotações anexadas e gastos anotados).
+        createCostSection({ routes, getRates, getFx: () => state.brlPerUsd })
       ]
     });
     return state.planner;

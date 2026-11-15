@@ -421,7 +421,7 @@ export class PlannerUI {
     if (stepId === 'flight') return this.#flightStep(trip, sections);
     if (stepId === 'budget') return this.#styleStep(trip, sections);
     if (stepId === 'prep') return sections;
-    return this.#summaryStep(trip);
+    return this.#summaryStep(trip, sections);
   }
 
   // ---------- Etapa 1: destino ----------
@@ -645,7 +645,7 @@ export class PlannerUI {
 
   // ---------- Etapa 6: resumo ----------
 
-  #summaryStep(trip) {
+  #summaryStep(trip, sections = '') {
     const country = this.countries[trip.countryKey];
     const progress = tripProgress(trip);
     const pending = PLANNER_STEPS.slice(0, -1).map((step, index) => ({ step, number: index + 1, done: progress.done[index] }));
@@ -656,6 +656,7 @@ export class PlannerUI {
           ${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}
         </dl>
       </div>
+      ${sections}
       ${trip.interests.length ? `<div class="planner-card"><h4 class="planner-block-title">Interesses</h4>
         <div class="planner-tags">${trip.interests.map(id => `<span class="planner-tag">${escapeHtml(INTERESTS[id])}</span>`).join('')}</div></div>` : ''}
       <div class="planner-card">
@@ -700,6 +701,9 @@ export class PlannerUI {
       `Viagem para ${country?.namePt || trip.countryKey}`,
       ...this.#facts(trip).map(([label, value]) => `${label}: ${value}`),
       trip.interests.length ? `Interesses: ${trip.interests.map(id => INTERESTS[id]).join(', ')}` : '',
+      // Seções do resumo podem acrescentar texto (ex.: custo estimado).
+      ...this.sections.filter(section => section.step === PLANNER_STEPS.length && section.summaryText)
+        .flatMap(section => ['', ...section.summaryText(trip)]),
       '',
       'Planejado no Traveling.'
     ].filter((line, index, all) => line || all[index - 1]).join('\n').trim();

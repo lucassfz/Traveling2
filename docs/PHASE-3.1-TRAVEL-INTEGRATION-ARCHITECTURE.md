@@ -30,6 +30,10 @@
 |---|---|
 | Bloco "Onde ficar" na etapa Orçamento: link para a busca do Booking.com com cidade, datas, hóspedes e quartos preenchidos. Funciona **já em produção, sem backend**; o id de afiliado vem da meta opcional `traveling-booking-aid` e o aviso de afiliado só aparece com ela | `js/planner/live.hotels.section.js` |
 | Busca de hotéis pelo backend (ordenação por preço ou estrelas, procedência, "Adicionar à viagem" como hospedagem cotada), visível só com a meta `traveling-api`. Hoje responde o fornecedor fictício; o adaptador LiteAPI fica para quando houver conta no sandbox | `js/planner/live.hotels.section.js`, `backend/src/providers/mock.js` |
+| Entregue (fase 3.5, sem depender de contas) | Onde |
+|---|---|
+| "Quanto vai custar" no resumo: passagens, hospedagem e gastos no destino por faixa; cotação anexada substitui a estimativa da categoria; cotação vencida aparece como "Preço expirado" com "Atualizar preço"; gastos anotados; comparação com o orçamento; entra no "Copiar resumo" | `js/planner/cost.section.js` |
+| Estimativa de rota compartilhada entre a etapa Voo e o resumo (um cálculo por viagem) | `createRouteEstimator` em `js/planner/flight.section.js` |
 
 Para publicar (precisa das contas, que são do responsável pelo projeto): criar a conta Cloudflare e rodar `npx wrangler deploy` em `backend/`; criar conta na Duffel e `npx wrangler secret put DUFFEL_TOKEN` com o token de **teste**; acrescentar `duffel` a `FLIGHT_PROVIDERS`; e incluir `<meta name="traveling-api" content="https://<worker>/api/v1">` no `index.html`. Travelpayouts, LiteAPI e afiliados Booking.com dependem do cadastro em cada programa.
 

@@ -13,7 +13,54 @@ import { formatBRL } from './money.js';
 export const CABINS = Object.freeze({ economy: 'Econômica', premium: 'Premium Economy', business: 'Executiva' });
 
 /**
+ * Rota estimada da viagem (origem → aeroporto da cidade ou do país), uma por vez
+ * e reaproveitada por quem precisar: a etapa Voo e o custo no resumo.
+ * @param {object} deps { airportRepository, resolveDestinationAirport, resolveCityAirport, usdRate }
+ * @returns {{ key: (trip) => string, get: (trip) => object|null, load: (trip) => Promise<object> }}
+ */
+export function createRouteEstimator({ airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, usdRate = () => null }) {
+  let route = null;
+  let pending = null;
+  const key = trip => [trip.id, trip.origin, trip.countryKey, trip.city?.id ?? '', trip.cabin, tripMonth(trip) ?? new Date().getMonth()].join('|');
+
+  async function compute(trip, routeKey) {
+    const [origin, destination] = await Promise.all([
+      airportRepository.resolve(trip.origin),
+      // Com cidade escolhida: aeroporto que atende a cidade; senão o do país.
+      (trip.city ? resolveCityAirport(trip.city.lat, trip.city.lng) : Promise.resolve(null))
+        .then(airport => airport ?? resolveDestinationAirport(trip.countryKey))
+    ]);
+    if (!origin) return { key: routeKey, status: 'error', message: `Aeroporto de origem ${trip.origin} não encontrado. Confira o código na etapa Datas.` };
+    if (!destination) return { key: routeKey, status: 'error', message: 'Ainda não há estimativa de voo para este destino.' };
+    if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) return { key: routeKey, status: 'error', message: 'Origem e destino são o mesmo aeroporto.' };
+    const month = tripMonth(trip) ?? new Date().getMonth();
+    return { key: routeKey, status: 'ready', origin, destination, estimate: estimateRoute({ origin, destination, cabin: trip.cabin, month, fx: usdRate() }) };
+  }
+
+  return {
+    key,
+    get: trip => (route?.key === key(trip) ? route : null),
+    load(trip) {
+      const routeKey = key(trip);
+      if (route?.key === routeKey && route.status !== 'error' && route.status !== 'loading') return Promise.resolve(route);
+      if (pending?.key === routeKey) return pending.promise;
+      route = { key: routeKey, status: 'loading' };
+      const promise = compute(trip, routeKey)
+        .catch(() => ({ key: routeKey, status: 'error', message: 'Não foi possível calcular agora.' }))
+        .then(result => {
+          if (route?.key === routeKey) route = result;
+          if (pending?.key === routeKey) pending = null;
+          return result;
+        });
+      pending = { key: routeKey, promise };
+      return promise;
+    }
+  };
+}
+
+/**
  * @param {object} deps
+ * @param {object} [deps.routes]            createRouteEstimator compartilhado (opcional).
  * @param {object} deps.airportRepository
  * @param {(countryKey: string) => Promise<object|null>} deps.resolveDestinationAirport
  * @param {(lat: number, lng: number) => Promise<object|null>} [deps.resolveCityAirport] Aeroporto de chegada de uma cidade.
@@ -22,36 +69,14 @@ export const CABINS = Object.freeze({ economy: 'Econômica', premium: 'Premium E
  * @param {(origin: object, destination: object, trip: object) => void} [deps.onPreviewRoute] Mostra a rota no globo.
  * @returns {object[]} Seções do passo a passo: { id, step, render, bind, refresh }.
  */
-export function createFlightSections({ airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, getFx, getRates = () => ({}), onPreviewRoute = null }) {
-  let route = null;
-
+export function createFlightSections({ routes = null, airportRepository, resolveDestinationAirport, resolveCityAirport = async () => null, getFx, getRates = () => ({}), onPreviewRoute = null }) {
   const usdRate = () => rateFor('USD', getRates()) ?? (getFx()?.rate > 0 ? getFx() : null);
-  const routeKey = trip => [trip.id, trip.origin, trip.countryKey, trip.city?.id ?? '', trip.cabin, tripMonth(trip) ?? new Date().getMonth()].join('|');
+  const estimator = routes ?? createRouteEstimator({ airportRepository, resolveDestinationAirport, resolveCityAirport, usdRate });
   const codes = value => `${value.origin.iata || value.origin.icao} ⇄ ${value.destination.iata || value.destination.icao}`;
 
-  async function loadRoute(trip) {
-    const key = routeKey(trip);
-    if (route?.key === key && route.status !== 'error') return route;
-    route = { key, status: 'loading' };
-    const [origin, destination] = await Promise.all([
-      airportRepository.resolve(trip.origin),
-      // Com cidade escolhida: aeroporto que atende a cidade; senão o do país.
-      (trip.city ? resolveCityAirport(trip.city.lat, trip.city.lng) : Promise.resolve(null))
-        .then(airport => airport ?? resolveDestinationAirport(trip.countryKey))
-    ]);
-    if (route.key !== key) return route;
-    if (!origin) route = { key, status: 'error', message: `Aeroporto de origem ${trip.origin} não encontrado. Confira o código na etapa Datas.` };
-    else if (!destination) route = { key, status: 'error', message: 'Ainda não há estimativa de voo para este destino.' };
-    else if ((origin.iata || origin.icao) === (destination.iata || destination.icao)) route = { key, status: 'error', message: 'Origem e destino são o mesmo aeroporto.' };
-    else {
-      const month = tripMonth(trip) ?? new Date().getMonth();
-      route = { key, status: 'ready', origin, destination, estimate: estimateRoute({ origin, destination, cabin: trip.cabin, month, fx: usdRate() }) };
-    }
-    return route;
-  }
-
   function infoHtml(trip) {
-    if (!route || route.key !== routeKey(trip) || route.status === 'loading') return '<p class="planner-hint">Calculando a estimativa…</p>';
+    const route = estimator.get(trip);
+    if (!route || route.status === 'loading') return '<p class="planner-hint">Calculando a estimativa…</p>';
     if (route.status === 'error') return `<p class="planner-hint">${escapeHtml(route.message)}</p>`;
     const usd = usdRate();
     const suggestion = flightSuggestion(route.estimate, { travelers: 1, brlPerUsd: usd?.rate ?? null });
@@ -84,15 +109,14 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
   }
 
   function update(root, trip, ui) {
-    const key = routeKey(trip);
+    const key = estimator.key(trip);
     fill(root, trip);
-    if (route?.key === key && route.status !== 'loading') return;
-    loadRoute(trip)
-      .catch(() => { route = { key, status: 'error', message: 'Não foi possível calcular agora.' }; })
-      .finally(() => {
-        const current = ui.trip;
-        if (current && routeKey(current) === key && root.isConnected) fill(root, current);
-      });
+    const known = estimator.get(trip);
+    if (known && known.status !== 'loading') return;
+    estimator.load(trip).then(() => {
+      const current = ui.trip;
+      if (current && estimator.key(current) === key && root.isConnected) fill(root, current);
+    });
   }
 
   return [{
@@ -105,6 +129,7 @@ export function createFlightSections({ airportRepository, resolveDestinationAirp
       </div>`,
     bind: (root, trip, ui) => {
       root.querySelector('#planner-flight-info')?.addEventListener('click', event => {
+        const route = estimator.get(ui.trip);
         if (!event.target.closest('[data-planner-preview-route]') || route?.status !== 'ready') return;
         onPreviewRoute?.(route.origin, route.destination, ui.trip);
       });

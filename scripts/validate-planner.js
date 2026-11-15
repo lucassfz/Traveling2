@@ -408,3 +408,68 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(clean({ expiresAt: 'logo' }).expiresAt, undefined);
   console.log('Planner: ofertas de fornecedor anexadas à viagem verificadas.');
 }
+
+// Quanto vai custar (resumo): estimativas, cotações anexadas, gastos anotados e orçamento.
+{
+  const { tripCostSummary, localCostRange, costSummaryText, costHtml } = await import('../js/planner/cost.section.js');
+  const { DESTINATION_PROFILES } = await import('../js/destination.profiles.js');
+  let id = 0;
+  const idFactory = prefix => `${prefix}_cost${String(++id).padStart(4, '0')}`;
+  const at = new Date('2026-11-15T12:10:00Z');
+  const base = createTrip({ countryKey: 'Portugal', travelers: 2, startDate: '2027-04-03', endDate: '2027-04-10', budgetBRL: 20000, idFactory });
+
+  const local = localCostRange(DESTINATION_PROFILES, base);
+  assert.ok(local, 'Portugal tem perfil revisado');
+  assert.equal(local.days, 8);
+  assert.equal(local.nights, 7);
+  assert.equal(local.assumedStay, false);
+  assert.ok(local.low.total < local.high.total);
+  assert.equal(localCostRange(DESTINATION_PROFILES, { ...base, countryKey: 'Nowhere' }), null);
+  const undated = localCostRange(DESTINATION_PROFILES, { ...base, startDate: null, endDate: null });
+  assert.equal(undated.assumedStay, true);
+  assert.equal(undated.days, 7);
+  const region = DESTINATION_PROFILES.find(profile => profile.countryKey === 'Portugal');
+  const narrowed = localCostRange(DESTINATION_PROFILES, { ...base, profileId: region.id });
+  assert.ok(narrowed.low.total >= local.low.total && narrowed.high.total <= local.high.total, 'região escolhida restringe a faixa');
+
+  const flight = { low: 4000, high: 6000 };
+  const estimate = tripCostSummary({ trip: base, flight, local, now: at });
+  assert.deepEqual(estimate.rows.map(row => [row.id, row.kind]), [['flights', 'estimate'], ['lodging', 'estimate'], ['daily', 'estimate']]);
+  assert.equal(estimate.rows[0].low, 8000, 'passagem × viajantes');
+  assert.equal(estimate.rows[0].high, 12000);
+  assert.equal(estimate.low, estimate.rows.reduce((sum, row) => sum + row.low, 0));
+  assert.equal(estimate.perPersonHigh, Math.round(estimate.high / 2));
+  assert.deepEqual(estimate.incomplete, []);
+  assert.ok(['within', 'tight', 'over'].includes(estimate.budget.status));
+
+  // Cotação anexada substitui a estimativa da categoria; vencida aparece como tal.
+  const source = { kind: 'provider-offer', provider: 'mock', offerId: 'o1', dataSource: 'test', fetchedAt: '2026-11-15T12:00:00Z', expiresAt: '2026-11-15T12:05:00Z' };
+  let quoted = addLine(base, { category: 'flights', status: 'quote', amountBRL: 9000.5, note: 'Voo de teste', source }, { idFactory });
+  quoted = addLine(quoted, { category: 'lodging', status: 'quote', amountBRL: 1500, note: 'Hotel', source: { ...source, offerId: 'h1', expiresAt: undefined } }, { idFactory });
+  quoted = addLine(quoted, { category: 'insurance', status: 'paid', amountBRL: 300, note: 'Seguro', source: { kind: 'user' } }, { idFactory });
+  quoted = addLine(quoted, { category: 'flights', status: 'estimate', amountBRL: 99999, note: 'antiga', source: { kind: 'traveling-estimate', model: 'pricing.engine' } }, { idFactory });
+  const withQuotes = tripCostSummary({ trip: quoted, flight, local, now: at });
+  const byId = Object.fromEntries(withQuotes.rows.map(row => [row.id, row]));
+  assert.equal(byId.flights.kind, 'quote');
+  assert.equal(byId.flights.low, 9000.5);
+  assert.equal(byId.flights.quotes[0].expired, true);
+  assert.equal(byId.lodging.quotes[0].expired, false, 'sem prazo não vence');
+  assert.equal(byId.own.low, 300);
+  assert.equal(byId.own.detail, 'Seguro e documentos');
+  assert.ok(withQuotes.high < 99999, 'estimativas antigas guardadas não entram (o cálculo é refeito)');
+  const html = costHtml(withQuotes, { local });
+  assert.ok(html.includes('Preço expirado') && html.includes('data-planner-step="3"'), 'cotação vencida oferece atualizar');
+  assert.ok(html.includes('Dados de teste'));
+  assert.ok(costSummaryText(withQuotes)[0].startsWith('Custo estimado: '));
+
+  // Sem nada para estimar: avisa o que falta, sem inventar valor.
+  const empty = tripCostSummary({ trip: { ...base, countryKey: 'Nowhere' }, flight: null, local: null, now: at });
+  assert.deepEqual(empty.rows, []);
+  assert.deepEqual(empty.incomplete, ['Passagens', 'Hospedagem', 'Gastos no destino']);
+  assert.equal(empty.budget, null);
+  assert.deepEqual(costSummaryText(empty), []);
+  assert.ok(costHtml(empty).includes('Ainda não há estimativa'));
+  const over = tripCostSummary({ trip: { ...base, budgetBRL: 100 }, flight, local, now: at });
+  assert.equal(over.budget.status, 'over');
+  console.log('Planner: custo da viagem no resumo (estimativas, cotações, gastos anotados, orçamento) verificado.');
+}
