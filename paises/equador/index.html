@@ -25,6 +25,7 @@
       if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
     } catch (error) { /* armazenamento bloqueado */ }
   </script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "bfcf66c2cb9f4a45ad35f88e629235c6"}'></script>
   <style>
     :root { color-scheme: dark; --bg: #05070c; --surface: #0d121c; --text: #e8edf3; --muted: #9aa8b8; --accent: #7cc9f5; --border: rgba(255, 255, 255, .1); --cta: #e8edf3; --cta-text: #05070c; }
     @media (prefers-color-scheme: light) { :root:not([data-theme='dark']) { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; --cta: #0b1220; --cta-text: #ffffff; } }

@@ -154,6 +154,7 @@ function head({ title, description, url, image, imageAlt, jsonLd }) {
   <meta name="twitter:image" content="${escapeHtml(image)}">
   <script type="application/ld+json">${JSON.stringify(jsonLd).replaceAll('<', '\\u003c')}</script>
   ${THEME_SCRIPT}
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "bfcf66c2cb9f4a45ad35f88e629235c6"}'></script>
   <style>${STYLE}
   </style>
 </head>`;
