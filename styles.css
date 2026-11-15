@@ -3679,3 +3679,7 @@ body.route-mode .city-card { visibility: hidden; }
 .trip-cost__note { color: var(--color-text-muted); font-size: .76rem; }
 .trip-cost__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .live-search__toolbar + .planner-hint { margin: 6px 0 10px; }
+
+/* Links de parceiros no Planner */
+.partner-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.partner-links .secondary-button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; text-decoration: none; font-size: .82rem; }

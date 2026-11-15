@@ -473,3 +473,16 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(over.budget.status, 'over');
   console.log('Planner: custo da viagem no resumo (estimativas, cotações, gastos anotados, orçamento) verificado.');
 }
+
+// Links de parceiros: busca do Aviasales preenchida com a viagem, com o marcador.
+{
+  const { aviasalesUrl, PARTNERS, PARTNER_MARKER } = await import('../js/planner/partners.section.js');
+  const trip = { travelers: 2, startDate: '2027-04-03', endDate: '2027-04-10' };
+  assert.equal(aviasalesUrl(trip, { origin: 'GRU', destination: 'LIS' }), `https://www.aviasales.com/search/GRU0304LIS10042?marker=${PARTNER_MARKER}`);
+  assert.equal(aviasalesUrl({ ...trip, endDate: null }, { origin: 'GRU', destination: 'LIS' }), `https://www.aviasales.com/search/GRU0304LIS2?marker=${PARTNER_MARKER}`, 'só ida');
+  assert.equal(aviasalesUrl({ ...trip, startDate: null }, { origin: 'GRU', destination: 'LIS' }), PARTNERS.aviasales.home, 'sem datas: página inicial');
+  assert.equal(aviasalesUrl(trip, { origin: 'GRU', destination: 'GRU' }), PARTNERS.aviasales.home);
+  assert.equal(aviasalesUrl(trip, {}), PARTNERS.aviasales.home);
+  assert.ok(Object.values(PARTNERS).every(partner => partner.home.startsWith('https://')));
+  console.log('Planner: links de parceiros (Aviasales preenchido) verificados.');
+}

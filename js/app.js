@@ -1249,8 +1249,9 @@ function ensurePlanner() {
     import('./planner/currency.js'),
     import('./planner/live.flights.section.js'),
     import('./planner/live.hotels.section.js'),
-    import('./planner/cost.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSections, createRouteEstimator }, { createPrepSection }, { rateTable, rateFor }, { createLiveFlightsSection }, { createLiveHotelsSection }, { createCostSection }]) => {
+    import('./planner/cost.section.js'),
+    import('./planner/partners.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSections, createRouteEstimator }, { createPrepSection }, { rateTable, rateFor }, { createLiveFlightsSection }, { createLiveHotelsSection }, { createCostSection }, { createPartnerSections }]) => {
     const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
     // Uma estimativa de rota por viagem, usada pela etapa Voo e pelo custo no resumo.
     const routes = createRouteEstimator({
@@ -1305,6 +1306,8 @@ function ensurePlanner() {
         }),
         // Hospedagem (fase 3.4): link do Booking.com sempre; busca com preços só com o backend ligado.
         ...createLiveHotelsSection({ getRates }),
+        // Links de parceiros (Aviasales, aluguel de carro, passes, eSIM), sem script.
+        ...createPartnerSections({ routes }),
         createPrepSection({ countries: COUNTRIES }),
         // Resumo: quanto vai custar (estimativas, cotações anexadas e gastos anotados).
         createCostSection({ routes, getRates, getFx: () => state.brlPerUsd })

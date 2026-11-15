@@ -414,8 +414,14 @@ export class PlannerUI {
     return this.sections.filter(section => section.step === this.step);
   }
 
+  // Seções com slot 'end' vão no fim da etapa; as demais, no lugar que a etapa define.
   #stepBody(trip, stepId) {
-    const sections = this.#stepSections().map(section => section.render(trip, this)).join('');
+    const render = list => list.map(section => section.render(trip, this)).join('');
+    const all = this.#stepSections();
+    return this.#stepMain(trip, stepId, render(all.filter(section => section.slot !== 'end'))) + render(all.filter(section => section.slot === 'end'));
+  }
+
+  #stepMain(trip, stepId, sections) {
     if (stepId === 'destination') return this.#destinationStep(trip);
     if (stepId === 'dates') return this.#datesStep(trip);
     if (stepId === 'flight') return this.#flightStep(trip, sections);
