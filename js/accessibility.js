@@ -214,9 +214,12 @@ export function createAccessibility({ button, panel, commands, announce = () => 
       const result = event.results[event.results.length - 1];
       if (!result?.isFinal) return;
       // Enquanto o site fala, o que o microfone capta é a própria voz do site.
-      if (canSpeak && speechSynthesis.speaking) return;
-      lastHeard = result[0].transcript.trim();
-      run(parseVoiceCommand(lastHeard));
+      // Exceção: "parar" (e "desligar microfone") valem mesmo durante a leitura.
+      const heard = result[0].transcript.trim();
+      const command = parseVoiceCommand(heard);
+      if (canSpeak && speechSynthesis.speaking && command.action !== 'stop-speaking' && command.action !== 'stop-listening') return;
+      lastHeard = heard;
+      run(command);
     };
     recognition.onerror = event => {
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
