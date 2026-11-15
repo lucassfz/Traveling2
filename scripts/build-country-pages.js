@@ -18,6 +18,34 @@ import { PARTNERS, klookUrl } from '../js/planner/partners.section.js';
 
 // Endereço público do site. Ao trocar de domínio, mude aqui e rode o gerador.
 export const SITE_URL = 'https://lucassfz.github.io/Traveling2/';
+// Backend de preços (o mesmo da meta traveling-prices do index.html).
+export const PRICES_API = 'https://traveling-api.travelingorgsenac.workers.dev/api/v1';
+
+// Preço visto recentemente, buscado quando a página abre (preço muda todo dia,
+// não pode ficar fixo no HTML). Ida e volta saindo de São Paulo no próximo mês.
+// Sem resposta, a seção continua escondida.
+const PRICE_SCRIPT = `<script>
+  (function () {
+    var box = document.getElementById('price');
+    if (!box || !window.fetch) return;
+    var now = new Date();
+    var next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    var month = next.getFullYear() + '-' + String(next.getMonth() + 1).padStart(2, '0');
+    var names = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    var url = box.dataset.api + '/flights/cheapest?origin=GRU&destination=' + box.dataset.airport + '&departure=' + month + '&return=' + month;
+    fetch(url).then(function (response) { return response.ok ? response.json() : null; }).then(function (body) {
+      var offer = body && body.offers && body.offers[0];
+      if (!offer || String(offer.url).indexOf('https://www.aviasales.com/') !== 0) return;
+      var price = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(offer.price.amount));
+      var seen = offer.foundOn ? offer.foundOn.split('-').reverse().slice(0, 2).join('/') : '';
+      box.querySelector('[data-price]').textContent = price;
+      box.querySelector('[data-when]').textContent = 'Ida e volta em ' + names[next.getMonth()] + ', por pessoa' + (offer.transfers === 0 ? ', voo direto' : '') + '.';
+      box.querySelector('[data-seen]').textContent = 'Preço visto ' + (seen ? 'em ' + seen + ' ' : 'recentemente ') + 'por outros viajantes; pode ter mudado.';
+      box.querySelector('a').href = offer.url;
+      box.hidden = false;
+    }).catch(function () {});
+  })();
+  </script>`;
 export const PAGES_UPDATED = '2026-11-15';
 
 const ROOT = new URL('../', import.meta.url);
@@ -88,6 +116,9 @@ const STYLE = `
     .places div { padding: 10px 12px 12px; }
     .places strong { display: block; }
     .foods { padding-left: 18px; }
+    .price { margin-top: 28px; padding: 4px 18px 8px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .price h2 { margin-top: 16px; }
+    .price__value { font-size: 1.8rem; }
     .partners { display: grid; gap: 8px; padding: 0; list-style: none; }
     .partners a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); text-decoration: none; font-weight: 600; }
     .list { columns: 2 180px; padding-left: 18px; }
@@ -201,7 +232,15 @@ ${landmarks.map(item => `      <li>
 ${foods.map(food => `      <li><strong>${escapeHtml(food.name)}</strong>${food.desc ? `: ${escapeHtml(plain(food.desc))}` : ''}</li>`).join('\n')}
     </ul>
 ` : ''}
-    <h2>Planeje com parceiros</h2>
+${country.airport && country.airport !== 'GRU' ? `    <section class="price" id="price" data-api="${PRICES_API}" data-airport="${escapeHtml(country.airport)}" hidden>
+      <h2>Passagens: São Paulo → ${escapeHtml(country.namePt)}</h2>
+      <p><span class="muted">a partir de</span> <strong class="price__value" data-price></strong></p>
+      <p class="muted" data-when></p>
+      <p><small data-seen></small></p>
+      <p><a class="cta" href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Ver esse preço no Aviasales ↗</a></p>
+    </section>
+    ${PRICE_SCRIPT}
+` : ''}    <h2>Planeje com parceiros</h2>
     <ul class="partners">
       <li><a href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Comparar passagens no Aviasales ↗</a></li>
       <li><a href="${escapeHtml(klookUrl(country.namePt))}" rel="noopener sponsored">Passeios em ${escapeHtml(country.namePt)} no Klook ↗</a></li>
