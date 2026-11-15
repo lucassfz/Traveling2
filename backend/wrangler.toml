@@ -1,0 +1,15 @@
+# Cloudflare Worker do Traveling (fase 3.2). SEM SEGREDOS AQUI.
+# Chaves de fornecedores entram só como Secrets:  npx wrangler secret put NOME
+# Ainda não publicado: o deploy depende da aprovação da decisão D1 (docs/PHASE-3.1-…).
+name = "traveling-api"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Origem do site no GitHub Pages (ajustar ao endereço final) e o servidor local de desenvolvimento.
+ALLOWED_ORIGINS = "https://lucassfz.github.io,http://localhost:8765,http://127.0.0.1:5500"
+SEARCH_ENABLED = "true"
+FLIGHT_PROVIDERS = "mock"
+HOTEL_PROVIDERS = "mock"
+RATE_PER_MINUTE = "10"
+RATE_PER_DAY = "100"
