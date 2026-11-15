@@ -121,3 +121,18 @@ console.log('Salvos: identificadores, migração da lista antiga, duplicados, re
   assert.equal(pageUrl('paises/japao/', { origin: 'https://x.io', pathname: '/Traveling2/index.html' }), 'https://x.io/Traveling2/paises/japao/', 'ignora o nome do arquivo');
   console.log('Salvos: link da página do país verificado.');
 }
+
+// Comparar destinos: linhas montadas dos dados, sem inventar valores.
+{
+  const assert = (await import('node:assert/strict')).default;
+  const { COUNTRIES } = await import('../js/countries.dataset.js');
+  const { compareRows } = await import('../js/compare.js');
+  const rows = compareRows([COUNTRIES.Japan, COUNTRIES.Portugal], { month: 10 });
+  const row = id => rows.find(item => item.id === id).cells.map(cell => cell.text);
+  assert.deepEqual(row('visa'), ['Sem visto', 'Sem visto']);
+  assert.equal(rows.find(item => item.id === 'now').label, 'Época em nov');
+  assert.ok(row('cost').every(text => /^R\$/.test(text)), 'custo estimado dos perfis revisados');
+  assert.ok(rows.find(item => item.id === 'flight').cells.every(cell => cell.pending), 'passagem chega depois, do backend');
+  assert.deepEqual(row('currency'), ['Iene', 'Euro'], 'sem sigla entre parênteses');
+  console.log('Salvos: comparação de destinos verificada.');
+}

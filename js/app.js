@@ -449,7 +449,14 @@ function renderSaved() {
   elements.savedCount.textContent = String(items.length);
   elements.savedLauncher.setAttribute('aria-label', items.length ? `Destinos salvos (${items.length})` : 'Destinos salvos');
   if (!elements.savedPanel.classList.contains('miles-hub--open')) return;
-  elements.savedContent.innerHTML = items.length ? `
+  // Países salvos (sem repetir): com 2 ou mais, dá para comparar lado a lado.
+  const countryKeys = [...new Set(items.filter(item => item.type === 'country').map(item => item.countryKey))].filter(key => COUNTRIES[key]);
+  if (state.compareOpen && countryKeys.length >= 2) return renderCompare(countryKeys);
+  state.compareOpen = false;
+  const compareBar = countryKeys.length >= 2
+    ? `<button class="primary-button saved-compare-button" type="button" data-compare-open>Comparar ${countryKeys.length >= 3 ? 'até 3 países' : 'os 2 países'} salvos</button>`
+    : '';
+  elements.savedContent.innerHTML = items.length ? `${compareBar}
     <ul class="saved-items">
       ${items.map(item => `
         <li class="saved-item">
@@ -471,6 +478,39 @@ function renderSaved() {
       <strong>Nada salvo ainda</strong>
       <p>Toque em "Salvar" num país, numa cidade ou num lugar em destaque para guardar aqui.</p>
     </div>`;
+}
+
+// Comparação lado a lado dentro do painel de salvos.
+function renderCompare(countryKeys) {
+  const chosen = (state.compareKeys ?? []).filter(key => countryKeys.includes(key));
+  state.compareKeys = chosen.length >= 2 ? chosen : countryKeys.slice(0, 3);
+  const keys = state.compareKeys;
+  const countries = keys.map(key => COUNTRIES[key]);
+  elements.savedContent.innerHTML = '<p class="planner-hint">Carregando comparação…</p>';
+  import('./compare.js').then(({ compareHtml, MAX_COMPARE }) => {
+    if (!state.compareOpen) return;
+    const picker = countryKeys.length > 2
+      ? `<div class="compare-pick" role="group" aria-label="Países na comparação (até ${MAX_COMPARE})">${countryKeys.map(key => `<button class="discovery-chip" type="button" data-compare-toggle="${escapeHtml(key)}" aria-pressed="${keys.includes(key)}">${escapeHtml(COUNTRIES[key].namePt)}</button>`).join('')}</div>`
+      : '';
+    elements.savedContent.innerHTML = `<button class="planner-text-action" type="button" data-compare-close>← Voltar à lista</button>${picker}${compareHtml(countries)}`;
+    // Passagem vista recentemente (São Paulo → país, próximo mês), quando o backend responde.
+    import('./api/prices.client.js').then(({ cheapestFlight }) => {
+      const next = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+      const month = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+      const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+      countries.forEach((country, index) => {
+        const done = offer => {
+          const target = elements.savedContent.querySelector(`[data-compare-row="flight"] [data-compare-cell="${index}"]`);
+          if (!target || state.compareKeys?.[index] !== country.key) return;
+          target.innerHTML = offer
+            ? `a partir de <strong>${escapeHtml(money(Number(offer.price.amount)))}</strong><br><a href="${escapeHtml(offer.url)}" target="_blank" rel="noopener sponsored">Ver no Aviasales ↗</a>`
+            : '—';
+        };
+        if (!country.airport || country.airport === 'GRU') return done(null);
+        cheapestFlight({ origin: 'GRU', destination: country.airport, departure: month, return: month }).then(done).catch(() => done(null));
+      });
+    }).catch(() => {});
+  }).catch(() => { elements.savedContent.innerHTML = '<p class="planner-hint">Não foi possível abrir a comparação.</p>'; });
 }
 
 function isSavedOpen() {
@@ -1083,6 +1123,17 @@ function bindUiEvents() {
   elements.savedLauncher.addEventListener('click', () => setSavedOpen(!isSavedOpen()));
   elements.savedClose.addEventListener('click', resetToGlobe);
   elements.savedContent.addEventListener('click', event => {
+    if (event.target.closest('[data-compare-open]')) { state.compareOpen = true; state.compareKeys = null; renderSaved(); return; }
+    if (event.target.closest('[data-compare-close]')) { state.compareOpen = false; renderSaved(); return; }
+    const toggle = event.target.closest('[data-compare-toggle]');
+    if (toggle) {
+      const key = toggle.dataset.compareToggle;
+      const keys = state.compareKeys ?? [];
+      if (keys.includes(key)) { if (keys.length > 2) state.compareKeys = keys.filter(item => item !== key); }
+      else state.compareKeys = [...keys, key].slice(-3);
+      renderSaved();
+      return;
+    }
     const open = event.target.closest('[data-saved-open]');
     const plan = event.target.closest('[data-saved-plan]');
     const remove = event.target.closest('[data-saved-remove]');

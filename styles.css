@@ -3831,3 +3831,17 @@ body:has(.a11y-panel:not([hidden])) .globe-hint { visibility: hidden; }
 .tour__actions button { min-height: 40px; padding: 0 16px; }
 .tour-target { position: relative; z-index: 1; box-shadow: 0 0 0 3px var(--color-accent), 0 0 0 7px var(--color-accent-soft) !important; border-radius: 999px; }
 body:has(.tour) .globe-hint { visibility: hidden; }
+
+/* Comparar destinos (painel de salvos) */
+.saved-compare-button { width: 100%; min-height: 44px; margin-bottom: 12px; }
+.compare-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.compare-scroll { overflow-x: auto; margin: 10px 0; border: 1px solid var(--color-border); border-radius: 14px; }
+.compare-table { width: 100%; min-width: 420px; border-collapse: collapse; font-size: .84rem; }
+.compare-table th, .compare-table td { padding: 10px; border-bottom: 1px solid var(--color-border-soft); text-align: left; vertical-align: top; }
+.compare-table thead th { font-size: .9rem; }
+.compare-table thead img { display: block; margin-bottom: 4px; border-radius: 3px; }
+.compare-table tbody th { width: 34%; color: var(--color-text-muted); font-size: .76rem; font-weight: 600; }
+.compare-table tr:last-child th, .compare-table tr:last-child td { border-bottom: 0; }
+.compare--good { color: var(--color-success); font-weight: 600; }
+.compare--warn { color: var(--color-warning); font-weight: 600; }
+.compare--bad { color: var(--color-danger); font-weight: 600; }
