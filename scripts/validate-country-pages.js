@@ -28,6 +28,20 @@ for (const country of countries) {
   const scripts = html.match(/<script[^>]*src="[^"]*"/g) ?? [];
   assert.ok(scripts.every(tag => tag.includes('src="https://static.cloudflareinsights.com/beacon.min.js"')), `${country.namePt}: script externo fora da lista`);
 }
+// Páginas das capitais: link para a cidade no globo, canonical e volta para o país.
+const capitalPages = Object.keys(files).filter(path => path.startsWith('cidades/'));
+const cityDirs = (await readdir(new URL('cidades/', root), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name);
+assert.equal(cityDirs.length, capitalPages.length, 'páginas de capitais sem sobras');
+assert.ok(capitalPages.length >= 40, 'páginas de capitais: menos do que o esperado');
+for (const path of capitalPages) {
+  const html = files[path];
+  assert.match(html, /href="\.\.\/\.\.\/#\/[A-Z]{2}\/i\d+"/, `${path}: link para a cidade no globo`);
+  assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}${path.replace(/index\.html$/, '')}">`), `${path}: canonical`);
+  assert.match(html, /href="\.\.\/\.\.\/paises\/[a-z0-9-]+\/"/, `${path}: volta para o país`);
+  assert.match(html, /property="og:image" content="https:\/\//, `${path}: imagem https`);
+  const scripts = html.match(/<script[^>]*src="[^"]*"/g) ?? [];
+  assert.ok(scripts.every(tag => tag.includes('src="https://static.cloudflareinsights.com/beacon.min.js"')), `${path}: script externo fora da lista`);
+}
 const sitemap = files['sitemap.xml'];
-assert.equal((sitemap.match(/<loc>/g) ?? []).length, countries.length + 4, 'sitemap: início, índice, países, parceiros e privacidade');
-console.log(`Páginas de país: ${countries.length} páginas, índice e sitemap em dia com os dados.`);
+assert.equal((sitemap.match(/<loc>/g) ?? []).length, countries.length + capitalPages.length + 4, 'sitemap: início, índice, países, capitais, parceiros e privacidade');
+console.log(`Páginas de país: ${countries.length} páginas, ${capitalPages.length} de capitais, índice e sitemap em dia com os dados.`);

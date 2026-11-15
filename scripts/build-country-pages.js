@@ -162,7 +162,7 @@ function head({ title, description, url, image, imageAlt, jsonLd }) {
 </head>`;
 }
 
-export function countryPage(country, summary) {
+export function countryPage(country, summary, capitalPath = null) {
   const slug = countrySlug(country.namePt);
   const url = `${SITE_URL}${COUNTRY_PAGES_DIR}/${slug}/`;
   const globe = `../../#/${country.alpha2}`;
@@ -231,7 +231,7 @@ ${summary?.text ? `
     <p class="lead">${escapeHtml(summary.text)}${summaryUrl ? ` <small><a href="${escapeHtml(summaryUrl)}" rel="noopener">Wikipédia</a> (CC BY-SA)</small>` : ''}</p>` : ''}
 
     <dl class="facts">
-${facts.map(([label, value]) => `      <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('\n')}
+${facts.map(([label, value]) => `      <div><dt>${escapeHtml(label)}</dt><dd>${label === 'Capital' && capitalPath ? `<a href="${capitalPath}">${escapeHtml(value)}</a>` : escapeHtml(value)}</dd></div>`).join('\n')}
     </dl>
 
     <h2>Visto para brasileiros</h2>
@@ -321,7 +321,145 @@ ${list.sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR')).map(country => 
 `;
 }
 
-export function sitemap(countries) {
+// ---------- Páginas das capitais (cidades/<capital>-<país>/) ----------
+// Só para capitais com pontos turísticos próprios no catálogo: sem conteúdo
+// próprio, a página repetiria a do país.
+export const CITY_PAGES_DIR = 'cidades';
+const normalizeName = value => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+export const capitalSlug = country => countrySlug(`${country.capital} ${country.namePt}`);
+
+export function capitalLandmarks(country) {
+  return (country.landmarks ?? []).filter(item => normalizeName(item.city) === normalizeName(country.capital) && httpsUrl(item.media?.url));
+}
+
+function populationText(value) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value >= 1_000_000) return `${String(Math.round(value / 100_000) / 10).replace('.', ',')} milhões de habitantes`;
+  if (value >= 1000) return `${Math.round(value / 1000)} mil habitantes`;
+  return `${value} habitantes`;
+}
+
+export function capitalPage(country, city) {
+  const name = country.capital;
+  const url = `${SITE_URL}${CITY_PAGES_DIR}/${capitalSlug(country)}/`;
+  const countryPath = `../../${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/`;
+  const globe = `../../#/${country.alpha2}/i${city.index}`;
+  const landmarks = capitalLandmarks(country).slice(0, 6);
+  const visa = visaInfo(country);
+  const months = bestMonths(country);
+  const image = landmarks[0]?.media.url ?? `${SITE_URL}og-image.png`;
+  const title = `${name}, ${country.namePt}: o que ver e guia para brasileiros | Traveling`;
+  const description = clip(`${name}, capital de ${country.namePt}: ${landmarks.slice(0, 3).map(item => item.name).join(', ')}. Visto, melhor época, moeda e preço de passagem.`, 158);
+  const population = populationText(city.population);
+  const sentence = text => (/[.!?]$/.test(text) ? text : `${text}.`);
+  const facts = [
+    ['País', country.namePt],
+    ['População', population],
+    ['Moeda', plain(country.currency)],
+    ['Idioma', plain(country.lang)],
+    ['Fuso horário', plain(country.timezoneLabel)],
+    ['Aeroporto', country.airport ? `${country.airport}${country.airportCity ? ` · ${country.airportCity}` : ''}` : null]
+  ].filter(([, value]) => value);
+  const faq = [
+    [`O que ver em ${name}?`, sentence(landmarks.map(item => item.name).join(', '))],
+    [`${name}: brasileiro precisa de visto?`, visa.domestic
+      ? 'Não. É destino nacional: basta documento de identidade válido.'
+      : `${sentence(visa.detail)} Regras mudam: confirme na fonte oficial antes de comprar a passagem.`],
+    [`${name}: qual a melhor época para ir?`, country.bestTime ? `${sentence(plain(country.bestTime))}${months.length ? ` Meses mais indicados: ${months.join(', ')}.` : ''}` : ''],
+    [`${name}: qual a moeda?`, country.currency ? sentence(plain(country.currency)) : '']
+  ].filter(([, answer]) => answer && answer !== '.');
+  const place = { '@type': 'City', name, url, image, containedInPlace: { '@type': 'Country', name: country.namePt } };
+  if (Number.isFinite(city.lat) && Number.isFinite(city.lng)) place.geo = { '@type': 'GeoCoordinates', latitude: city.lat, longitude: city.lng };
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      place,
+      { '@type': 'FAQPage', mainEntity: faq.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } })) }
+    ]
+  };
+
+  return `${head({ title, description, url, image, imageAlt: landmarks[0] ? `${landmarks[0].name}, ${name}` : name, jsonLd })}
+<body>
+  <main>
+    <a class="back" href="${countryPath}">← Guia de ${escapeHtml(country.namePt)}</a>
+    <div class="identity">
+      <img src="https://flagcdn.com/w80/${country.alpha2.toLowerCase()}.png" alt="" width="56" height="42">
+      <div>
+        <div class="eyebrow">Capital de ${escapeHtml(country.namePt)}</div>
+        <h1>${escapeHtml(name)}</h1>
+      </div>
+    </div>
+    <a class="cta" href="${globe}">Abrir ${escapeHtml(name)} no globo 3D</a>
+
+    <dl class="facts">
+${facts.map(([label, value]) => `      <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('\n')}
+    </dl>
+
+    <h2>O que ver em ${escapeHtml(name)}</h2>
+    <ul class="places">
+${landmarks.map(item => `      <li>
+        <img src="${escapeHtml(item.media.url)}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async">
+        <div><strong>${escapeHtml(item.name)}</strong>
+          <br><small>Foto: ${httpsUrl(item.media.sourcePage) ? `<a href="${escapeHtml(item.media.sourcePage)}" rel="noopener">${escapeHtml(item.media.author ?? 'Wikimedia Commons')}</a>` : escapeHtml(item.media.author ?? 'Wikimedia Commons')}${item.media.license ? ` · ${escapeHtml(item.media.license)}` : ''}</small></div>
+      </li>`).join('\n')}
+    </ul>
+
+    <h2>Visto para brasileiros</h2>
+    <p class="note">${escapeHtml(visa.detail)}${visa.domestic ? '' : `<br><small>${visa.source ? `Fonte oficial: <a href="${escapeHtml(visa.source)}" rel="noopener">${escapeHtml(new URL(visa.source).hostname)}</a>. ` : ''}Regras mudam: confirme antes de comprar a passagem.</small>`}</p>
+
+    <h2>Melhor época</h2>
+    <p>${escapeHtml(plain(country.bestTime))}</p>
+${months.length ? `    <p class="muted">Meses mais indicados: ${escapeHtml(months.join(', '))}.</p>\n` : ''}
+${country.airport && country.airport !== 'GRU' ? `    <section class="price" id="price" data-api="${PRICES_API}" data-airport="${escapeHtml(country.airport)}" hidden>
+      <h2>Passagens: São Paulo → ${escapeHtml(country.airportCity || name)}</h2>
+      <p><span class="muted">a partir de</span> <strong class="price__value" data-price></strong></p>
+      <p class="muted" data-when></p>
+      <p><small data-seen></small></p>
+      <p><a class="cta" href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Ver esse preço no Aviasales ↗</a></p>
+    </section>
+    ${PRICE_SCRIPT}
+` : ''}    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+${faq.map(([question, answer]) => `      <h3>${escapeHtml(question)}</h3>
+      <p>${escapeHtml(answer)}</p>`).join('\n')}
+    </div>
+
+    <h2>Planeje com parceiros</h2>
+    <ul class="partners">
+      <li><a href="${escapeHtml(klookUrl(name))}" rel="noopener sponsored">Passeios em ${escapeHtml(name)} no Klook ↗</a></li>
+      <li><a href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Comparar passagens no Aviasales ↗</a></li>
+      <li><a href="${escapeHtml(PARTNERS.yesim.home)}" rel="noopener sponsored">Internet no destino: eSIM no Yesim ↗</a></li>
+    </ul>
+    <p class="muted"><small>Links de parceiro: o Traveling pode receber comissão, sem custo extra para você. <a href="../../parceiros.html">Saiba mais</a></small></p>
+
+    <a class="cta" href="${globe}">Ver ${escapeHtml(name)} no globo e planejar a viagem</a>
+
+    <footer>
+      Informações editoriais do Traveling, revisadas em fontes públicas; preços e regras mudam. Atualizado em ${PAGES_UPDATED.split('-').reverse().join('/')}.
+      <br><a href="${countryPath}">Guia de ${escapeHtml(country.namePt)}</a> · <a href="../../${COUNTRY_PAGES_DIR}/">Todos os países</a> · <a href="../../parceiros.html">Parceiros</a> · <a href="../../privacidade.html">Privacidade</a>
+    </footer>
+  </main>
+</body>
+</html>
+`;
+}
+
+/** Capitais com página: [{ country, city }], com a linha da capital (rank 0) em data/admin. */
+export async function capitalsWithPages(countries) {
+  const list = [];
+  for (const country of countries) {
+    if (!country.capital || !capitalLandmarks(country).length) continue;
+    let admin;
+    try { admin = JSON.parse(await readFile(new URL(`data/admin/${country.alpha2}.json`, ROOT), 'utf8')); } catch { continue; }
+    const index = (admin.cities ?? []).findIndex(row => row[4] === 0);
+    if (index < 0) continue;
+    const [, lat, lng, population] = admin.cities[index];
+    list.push({ country, city: { index, lat, lng, population } });
+  }
+  return list;
+}
+
+export function sitemap(countries, capitals = []) {
   const entry = (path, changefreq, priority) => `  <url><loc>${SITE_URL}${path}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -329,6 +467,7 @@ ${[
     entry('', 'weekly', '1.0'),
     entry(`${COUNTRY_PAGES_DIR}/`, 'monthly', '0.8'),
     ...countries.map(country => entry(`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/`, 'monthly', '0.7')),
+    ...capitals.map(({ country }) => entry(`${CITY_PAGES_DIR}/${capitalSlug(country)}/`, 'monthly', '0.6')),
     entry('parceiros.html', 'monthly', '0.3'),
     entry('privacidade.html', 'monthly', '0.3')
   ].join('\n')}
@@ -341,23 +480,28 @@ export async function buildAll() {
   const summaries = JSON.parse(await readFile(new URL('data/summaries.pt.json', ROOT), 'utf8'));
   const countries = Object.values(COUNTRIES).filter(country => country.alpha2 && country.namePt)
     .sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR'));
-  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries), 'sitemap.xml': sitemap(countries) };
+  const capitals = await capitalsWithPages(countries);
+  const capitalPaths = new Map(capitals.map(({ country }) => [country.alpha2, `../../${CITY_PAGES_DIR}/${capitalSlug(country)}/`]));
+  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries), 'sitemap.xml': sitemap(countries, capitals) };
   for (const country of countries) {
-    files[`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/index.html`] = countryPage(country, summaries.countries?.[country.alpha2]);
+    files[`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/index.html`] = countryPage(country, summaries.countries?.[country.alpha2], capitalPaths.get(country.alpha2));
   }
+  for (const { country, city } of capitals) files[`${CITY_PAGES_DIR}/${capitalSlug(country)}/index.html`] = capitalPage(country, city);
   return files;
 }
 
 async function main() {
   const files = await buildAll();
   await rm(new URL(`${COUNTRY_PAGES_DIR}/`, ROOT), { recursive: true, force: true });
+  await rm(new URL(`${CITY_PAGES_DIR}/`, ROOT), { recursive: true, force: true });
   for (const [path, content] of Object.entries(files)) {
     const target = new URL(path, ROOT);
     await mkdir(new URL('./', target), { recursive: true });
     await writeFile(target, content);
   }
   const pages = (await readdir(new URL(`${COUNTRY_PAGES_DIR}/`, ROOT))).filter(name => !name.endsWith('.html')).length;
-  console.log(`${pages} páginas de país, índice e sitemap gerados.`);
+  const cities = (await readdir(new URL(`${CITY_PAGES_DIR}/`, ROOT))).length;
+  console.log(`${pages} páginas de país, ${cities} de capitais, índice e sitemap gerados.`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
