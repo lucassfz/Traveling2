@@ -1109,7 +1109,7 @@ function bindUiEvents() {
   const a11yButton = document.getElementById('a11y-button');
   const a11yPanel = document.getElementById('a11y-panel');
   if (a11yButton && a11yPanel) {
-    import('./accessibility.js').then(({ createAccessibility, normalize }) => {
+    Promise.all([import('./accessibility.js'), import('./speech.text.js')]).then(([{ createAccessibility, normalize }, { citySpeech, countrySpeech, discoverySpeech, plannerSpeech }]) => {
       const countryIndex = Object.entries(COUNTRIES).map(([key, country]) => ({ key, names: [normalize(country.namePt), normalize(key)] }));
       const findCountry = phrase => {
         const query = normalize(phrase);
@@ -1119,23 +1119,58 @@ function bindUiEvents() {
           ?? countryIndex.find(item => item.names.some(name => name.length >= 4 && query.includes(name)))
           ?? null;
       };
+      const capitalIndex = Object.entries(COUNTRIES).filter(([, country]) => country.capital)
+        .map(([key, country]) => ({ key, name: normalize(country.capital) }));
+      const exactCity = (cities, query) => cities.find(city => normalize(city.name) === query) ?? null;
+      const partialCity = (cities, query) => (query.length >= 4 ? cities.find(city => normalize(city.name).startsWith(query)) ?? null : null);
+      const citiesOf = key => loadCities(COUNTRIES[key].alpha2).catch(() => []);
+      // Ordem: país pelo nome; cidade com o nome exato no país aberto; capital
+      // de qualquer país ("Paris"); cidade do Brasil com o nome exato; por fim,
+      // nome parcial no país aberto.
+      async function findPlace(phrase) {
+        const query = normalize(phrase);
+        const country = findCountry(phrase);
+        if (country) return { countryKey: country.key, city: null };
+        if (query.length < 3) return null;
+        const openKey = state.countryKey ?? COUNTRY_BY_ALPHA2.get(state.map?.adminLayer?.focusCode);
+        const openCities = openKey ? await citiesOf(openKey) : [];
+        const exact = exactCity(openCities, query);
+        if (exact) return { countryKey: openKey, city: exact };
+        const capital = capitalIndex.find(item => item.name === query);
+        if (capital) return { countryKey: capital.key, city: exactCity(await citiesOf(capital.key), query) };
+        const brazilKey = COUNTRY_BY_ALPHA2.get('BR');
+        const brazilian = brazilKey && brazilKey !== openKey ? exactCity(await citiesOf(brazilKey), query) : null;
+        if (brazilian) return { countryKey: brazilKey, city: brazilian };
+        const partial = partialCity(openCities, query);
+        return partial ? { countryKey: openKey, city: partial } : null;
+      }
       const announce = text => { const slot = document.getElementById('globe-announcer'); if (slot) slot.textContent = text; };
-      const visibleText = element => (element?.innerText ?? '').replace(/\n{2,}/g, '\n').trim();
       state.accessibility = createAccessibility({
         button: a11yButton,
         panel: a11yPanel,
         announce,
         commands: {
-          openCountry: phrase => {
-            const match = findCountry(phrase);
-            if (!match) return null;
-            selectCountry(match.key);
-            return COUNTRIES[match.key].namePt;
+          // País pelo nome; senão uma capital ("Paris"); senão uma cidade do país
+          // aberto ("São Paulo" com o Brasil aberto). Devolve o nome aberto ou null.
+          openPlace: async phrase => {
+            const place = await findPlace(phrase);
+            if (!place) return null;
+            if (state.countryKey !== place.countryKey) selectCountry(place.countryKey);
+            if (place.city) selectCity(place.city, { fly: true });
+            return place.city?.name ?? COUNTRIES[place.countryKey].namePt;
           },
-          plan: () => {
-            if (!state.countryKey) return false;
-            planTrip(state.countryKey);
-            return true;
+          // "planejar viagem" (país aberto) ou "planejar viagem para o Brasil".
+          plan: async phrase => {
+            if (!phrase) {
+              if (!state.countryKey) return false;
+              planTrip(state.countryKey);
+              return true;
+            }
+            const place = await findPlace(phrase);
+            if (!place) return null;
+            const city = place.city ? { id: place.city.id, name: place.city.name, lat: place.city.lat, lng: place.city.lng, region: place.city.region } : null;
+            planTrip(place.countryKey, { city });
+            return city?.name ?? COUNTRIES[place.countryKey].namePt;
           },
           close: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
           home: () => resetToGlobe(),
@@ -1148,15 +1183,24 @@ function bindUiEvents() {
             switchTab(name);
             return true;
           },
+          // Texto para ouvir, montado dos dados (sem botões, créditos ou siglas).
           readTarget: () => {
-            if (cityCard?.isOpen) return visibleText(document.getElementById('city-card'));
-            if (elements.panel.classList.contains('country-panel--open')) {
-              const country = COUNTRIES[state.countryKey];
-              return `${country?.namePt ?? ''}. ${visibleText(elements.panel.querySelector('.country-tab--active'))}`;
+            if (cityCard?.isOpen) {
+              const city = cityCard.city;
+              const countryKey = COUNTRY_BY_ALPHA2.get(city?.country);
+              return citySpeech(city, { countryName: COUNTRIES[countryKey]?.namePt ?? '', localTime: document.querySelector('[data-city-clock]')?.textContent ?? '' });
             }
-            if (isPlannerOpen()) return visibleText(elements.plannerContent);
-            if (state.discovery?.isOpen) return visibleText(document.getElementById('discovery-panel'));
-            return `No centro do globo: ${state.map?.centerLabel() ?? 'carregando'}. Para abrir um país, diga "abrir" e o nome dele, ou use a busca.`;
+            if (elements.panel.classList.contains('country-panel--open') && state.countryKey) {
+              const country = COUNTRIES[state.countryKey];
+              return countrySpeech(country, {
+                tab: state.tab,
+                summary: summaryFor('countries', country.alpha2)?.text ?? '',
+                history: historyCatalogIfLoaded()?.[state.countryKey] ?? country.history
+              });
+            }
+            if (isPlannerOpen()) return plannerSpeech(elements.plannerContent);
+            if (state.discovery?.isOpen) return discoverySpeech(document.getElementById('discovery-panel'));
+            return `No centro do globo: ${state.map?.centerLabel() ?? 'carregando'}. Para abrir um país, diga, por exemplo: abrir Japão.`;
           }
         }
       });
