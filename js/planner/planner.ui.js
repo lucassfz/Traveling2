@@ -682,6 +682,7 @@ export class PlannerUI {
       </div>
       <div class="planner-actions">
         <button class="secondary-button" type="button" data-planner-action="copy">Copiar resumo</button>
+        <button class="secondary-button" type="button" data-planner-action="print">Imprimir / salvar PDF</button>
         <button class="secondary-button" type="button" data-planner-action="show-country">Ver guia de ${escapeHtml(country?.namePt || 'destino')}</button>
       </div>
       <p class="planner-hint" data-planner-status role="status" aria-live="polite"></p>
@@ -1016,6 +1017,14 @@ export class PlannerUI {
     }
     if (action === 'travelers-inc' || action === 'travelers-dec') {
       this.update({ travelers: trip.travelers + (action === 'travelers-inc' ? 1 : -1) });
+    }
+    // Imprimir: a folha de impressão mostra só o resumo da viagem (styles.css, @media print).
+    if (action === 'print') {
+      document.body.classList.add('printing-trip');
+      const done = () => { document.body.classList.remove('printing-trip'); window.removeEventListener('afterprint', done); };
+      window.addEventListener('afterprint', done);
+      window.print();
+      setTimeout(done, 1000);
     }
     if (action === 'copy') {
       const status = this.element.querySelector('[data-planner-status]');
