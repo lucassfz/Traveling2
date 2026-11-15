@@ -9,6 +9,12 @@
   <meta name="google-site-verification" content="RHlazo6sEOf4CkudG1IXQVqRpQ6Pz5RTgAUf2S90ApI">
   <!-- Preços de passagem vistos recentemente (backend na Cloudflare → Travelpayouts). -->
   <meta name="traveling-prices" content="https://traveling-api.travelingorgsenac.workers.dev/api/v1">
+  <!-- Instalar como aplicativo (PWA). -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-any-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Traveling">
   <link rel="canonical" href="https://lucassfz.github.io/Traveling2/">
   <!-- Prévia ao compartilhar o link (WhatsApp, Instagram, X, Google). -->
   <meta property="og:type" content="website">
@@ -54,7 +60,7 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.12.08">
+  <link rel="stylesheet" href="styles.css?v=2026.12.09">
   <!-- Cloudflare Web Analytics: contagem de visitas sem cookies (ver privacidade.html). -->
   <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "bfcf66c2cb9f4a45ad35f88e629235c6"}'></script>
 </head>
@@ -315,6 +321,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.12.08"></script>
+  <script type="module" src="js/app.js?v=2026.12.09"></script>
 </body>
 </html>

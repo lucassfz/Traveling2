@@ -1361,6 +1361,11 @@ function watchHeaderLayout() {
   sync();
 }
 
+// Modo offline e instalação como app (sw.js: rede primeiro, cópia só sem internet).
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
 function markInterfaceReady() {
   window.__travelingBoot = window.__travelingBoot || {};
   window.__travelingBoot.interactive = true;
