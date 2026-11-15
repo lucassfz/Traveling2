@@ -288,7 +288,7 @@ ${faq.map(([question, answer]) => `      <h3>${escapeHtml(question)}</h3>
 `;
 }
 
-export function indexPage(countries) {
+export function indexPage(countries, capitals = []) {
   const url = `${SITE_URL}${COUNTRY_PAGES_DIR}/`;
   const title = 'Guias de viagem de 196 países para brasileiros | Traveling';
   const description = 'Visto para brasileiros, melhor época, moeda e o que ver em 196 países. Escolha um destino e explore no globo 3D do Traveling.';
@@ -311,7 +311,12 @@ ${groups.map(([label, list]) => `
     <ul class="list">
 ${list.sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR')).map(country => `      <li><a href="${countrySlug(country.namePt)}/">${escapeHtml(country.namePt)}</a></li>`).join('\n')}
     </ul>`).join('\n')}
-
+${capitals.length ? `
+    <h2>Guias de capitais</h2>
+    <ul class="list">
+${[...capitals].sort((a, b) => a.country.capital.localeCompare(b.country.capital, 'pt-BR')).map(({ country }) => `      <li><a href="../${capitalPagePath(country)}">${escapeHtml(country.capital)}</a> <small>${escapeHtml(country.namePt)}</small></li>`).join('\n')}
+    </ul>
+` : ''}
     <footer>
       Atualizado em ${PAGES_UPDATED.split('-').reverse().join('/')}. <a href="../parceiros.html">Parceiros</a> · <a href="../privacidade.html">Privacidade</a>
     </footer>
@@ -561,7 +566,7 @@ export async function buildAll() {
     .sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR'));
   const capitals = await capitalsWithPages(countries);
   const capitalPaths = new Map(capitals.map(({ country }) => [country.alpha2, `../../${CITY_PAGES_DIR}/${capitalSlug(country)}/`]));
-  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries), 'sitemap.xml': sitemap(countries, capitals), '404.html': notFoundPage(countries, capitals) };
+  const files = { [`${COUNTRY_PAGES_DIR}/index.html`]: indexPage(countries, capitals), 'sitemap.xml': sitemap(countries, capitals), '404.html': notFoundPage(countries, capitals) };
   for (const country of countries) {
     files[`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/index.html`] = countryPage(country, summaries.countries?.[country.alpha2], capitalPaths.get(country.alpha2));
   }
