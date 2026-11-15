@@ -28,6 +28,18 @@
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
   <link rel="stylesheet" href="styles.css?v=2026.11.22">
+  <!-- Travelpayouts (temporário): só para concluir o cadastro no programa de
+       afiliados. Carrega depois que a página abre, para não atrasar o globo.
+       Remover quando o painel liberar os links simples. -->
+  <script data-cfasync="false" data-cmp-ab="2">
+    window.addEventListener('load', function () {
+      var script = document.createElement('script');
+      script.async = 1;
+      script.setAttribute('data-cmp-ab', '2');
+      script.src = 'https://tpembars.com/NjAxNDM5.js?t=601439';
+      document.head.appendChild(script);
+    });
+  </script>
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
