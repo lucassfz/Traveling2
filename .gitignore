@@ -16,3 +16,6 @@ desktop.ini
 
 # Configurações locais de ferramentas
 .claude/settings.local.json
+
+# Cache local do wrangler (deploy do backend)
+.wrangler/
