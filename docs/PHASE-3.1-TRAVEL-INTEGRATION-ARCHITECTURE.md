@@ -34,6 +34,7 @@
 |---|---|
 | "Quanto vai custar" no resumo: passagens, hospedagem e gastos no destino por faixa; cotação anexada substitui a estimativa da categoria; cotação vencida aparece como "Preço expirado" com "Atualizar preço"; gastos anotados; comparação com o orçamento; entra no "Copiar resumo" | `js/planner/cost.section.js` |
 | Estimativa de rota compartilhada entre a etapa Voo e o resumo (um cálculo por viagem) | `createRouteEstimator` em `js/planner/flight.section.js` |
+| Métricas por fornecedor (chamadas, taxa de erro, prazos estourados, latência p50/p95) em `/providers/status`; disjuntor separado por tipo (voos × hotéis) | `ProviderMetrics` em `backend/src/reliability.js` |
 
 Para publicar (precisa das contas, que são do responsável pelo projeto): criar a conta Cloudflare e rodar `npx wrangler deploy` em `backend/`; criar conta na Duffel e `npx wrangler secret put DUFFEL_TOKEN` com o token de **teste**; acrescentar `duffel` a `FLIGHT_PROVIDERS`; e incluir `<meta name="traveling-api" content="https://<worker>/api/v1">` no `index.html`. Travelpayouts, LiteAPI e afiliados Booking.com dependem do cadastro em cada programa.
 
@@ -488,11 +489,14 @@ Resposta 200: `{ requestId, status, searchedAt, providers, properties: HotelProp
 {
   "requestId": "req_...",
   "providers": [
-    { "id": "duffel", "kind": "flights", "mode": "test", "status": "operational", "dataSource": "test" },
+    { "id": "duffel", "kind": "flights", "mode": "test", "status": "operational", "dataSource": "test",
+      "recent": { "calls": 42, "errorRate": 0.02, "timeouts": 1, "p50Ms": 1830, "p95Ms": 6100, "lastFailureAt": "2026-11-15T13:02:11.000Z" } },
     { "id": "travelpayouts", "kind": "flights", "mode": "live", "status": "degraded", "dataSource": "cached" }
   ]
 }
 ```
+
+`recent` resume as últimas 50 chamadas ao fornecedor **nesta instância** do Worker (memória local; o cache não conta), para diagnóstico. A saúde (`status`, disjuntor) e as métricas são contadas por tipo e id, porque voos e hotéis podem usar o mesmo id.
 
 O front usa esse endpoint para decidir o que mostrar (ex.: esconder busca ao vivo se nenhum fornecedor `live` estiver operacional).
 

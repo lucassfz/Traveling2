@@ -9,7 +9,7 @@ import { isKnownIata, validateFlightSearch, validateHotelSearch } from '../backe
 import { checkFlightOffer, checkHotelOffer, checkHotelProperty, dedupeFlights, money, sortByPrice } from '../backend/src/models.js';
 import { mockFlights, mockHotels } from '../backend/src/providers/mock.js';
 import { registerProvider } from '../backend/src/providers/index.js';
-import { CircuitBreaker, RateLimiter, TtlCache, cacheKey, withTimeout } from '../backend/src/reliability.js';
+import { CircuitBreaker, ProviderMetrics, RateLimiter, TtlCache, cacheKey, withTimeout } from '../backend/src/reliability.js';
 import { clientKey, createApp } from '../backend/src/index.js';
 
 const NOW = new Date('2026-11-15T12:00:00Z');
@@ -124,6 +124,12 @@ const expectError = (fn, code, field) => {
   assert.equal(breaker.status('p', 500), 'degraded');
   assert.equal(breaker.status('p', 1500), 'operational');
   await assert.rejects(withTimeout(signal => new Promise(resolve => setTimeout(resolve, 200, signal)), 20), error => error.timeout === true);
+  const metrics = new ProviderMetrics({ window: 4 });
+  assert.deepEqual(metrics.snapshot('x'), { calls: 0 });
+  for (const ms of [100, 200, 300]) metrics.record('x', { ms, ok: true, at: 0 });
+  metrics.record('x', { ms: 9000, ok: false, timeout: true, at: Date.UTC(2026, 10, 15) });
+  metrics.record('x', { ms: 400, ok: true, at: 0 });
+  assert.deepEqual(metrics.snapshot('x'), { calls: 4, errorRate: 0.25, timeouts: 1, p50Ms: 400, p95Ms: 9000, lastFailureAt: '2026-11-15T00:00:00.000Z' }, 'janela das últimas chamadas');
   assert.equal(cacheKey('f', { b: 1, a: { d: 1, c: 2 } }), cacheKey('f', { a: { c: 2, d: 1 }, b: 1 }), 'chave estável');
 }
 
@@ -158,6 +164,13 @@ const expectError = (fn, code, field) => {
   assert.deepEqual(data.warnings, ['Dados de teste: preços, horários e hotéis são fictícios.']);
   assert.deepEqual(data.providers, [{ id: 'mock', status: 'ok', dataSource: 'test' }]);
   assert.equal((await call('/flights/search', { body: flight })).headers.get('x-cache'), 'hit');
+  {
+    const status = await (await call('/providers/status', { method: 'GET' })).json();
+    const recent = Object.fromEntries(status.providers.map(provider => [`${provider.kind}:${provider.id}`, provider.recent]));
+    assert.equal(recent['flights:mock'].calls, 1, 'cache não conta como chamada ao fornecedor');
+    assert.equal(recent['flights:mock'].errorRate, 0);
+    assert.deepEqual(recent['hotels:mock'], { calls: 0 });
+  }
 
   response = await call('/hotels/search', { body: { destination: { lat: 38.72, lng: -9.14, label: 'Lisboa' }, checkIn: '2027-04-03', checkOut: '2027-04-10', guests: { adults: 2 } }, ip: '198.51.100.1' });
   assert.equal(response.status, 200);

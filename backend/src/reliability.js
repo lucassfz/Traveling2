@@ -110,6 +110,41 @@ export class CircuitBreaker {
   }
 }
 
+/**
+ * Métricas por fornecedor nas últimas chamadas desta instância do Worker
+ * (memória local: cada instância conta as suas; servem para diagnóstico, não
+ * para cobrança). Sem dados de quem buscou.
+ */
+export class ProviderMetrics {
+  constructor({ window = 50 } = {}) {
+    this.window = window;
+    this.calls = new Map();
+  }
+
+  record(id, { ms, ok, timeout = false, at = Date.now() }) {
+    const list = this.calls.get(id) ?? [];
+    list.push({ ms: Math.max(0, Math.round(ms)), ok, timeout, at });
+    if (list.length > this.window) list.splice(0, list.length - this.window);
+    this.calls.set(id, list);
+  }
+
+  snapshot(id) {
+    const list = this.calls.get(id) ?? [];
+    if (!list.length) return { calls: 0 };
+    const sorted = list.map(call => call.ms).sort((a, b) => a - b);
+    const pick = share => sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))];
+    const failures = list.filter(call => !call.ok);
+    return {
+      calls: list.length,
+      errorRate: Math.round((failures.length / list.length) * 100) / 100,
+      timeouts: list.filter(call => call.timeout).length,
+      p50Ms: pick(0.5),
+      p95Ms: pick(0.95),
+      ...(failures.length ? { lastFailureAt: new Date(failures.at(-1).at).toISOString() } : {})
+    };
+  }
+}
+
 /** Executa com prazo; rejeita com { timeout: true } ao estourar e aborta o fornecedor. */
 export async function withTimeout(task, ms) {
   const controller = new AbortController();

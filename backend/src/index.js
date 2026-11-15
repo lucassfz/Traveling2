@@ -18,7 +18,7 @@ import { API_VERSION, ApiError, LIMITS } from './contract.js';
 import { validateFlightSearch, validateHotelSearch } from './validate.js';
 import { checkFlightOffer, checkHotelOffer, checkHotelProperty, dedupeFlights, sortByPrice } from './models.js';
 import { allProviders, providersFor } from './providers/index.js';
-import { CircuitBreaker, RateLimiter, TtlCache, cacheKey, withTimeout } from './reliability.js';
+import { CircuitBreaker, ProviderMetrics, RateLimiter, TtlCache, cacheKey, withTimeout } from './reliability.js';
 
 const TTL = Object.freeze({ live: 5 * 60_000, cached: 60 * 60_000, test: 5 * 60_000 });
 const WARNINGS = Object.freeze({
@@ -76,6 +76,7 @@ async function readBody(request) {
 export function createApp({ now = () => new Date(), log = line => console.log(JSON.stringify(line)) } = {}) {
   const cache = new TtlCache();
   const breaker = new CircuitBreaker();
+  const metrics = new ProviderMetrics();
   const limiters = new Map();
 
   function limiter(name, limit, windowMs) {
@@ -98,21 +99,25 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
 
   async function runProviders(kind, request, providers) {
     const timeoutMs = kind === 'flights' ? LIMITS.flightTimeoutMs : LIMITS.hotelTimeoutMs;
-    const available = providers.filter(provider => !breaker.isOpen(provider.id, now().getTime()));
+    // Voos e hotéis podem ter o mesmo id (ex.: mock): a saúde é contada por tipo.
+    const slot = provider => `${kind}:${provider.id}`;
+    const available = providers.filter(provider => !breaker.isOpen(slot(provider), now().getTime()));
     if (!available.length) throw new ApiError('PROVIDER_UNAVAILABLE', 'A busca está indisponível no momento. Tente mais tarde.');
-    const settled = await Promise.allSettled(available.map(provider => withTimeout(
+    const started = available.map(() => Date.now());
+    const settled = await Promise.allSettled(available.map((provider, index) => withTimeout(
       signal => (kind === 'flights' ? provider.searchFlights(request, { signal, now: now() }) : provider.searchHotels(request, { signal, now: now() })),
       timeoutMs - 1000
-    )));
+    ).finally(() => { started[index] = Date.now() - started[index]; })));
     const results = [];
     const failures = [];
     settled.forEach((outcome, index) => {
       const provider = available[index];
+      metrics.record(slot(provider), { ms: started[index], ok: outcome.status === 'fulfilled', timeout: Boolean(outcome.reason?.timeout), at: now().getTime() });
       if (outcome.status === 'fulfilled') {
-        breaker.success(provider.id);
+        breaker.success(slot(provider));
         results.push({ provider, value: outcome.value });
       } else {
-        breaker.failure(provider.id, now().getTime());
+        breaker.failure(slot(provider), now().getTime());
         failures.push({ provider, timeout: Boolean(outcome.reason?.timeout) });
       }
     });
@@ -193,7 +198,7 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
       return json(200, {
         requestId,
         searchEnabled: env.SEARCH_ENABLED !== 'false',
-        providers: allProviders(env).map(provider => ({ id: provider.id, kind: provider.kind, mode: provider.mode, dataSource: provider.dataSource, status: breaker.status(provider.id, time) }))
+        providers: allProviders(env).map(provider => ({ id: provider.id, kind: provider.kind, mode: provider.mode, dataSource: provider.dataSource, status: breaker.status(`${provider.kind}:${provider.id}`, time), recent: metrics.snapshot(`${provider.kind}:${provider.id}`) }))
       });
     }
     const kind = url.pathname === `${base}/flights/search` ? 'flights' : url.pathname === `${base}/hotels/search` ? 'hotels' : null;
