@@ -11,18 +11,6 @@
       if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
     } catch (error) { /* armazenamento bloqueado: tema escuro */ }
   </script>
-  <!-- Travelpayouts (programa de afiliados). Fica SÓ nesta página: o script
-       altera funções do navegador e carrega código remoto, então não entra
-       no site principal (globo, Planner), que usa links de afiliado simples. -->
-  <script data-cfasync="false" data-cmp-ab="2">
-    (function () {
-      var script = document.createElement('script');
-      script.async = 1;
-      script.setAttribute('data-cmp-ab', '2');
-      script.src = 'https://tpembars.com/NjAxNDM5.js?t=601439';
-      document.head.appendChild(script);
-    })();
-  </script>
   <style>
     :root { color-scheme: dark; --bg: #05070c; --surface: #0d121c; --text: #e8edf3; --muted: #9aa8b8; --accent: #7cc9f5; --border: rgba(255, 255, 255, .1); }
     [data-theme='light'] { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; }
@@ -46,7 +34,7 @@
     <p class="note">Alguns links para reservar hotéis e passagens são <strong>links de afiliado</strong>. Se você reservar por eles, o Traveling pode receber uma comissão do parceiro, <strong>sem custo extra para você</strong>. O preço é o mesmo que no site do parceiro.</p>
 
     <h2>Quem são os parceiros</h2>
-    <p>Os links de afiliado passam pela <a href="https://www.travelpayouts.com/" rel="noopener">Travelpayouts</a>, uma rede de programas de afiliados de viagem (por exemplo, Booking.com). A reserva, o pagamento e o atendimento são feitos pelo parceiro, nunca pelo Traveling.</p>
+    <p>Os links de afiliado passam por redes de programas de afiliados de viagem (por exemplo, o do Booking.com). A reserva, o pagamento e o atendimento são feitos pelo parceiro, nunca pelo Traveling.</p>
 
     <h2>O que não muda</h2>
     <ul>
@@ -55,8 +43,7 @@
       <li>Seus planos continuam salvos só no seu navegador.</li>
     </ul>
 
-    <h2>Nesta página</h2>
-    <p>Esta página carrega um script da Travelpayouts usado para confirmar o site no programa de afiliados. Ele não é carregado no globo nem no Planner. Mais detalhes na página de <a href="privacidade.html">privacidade</a>.</p>
+    <p>Mais detalhes na página de <a href="privacidade.html">privacidade</a>.</p>
   </main>
 </body>
 </html>
