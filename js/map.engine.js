@@ -786,7 +786,78 @@ export class MapEngine {
     }
   }
 
+  // ---------- Teclado ----------
+  // O globo recebe foco: setas giram, + e − aproximam, Enter escolhe o país ou
+  // a cidade no centro (a mira). Depois de cada movimento, onAnnounce diz o que
+  // está no centro, para leitores de tela.
+
+  /** Ponto do centro visível, em coordenadas da janela. */
+  #visibleCenter() {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2 - (this.viewInsetCurrent ?? 0) / 2, y: rect.top + rect.height / 2 };
+  }
+
+  #centerLabel() {
+    const { x, y } = this.#visibleCenter();
+    const place = this.pickPlace(x, y);
+    if (place?.kind === 'city') return `${place.name}${place.region ? `, ${place.region}` : ''}`;
+    const countryKey = this.pickCountry(x, y);
+    return countryKey ? (COUNTRIES[countryKey]?.namePt ?? countryKey) : 'Oceano';
+  }
+
+  #announceCenter(delay) {
+    clearTimeout(this.announceTimer);
+    this.announceTimer = setTimeout(() => this.callbacks.onAnnounce?.(`Centro: ${this.#centerLabel()}`), delay);
+  }
+
+  #bindKeyboard() {
+    const stage = this.stage;
+    stage.tabIndex = 0;
+    stage.setAttribute('role', 'application');
+    stage.setAttribute('aria-roledescription', 'globo');
+    stage.setAttribute('aria-label', 'Globo 3D. Setas giram o globo, + e − aproximam e afastam, Enter escolhe o país ou a cidade no centro.');
+    stage.addEventListener('focus', () => this.#announceCenter(0));
+    // Mira visível enquanto se usa o teclado; some ao voltar para o mouse ou o toque.
+    stage.addEventListener('pointerdown', () => stage.classList.remove('globe__stage--keyboard'));
+    stage.addEventListener('blur', () => stage.classList.remove('globe__stage--keyboard'));
+    stage.addEventListener('keydown', event => {
+      if (event.altKey || event.ctrlKey || event.metaKey || this.routePreview) return;
+      if (event.key !== 'Tab') stage.classList.add('globe__stage--keyboard');
+      const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
+      // Passo proporcional à altitude: perto, movimentos curtos.
+      const step = THREE.MathUtils.clamp((distance - 1) * 14, 0.6, 18) * (event.shiftKey ? 2 : 1);
+      const { latitude, longitude } = cartesianToLatLng(this.camera.position, GLOBE_YAW, GLOBE_ORIGIN);
+      const moves = { ArrowUp: [step, 0], ArrowDown: [-step, 0], ArrowLeft: [0, -step], ArrowRight: [0, step] };
+      if (moves[event.key]) {
+        event.preventDefault();
+        const [dLat, dLng] = moves[event.key];
+        this.flyTo(THREE.MathUtils.clamp(latitude + dLat, -80, 80), longitude + dLng, distance, 260);
+        this.#announceCenter(420);
+        return;
+      }
+      if (event.key === '+' || event.key === '=' || event.key === '-' || event.key === '_') {
+        event.preventDefault();
+        this.zoom(event.key === '+' || event.key === '=' ? 0.55 : 1.8);
+        this.#announceCenter(MOTION.zoom + 80);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const { x, y } = this.#visibleCenter();
+        const place = this.pickPlace(x, y);
+        if (place?.kind === 'city') {
+          this.callbacks.onCitySelect?.(place);
+          return;
+        }
+        const countryKey = this.pickCountry(x, y);
+        if (countryKey && !this.#isExploring(countryKey)) this.callbacks.onSelect?.(countryKey);
+        else if (!countryKey) this.callbacks.onAnnounce?.('Nada para escolher aqui: o centro está no oceano.');
+      }
+    });
+  }
+
   #bindPointerEvents() {
+    this.#bindKeyboard();
     this.onPointerMove = createRafThrottle((clientX, clientY) => {
       if (this.cameraFlight || this.routePreview) return;
       // Cidades e estados (quando visíveis) têm prioridade sobre o país embaixo.
@@ -1420,6 +1491,8 @@ export class MapEngine {
     const shift = this.viewInsetCurrent / 2;
     if (shift < 0.5) this.camera.clearViewOffset();
     else this.camera.setViewOffset(width, height, shift, 0, width, height);
+    // Centro visível (a mira do teclado acompanha o painel aberto).
+    this.stage.style.setProperty('--globe-view-shift', `${shift}px`);
     this.camera.updateProjectionMatrix();
   }
 

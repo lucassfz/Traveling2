@@ -290,6 +290,7 @@ button {
 }
 
 button:focus-visible,
+a:focus-visible,
 input:focus-visible,
 select:focus-visible {
   outline: 3px solid var(--color-focus);
@@ -3731,3 +3732,11 @@ body.route-mode .city-card { visibility: hidden; }
   /* O aviso da rota continua para leitores de tela (aria-describedby), sem ocupar a tela. */
   .country-explore-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+
+/* Acessibilidade: atalho para a busca (aparece com Tab) e globo pelo teclado. */
+.skip-link { position: fixed; z-index: 1000; top: 8px; left: 8px; padding: 10px 16px; border-radius: 999px; background: var(--color-text); color: var(--color-background); font-weight: 600; text-decoration: none; transform: translateY(-160%); transition: transform .15s ease; }
+.skip-link:focus { transform: none; outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.globe__stage:focus { outline: none; }
+.globe__stage:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.globe__stage:focus-visible::after,
+.globe__stage--keyboard::after { content: ''; position: absolute; z-index: 5; top: 50%; left: calc(50% - var(--globe-view-shift, 0px)); width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid var(--color-focus); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, .45); pointer-events: none; }

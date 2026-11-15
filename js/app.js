@@ -1123,6 +1123,8 @@ async function initializeMap() {
       onHover: showTooltip,
       onSelect: countryKey => selectCountry(countryKey),
       onCitySelect: city => selectCity(city),
+      // Teclado no globo: o leitor de tela ouve o que está no centro.
+      onAnnounce: text => { const slot = document.getElementById('globe-announcer'); if (slot) slot.textContent = text; },
       onRouteArrived: () => {
         const countryKey = state.exploreRouteCountryKey;
         if (!countryKey || countryKey !== state.countryKey || !state.routePreviewActive) return;
