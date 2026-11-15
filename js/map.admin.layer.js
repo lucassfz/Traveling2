@@ -2,6 +2,7 @@ import { reducedMotion } from './core/motion.js';
 import * as THREE from 'three';
 import { geographicToCartesian } from './geospatial.js';
 import { inFlatRing, inFlatShape, nearestRegion, shapesBox } from './map.pick.js';
+import { displayCityName } from './geo/city.names.js';
 
 // Camada "aproxime para ver mais". Mostra estados, cidades e contornos urbanos
 // de UM país por vez, o país em foco:
@@ -317,7 +318,7 @@ export class AdminLayer {
     // id = posição no arquivo (compatível com viagens e salvos antigos); geonameId,
     // quando o arquivo já traz a coluna 8, é a identidade estável da cidade.
     record.cities = data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
-      id: `${record.code}-${index}`, index, name, population, rank, lat, lng, kind: 'city', country: record.code,
+      id: `${record.code}-${index}`, index, name: displayCityName(record.code, rank, name), population, rank, lat, lng, kind: 'city', country: record.code,
       geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
       timeZone: zones[zone] ?? null, region: regions[region] ?? null, hasOutline: urban === 1,
       position: toVector(lat, lng, POINT_RADIUS)

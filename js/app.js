@@ -868,7 +868,11 @@ function cityPartnerLinks(city) {
   if (!partnersModule) return '';
   const { PARTNERS, klookUrl } = partnersModule;
   const link = (url, label) => `<a class="partner-link" href="${escapeHtml(url)}" target="_blank" rel="noopener sponsored">${escapeHtml(label)} ↗</a>`;
-  return `<div class="partner-links">${link(klookUrl(city.name), `Passeios em ${city.name}`)}${link(PARTNERS.aviasales.home, 'Passagens')}</div>${PARTNER_NOTE}`;
+  // Capital com página própria (cidades/): o guia vem antes, separado dos parceiros.
+  const country = COUNTRIES[COUNTRY_BY_ALPHA2.get(city.country)];
+  const guide = city.rank === 0 ? capitalPagePath(country) : '';
+  const guideLink = guide ? `<div class="partner-links"><a class="partner-link" href="${escapeHtml(guide)}" target="_blank" rel="noopener">Guia de ${escapeHtml(country.capital)}: o que ver ↗</a></div>` : '';
+  return `${guideLink}<div class="partner-links">${link(klookUrl(city.name), `Passeios em ${city.name}`)}${link(PARTNERS.aviasales.home, 'Passagens')}</div>${PARTNER_NOTE}`;
 }
 
 // Compartilhar: menu do sistema no celular, senão copia o link. O botão mostra

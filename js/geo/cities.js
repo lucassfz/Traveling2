@@ -2,6 +2,8 @@
 // usadas pelo Planner (escolha da cidade) e pela Descoberta. O mesmo `id`
 // ("BR-12") identifica a cidade no globo, no Planner e no cartão da cidade.
 
+import { displayCityName } from './city.names.js';
+
 const cache = new Map();
 
 const normalize = value => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -19,10 +21,10 @@ export function loadCities(alpha2) {
         // ordem segue a população). geonameId (coluna 8, quando existe) é a
         // identidade estável; ver resolveCity.
         return data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
-          id: `${code}-${index}`, index, name, lat, lng, population, rank, kind: 'city', country: code,
+          id: `${code}-${index}`, index, name: displayCityName(code, rank, name), lat, lng, population, rank, kind: 'city', country: code,
           geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
           timeZone: zones[zone] ?? null, region: regions[region] ?? null, hasOutline: urban === 1,
-          search: normalize(name)
+          search: normalize(`${displayCityName(code, rank, name)} ${name}`)
         }));
       })
       .catch(error => {
