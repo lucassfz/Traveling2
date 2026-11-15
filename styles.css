@@ -3698,3 +3698,36 @@ body.route-mode .city-card { visibility: hidden; }
   .share-button:not(.share-button--done) span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .share-button:not(.share-button--done) { padding: 0 10px; }
 }
+
+/* Celular em pé: os efeitos atrás do globo eram dimensionados pela tela e
+   viravam um oval comprido no meio do globo. Aqui ficam circulares. */
+@media (max-aspect-ratio: 1/1) {
+  .globe {
+    background:
+      radial-gradient(circle at 50% 46%, var(--color-globe-ambient) 0%, transparent 46vw),
+      linear-gradient(145deg, var(--color-background) 0%, var(--color-background-subtle) 100%);
+  }
+  [data-theme='light'] .globe {
+    background:
+      radial-gradient(circle at 50% 42%, rgba(249, 252, 254, .64), transparent 46vw),
+      linear-gradient(145deg, var(--color-background) 0%, var(--color-background-subtle) 100%);
+  }
+  .globe__visual-overlay::before { display: none; }
+  .globe__visual-overlay::after { background: radial-gradient(circle at center, transparent 60%, rgba(2, 6, 23, .18) 100%); }
+}
+
+/* Celular: cabeçalho do país compacto, para Visão geral, Cultura e História
+   ganharem a maior parte da tela. */
+@media (max-width: 600px) {
+  .country-panel__toolbar { padding: var(--space-2) var(--space-4) 0; }
+  .country-panel__identity { gap: var(--space-3); padding: var(--space-2) var(--space-4) var(--space-3); }
+  .country-panel__flag { flex-basis: 40px; width: 40px; height: 28px; }
+  .country-panel__flag img { max-width: 40px; max-height: 28px; }
+  .country-panel__region { font-size: .62rem; }
+  .country-panel__name { font-size: 1.75rem; line-height: 1.1; }
+  .country-actions { flex-wrap: nowrap; margin-top: var(--space-3); }
+  .country-actions .primary-button,
+  .country-actions .secondary-button { min-height: 36px; padding: 0 14px; font-size: .82rem; white-space: nowrap; }
+  /* O aviso da rota continua para leitores de tela (aria-describedby), sem ocupar a tela. */
+  .country-explore-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
