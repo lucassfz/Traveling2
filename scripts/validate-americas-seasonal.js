@@ -39,7 +39,9 @@ for (const key of Object.keys(CARIBBEAN_AUDIT_ENRICHMENT)) {
   if (/Confirme o padrão elétrico local/.test(country.voltage) || !/^https:\/\//.test(CARIBBEAN_AUDIT_ENRICHMENT[key].voltageSource)) errors.push(`${key}: voltagem sem dado/fonte`);
   const airport = await airports.resolve(country.airport);
   if (!airport || airport.country !== country.alpha2) errors.push(`${key}: aeroporto não resolve no país`);
-  if (country.visaPolicyBR?.eligibility !== 'unknown' || country.entryRequirements) errors.push(`${key}: entrada sem fonte oficial foi classificada indevidamente`);
+  // Classificar a entrada só com fonte oficial (https) registrada; sem ela, fica "a confirmar".
+  const official = /^https:\/\//.test(country.entryRequirements?.officialSource ?? '') && /^https:\/\//.test(country.visaPolicyBR?.source ?? '');
+  if (official ? country.visaPolicyBR?.eligibility === 'unknown' : (country.visaPolicyBR?.eligibility !== 'unknown' || country.entryRequirements)) errors.push(`${key}: entrada sem fonte oficial foi classificada indevidamente`);
 }
 console.log(`Américas: ${countries.length} destinos, 12 meses por destino; erros: ${errors.length}`);
 for (const error of errors) console.error(`ERRO ${error}`);

@@ -236,6 +236,47 @@ export const AMERICAS_ENTRY_CORRECTIONS = Object.freeze({
       'https://gov.sr/ministeries/ministerie-van-buitenlandse-zaken-internationale-handel-samenwerking/reizen-naar-suriname/'
     ), modality: 'free' }
   },
+  // Ilhas do Caribe: só entram aqui com lista oficial do próprio país citando o Brasil.
+  'Antigua & Barbuda': {
+    visa: 'free',
+    visaText: 'Turismo sem visto para brasileiros: o Brasil está na lista oficial de países isentos de visto.',
+    borderNote: 'Turismo sem visto para brasileiros; leve passaporte válido e passagem de saída.',
+    passport: 'Passaporte válido para toda a estadia; confirme a margem exigida pela companhia aérea.',
+    visaPolicyBR: {
+      detail: 'Turismo sem visto para brasileiros: o Brasil está na lista oficial de países isentos de visto. O prazo de permanência é definido pela imigração na chegada.',
+      source: 'https://www.visitantiguabarbuda.com/visa-requirements',
+      verifiedOn: '2026-11-15'
+    },
+    entryRequirements: { ...entry(
+      'Brasileiros não precisam de visto para visitar Antígua e Barbuda (lista oficial de países isentos).',
+      'Definido pela imigração na chegada; confirme o prazo carimbado no passaporte.',
+      'Passaporte válido para toda a estadia.',
+      'Leve passagem de saída e endereço de hospedagem.',
+      'Confira o certificado de febre amarela exigido para quem chega do Brasil.',
+      'https://www.visitantiguabarbuda.com/visa-requirements',
+      'verified'
+    ), verifiedAt: '2026-11', modality: 'free' }
+  },
+  Barbados: {
+    visa: 'free',
+    visaText: 'Turismo sem visto para brasileiros, com permanência de até 6 meses (lista oficial do Ministério das Relações Exteriores de Barbados).',
+    borderNote: 'Turismo sem visto para brasileiros, até 6 meses.',
+    passport: 'Passaporte válido para toda a estadia; confirme a margem exigida pela companhia aérea.',
+    visaPolicyBR: {
+      detail: 'Turismo sem visto para brasileiros, com permanência de até 6 meses, segundo a lista oficial do Ministério das Relações Exteriores de Barbados.',
+      source: 'https://www.foreign.gov.bb/wp-content/uploads/2022/08/Updated-visa-list-August-2022.pdf',
+      verifiedOn: '2026-11-15'
+    },
+    entryRequirements: { ...entry(
+      'Brasileiros não precisam de visto para visitar Barbados.',
+      'Até 6 meses.',
+      'Passaporte válido para toda a estadia.',
+      'Leve passagem de saída e endereço de hospedagem.',
+      'Confira o certificado de febre amarela exigido para quem chega do Brasil.',
+      'https://www.foreign.gov.bb/wp-content/uploads/2022/08/Updated-visa-list-August-2022.pdf',
+      'verified'
+    ), verifiedAt: '2026-11', modality: 'free' }
+  },
   'Fr. Guiana': {
     visa: 'req',
     visaText: 'Brasileiros com passaporte comum precisam de visto específico para a Guiana Francesa; visto Schengen não equivale a essa autorização.',
