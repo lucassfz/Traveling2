@@ -21,7 +21,8 @@ import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js'
 import { createTripStore } from './planner/trip.store.js';
 import { createTrip } from './planner/trip.model.js';
 import { loadCities, resolveCity } from './geo/cities.js';
-import { cityHash, countryHash, parseHash, setHash, shareLink, shareUrl } from './share.link.js';
+import { cityHash, countryHash, pageUrl, parseHash, setHash, shareLink, shareUrl } from './share.link.js';
+import { countryPagePath } from './country.slug.js';
 import { createSavedStore } from './saved.store.js';
 import { loadSummaries, summaryFor, summaryHtml } from './summaries.js';
 
@@ -758,9 +759,9 @@ function selectCity(city, { fly = false } = {}) {
 
 // Compartilhar: menu do sistema no celular, senão copia o link. O botão mostra
 // o resultado por 2 s.
-async function shareFrom(button, { title, text, hash }) {
-  if (!hash) return;
-  const result = await shareLink({ title, text, url: shareUrl(hash) });
+async function shareFrom(button, { title, text, hash = '', url = hash ? shareUrl(hash) : '' }) {
+  if (!url) return;
+  const result = await shareLink({ title, text, url });
   if (!button || result === 'shared' || result === 'cancelled') return;
   // O texto fica num <span> quando o botão tem ícone (no celular só o ícone aparece).
   const target = button.querySelector('span') ?? button;
@@ -1017,7 +1018,8 @@ function bindUiEvents() {
   elements.countrySaveButton.addEventListener('click', toggleCountrySaved);
   elements.countryShareButton?.addEventListener('click', () => {
     const country = COUNTRIES[state.countryKey];
-    if (country) shareFrom(elements.countryShareButton, { title: `${country.namePt} no Traveling`, text: `Olha ${country.namePt} no globo do Traveling`, hash: countryHash(country.alpha2) });
+    // A página do país (paises/<nome>/) tem prévia própria com foto no WhatsApp e afins.
+    if (country) shareFrom(elements.countryShareButton, { title: `${country.namePt}: guia de viagem`, text: `Olha ${country.namePt} no Traveling`, url: pageUrl(countryPagePath(country)) });
   });
   // Link colado com o site já aberto.
   window.addEventListener('hashchange', () => openFromHash());

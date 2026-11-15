@@ -32,6 +32,11 @@ export function shareUrl(hash, location = globalThis.location) {
   return `${location.origin}${location.pathname}${hash}`;
 }
 
+/** Endereço de uma página do site (ex.: "paises/portugal/"), a partir da pasta do site. */
+export function pageUrl(path, location = globalThis.location) {
+  return `${location.origin}${location.pathname.replace(/[^/]*$/, '')}${path}`;
+}
+
 /** Troca o hash sem criar entrada no histórico nem rolar a página. */
 export function setHash(hash) {
   const current = globalThis.location?.hash ?? '';

@@ -109,3 +109,15 @@ console.log('Salvos: identificadores, migração da lista antiga, duplicados, re
   assert.equal(await shareLink({ url: 'u' }, {}), 'failed');
   console.log('Salvos: links compartilháveis verificados.');
 }
+
+// Página do país para compartilhar.
+{
+  const assert = (await import('node:assert/strict')).default;
+  const { pageUrl } = await import('../js/share.link.js');
+  const { countryPagePath, countrySlug } = await import('../js/country.slug.js');
+  assert.equal(countrySlug('Antígua e Barbuda'), 'antigua-e-barbuda');
+  assert.equal(countryPagePath({ namePt: 'Japão' }), 'paises/japao/');
+  assert.equal(pageUrl('paises/japao/', { origin: 'https://x.io', pathname: '/Traveling2/' }), 'https://x.io/Traveling2/paises/japao/');
+  assert.equal(pageUrl('paises/japao/', { origin: 'https://x.io', pathname: '/Traveling2/index.html' }), 'https://x.io/Traveling2/paises/japao/', 'ignora o nome do arquivo');
+  console.log('Salvos: link da página do país verificado.');
+}
