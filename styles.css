@@ -186,7 +186,13 @@
 .discovery-panel button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 body.route-mode .discovery-panel { visibility: hidden; pointer-events: none; }
 @keyframes discovery-appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.discovery-filters-toggle { display: none; }
 @media (max-width: 600px) {
+  .discovery-filters-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-bottom: 12px; padding: 10px 14px; border: 1px solid var(--color-border-soft); border-radius: 14px; background: var(--glass-fill, transparent); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .discovery-filters-toggle span { display: grid; gap: 2px; font-size: .88rem; }
+  .discovery-filters-toggle small { color: var(--color-text-muted); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+  .discovery-filters-toggle strong { color: var(--color-accent); font-size: .85rem; white-space: nowrap; }
+  .discovery-filters--collapsed { display: none; }
   .discovery-panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 78dvh; padding: 16px; }
   .discovery-chips--months { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

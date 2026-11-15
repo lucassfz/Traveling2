@@ -33,6 +33,8 @@ export class DiscoveryUI {
    * @param {(code: string) => Promise<object|null>} [resolveAirport] Aeroporto (lat/lng) do roteiro, para achar as cidades da região.
    * @param {(city: object) => void} [onCity] Destaca a cidade escolhida no globo.
    */
+  filtersOpen = false;
+
   constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport = async () => null, onCity = () => {} }) {
     Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport, onCity });
     this.regionCities = new Map(); // id do perfil → cidades da região (ou 'error')
@@ -79,10 +81,28 @@ export class DiscoveryUI {
     return entries.map(([value, label]) => `<button type="button" class="discovery-chip" data-${kind}="${escape(value)}" aria-pressed="${isOn(value)}" ${disabled(value) ? 'disabled' : ''}>${escape(label)}</button>`).join('');
   }
 
+  // Resumo dos filtros (no celular, os filtros ficam recolhidos atrás dele para
+  // os destinos aparecerem logo; no computador o resumo não aparece).
+  #filtersSummary() {
+    const prefs = this.preferences;
+    const label = value => String(value ?? '').replace(/^[^\p{L}\d]+/u, '').trim();
+    const parts = [
+      prefs.interests.length ? prefs.interests.map(id => label(INTERESTS[id])).join(' + ') : 'Qualquer interesse',
+      DISCOVERY_MONTHS[prefs.month],
+      prefs.climate && prefs.climate !== 'any' ? label(CLIMATES[prefs.climate]) : null,
+      prefs.budget && prefs.budget !== 'any' ? BUDGET_SHORT[prefs.budget] : null,
+      prefs.visaFree ? 'Sem visto' : null
+    ].filter(Boolean);
+    return `<button type="button" class="discovery-filters-toggle" data-action="filters" aria-expanded="${this.filtersOpen}" aria-controls="discovery-filters">
+        <span><small>Filtros</small>${escape(parts.join(' · '))}</span>
+        <strong>${this.filtersOpen ? 'Fechar' : 'Editar'}</strong>
+      </button>`;
+  }
+
   #filters() {
     const prefs = this.preferences;
-    return `
-      <div class="discovery-filters">
+    return `${this.#filtersSummary()}
+      <div class="discovery-filters${this.filtersOpen ? '' : ' discovery-filters--collapsed'}" id="discovery-filters">
         <div class="discovery-filter">
           <span class="discovery-filter__label">O que você quer? <small>até ${MAX_INTERESTS}</small></span>
           <div class="discovery-chips" role="group" aria-label="Interesses">${this.#chips('interest', Object.entries(INTERESTS), id => prefs.interests.includes(id),
@@ -249,6 +269,12 @@ export class DiscoveryUI {
       return;
     }
     if (action === 'close') { this.close(true); return; }
+    if (action === 'filters') {
+      this.filtersOpen = !this.filtersOpen;
+      this.render(false);
+      this.element.querySelector('[data-action="filters"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (action === 'surprise' && this.matches.length) {
       const options = this.matches.map((_, index) => index).filter(index => index !== this.index);
       this.#select(options[Math.floor(Math.random() * options.length)] ?? 0);
