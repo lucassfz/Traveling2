@@ -1,0 +1,44 @@
+name: Visa rules review
+
+# Todo dia 1º, lista as regras de visto conferidas há mais de 180 dias
+# (scripts/check-visa-age.js). Se houver alguma, abre (ou atualiza) um aviso
+# "Regras de visto para reconferir" nas Issues do repositório. Não altera dados.
+on:
+  schedule:
+    - cron: '0 12 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    name: Check visa verification dates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Build report
+        id: report
+        run: |
+          set +e
+          node scripts/check-visa-age.js --strict > visa-report.md
+          code=$?
+          if [ "$code" -eq 1 ]; then echo "stale=true" >> "$GITHUB_OUTPUT"; elif [ "$code" -ne 0 ]; then exit "$code"; fi
+          cat visa-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Open or update the issue
+        if: steps.report.outputs.stale == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Regras de visto para reconferir"
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file visa-report.md
+          else
+            gh issue create --title "$title" --body-file visa-report.md
+          fi
