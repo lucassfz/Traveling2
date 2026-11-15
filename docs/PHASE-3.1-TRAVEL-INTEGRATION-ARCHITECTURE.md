@@ -15,7 +15,18 @@
 | Cliente do site, **desligado** sem `<meta name="traveling-api">`, que monta as buscas a partir da viagem | `js/api/travel.client.js` |
 | Testes de ponta a ponta (backend + cliente) e auditorias de segredos e de preloads, no `npm run validate` | `scripts/validate-backend.js`, `validate-secrets.js`, `validate-page.js` |
 
-Pendente para concluir a 3.2: aprovar D1 e D6, criar a conta Cloudflare e publicar o Worker (`npx wrangler deploy`), depois ligar a meta no site. Nenhuma interface nova foi adicionada ao Planner.
+**Decisões D1–D7 aprovadas em 15/11/2026.** Em seguida:
+
+| Entregue (fase 3.3, parte de voos) | Onde |
+|---|---|
+| Adaptador Duffel conforme a documentação oficial (fusos convertidos para ISO 8601 com offset, bagagem, condições, expiração); ativo só com o Secret `DUFFEL_TOKEN`; token de teste → `dataSource: "test"`; só adultos (a Duffel exige idade dos menores) | `backend/src/providers/duffel.flights.js` |
+| Seção "Buscar voos reais" na etapa Voo: busca a partir da viagem, ordenação, rótulos de procedência, expiração, "Adicionar à viagem" (cotação no orçamento) e "Na sua viagem" | `js/planner/live.flights.section.js` |
+| Referência de oferta na viagem (`source.kind: "provider-offer"`), aditiva: **sem** mudança de versão do schema (o §11.4 previa v3; não foi preciso) | `js/planner/trip.model.js` |
+| Rótulos novos `cached` ("Preço visto recentemente") e `test` ("Dados de teste") | `js/provenance.js` |
+| Página de privacidade e aviso de afiliados (D7) | `privacidade.html` |
+| Servidor local do backend para desenvolvimento, sem wrangler | `npm run dev:backend` |
+
+Para publicar (precisa das contas, que são do responsável pelo projeto): criar a conta Cloudflare e rodar `npx wrangler deploy` em `backend/`; criar conta na Duffel e `npx wrangler secret put DUFFEL_TOKEN` com o token de **teste**; acrescentar `duffel` a `FLIGHT_PROVIDERS`; e incluir `<meta name="traveling-api" content="https://<worker>/api/v1">` no `index.html`. Travelpayouts, LiteAPI e afiliados Booking.com dependem do cadastro em cada programa.
 
 ## Sumário
 

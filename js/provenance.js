@@ -8,6 +8,9 @@ export const PROVENANCE_KINDS = Object.freeze({
   verified: 'Verificado',
   live: 'Ao vivo',
   estimate: 'Estimativa Traveling',
+  // Busca de preços (fase 3.3): preço em cache de parceiro e dados do modo de teste.
+  cached: 'Preço visto recentemente',
+  test: 'Dados de teste',
   calculated: 'Calculado com seus valores',
   unverified: 'Pendente de verificação'
 });

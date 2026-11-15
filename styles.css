@@ -1713,6 +1713,8 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
 .provenance--estimate { --provenance-color: var(--color-warning); }
 .provenance--calculated { --provenance-color: var(--color-text-secondary); }
 .provenance--unverified { --provenance-color: var(--color-text-muted); }
+.provenance--cached { --provenance-color: var(--color-warning); }
+.provenance--test { --provenance-color: var(--color-danger); }
 .provenance__kind {
   display: inline-flex;
   align-items: center;
@@ -1731,6 +1733,7 @@ body:has(.country-panel--open):has(.miles-hub--open) .dock { opacity: 0; pointer
 }
 .provenance--estimate .provenance__kind::before { border-radius: 1px; transform: rotate(45deg); }
 .provenance--calculated .provenance__kind::before,
+.provenance--cached .provenance__kind::before,
 .provenance--unverified .provenance__kind::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 .provenance__part::before { content: '·'; margin: 0 6px; color: var(--color-text-muted); }
 .provenance a { color: var(--color-accent-strong); }
@@ -3602,4 +3605,52 @@ body.route-mode .city-card { visibility: hidden; }
   .country-panel--open, .miles-hub--open { transition-duration: .01ms; }
   .globe:not(.globe--ready) .globe__canvas { opacity: 1; transform: none; }
   .slide-indicator { transition: none; }
+}
+
+/* Busca de voos reais no Planner (js/planner/live.flights.section.js). */
+.live-search { display: grid; gap: 12px; margin-top: var(--space-4); }
+.live-search__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.live-search__head .planner-hint { margin: 2px 0 0; }
+.live-search__status--error { color: var(--color-danger); }
+.live-search__toolbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.live-offers { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.live-offer {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--glass-hairline, var(--color-border-soft));
+  border-radius: var(--radius-sm);
+  background: var(--glass-fill, var(--color-surface));
+  animation: rise-in var(--dur-md, 300ms) var(--ease-out-expo, ease-out) both;
+}
+.live-offer--expired { opacity: .55; }
+.live-offer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.live-offer__carrier { font-size: .92rem; }
+.live-offer__price { display: grid; justify-items: end; text-align: right; }
+.live-offer__price strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.live-offer__price small { color: var(--color-text-muted); font-size: .74rem; }
+.live-offer__slice {
+  display: grid;
+  grid-template-columns: auto auto minmax(16px, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: .86rem;
+  font-variant-numeric: tabular-nums;
+}
+.live-offer__slice small { grid-column: 2 / -1; color: var(--color-text-muted); font-size: .74rem; }
+.live-offer__tag { min-width: 76px; color: var(--color-text-muted); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.live-offer__line { height: 1px; background: linear-gradient(90deg, var(--color-border), var(--color-accent), var(--color-border)); }
+.live-offer__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.live-offer__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.live-offer__actions .primary-button,
+.live-offer__actions .secondary-button { min-height: 36px; padding: 0 12px; font-size: .78rem; display: inline-flex; align-items: center; text-decoration: none; }
+.live-attached { padding-top: 10px; border-top: 1px solid var(--glass-hairline, var(--color-border-soft)); }
+.live-attached ul { display: grid; gap: 8px; margin: 6px 0 0; padding: 0; list-style: none; }
+.live-attached li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .84rem; }
+.live-attached li span { display: grid; gap: 2px; }
+.live-attached small { color: var(--color-text-muted); font-size: .74rem; }
+@media (max-width: 520px) {
+  .live-search__head { flex-direction: column; }
+  .live-offer__slice { grid-template-columns: auto minmax(12px, 1fr) auto; }
+  .live-offer__tag { grid-column: 1 / -1; }
 }

@@ -714,8 +714,8 @@ export class PlannerUI {
 
   #savedNote() {
     return this.store.persistent
-      ? '<p class="planner-saved">Salvo neste navegador. Limpar os dados do navegador apaga as viagens.</p>'
-      : '<p class="planner-saved planner-saved--warning" role="status">Este navegador não permite salvar. As viagens ficam disponíveis só até fechar a página.</p>';
+      ? '<p class="planner-saved">Salvo neste navegador. Limpar os dados do navegador apaga as viagens. <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>'
+      : '<p class="planner-saved planner-saved--warning" role="status">Este navegador não permite salvar. As viagens ficam disponíveis só até fechar a página. <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>';
   }
 
   // Atualiza o que depende dos dados sem redesenhar a etapa (mantém o foco).

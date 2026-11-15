@@ -15,20 +15,35 @@ Camada entre o site (GitHub Pages) e os fornecedores de voos e hotéis. Arquitet
 | `src/reliability.js` | Cache curto com coalescência, limite por cliente, disjuntor e prazo |
 | `src/providers/index.js` | Registro de fornecedores (interface comum) |
 | `src/providers/mock.js` | Fornecedor fictício e determinístico |
+| `src/providers/duffel.flights.js` | Adaptador Duffel (voos); ativo só com o Secret `DUFFEL_TOKEN` e `duffel` em `FLIGHT_PROVIDERS` |
 | `src/airports.generated.js` | Códigos IATA gerados por `npm run build:backend-airports` |
 
 ## Testes
 
 Sem dependências: os testes rodam em Node (≥ 20, com `Request`/`Response` nativos) dentro do `npm run validate` da raiz, por `scripts/validate-backend.js`. Eles exercitam o Worker de ponta a ponta com o fornecedor fictício.
 
-## Rodar localmente (quando o deploy for aprovado)
+## Rodar localmente
+
+Sem instalar nada (o mesmo Worker, em Node):
+
+```sh
+npm run dev:backend                    # http://localhost:8787/api/v1/providers/status
+DUFFEL_TOKEN=duffel_test_… FLIGHT_PROVIDERS=mock,duffel npm run dev:backend
+```
+
+Para ver a busca no site local, acrescente temporariamente ao `<head>` do `index.html` a meta `<meta name="traveling-api" content="http://localhost:8787/api/v1">` (não commitar).
+
+Com o runtime da Cloudflare: `cd backend && npx wrangler dev` (`wrangler` não é dependência; o `npx` baixa sob demanda).
+
+## Publicar
 
 ```sh
 cd backend
-npx wrangler dev          # http://localhost:8787/api/v1/providers/status
+npx wrangler deploy
+npx wrangler secret put DUFFEL_TOKEN   # token de TESTE até a decisão de vender (D2)
 ```
 
-`wrangler` não é dependência do projeto; o `npx` baixa sob demanda.
+Depois, ajuste `ALLOWED_ORIGINS` ao endereço do site e inclua no `index.html` a meta `traveling-api` com o endereço do Worker.
 
 ## Adicionar um fornecedor real (fases 3.3 e 3.4)
 

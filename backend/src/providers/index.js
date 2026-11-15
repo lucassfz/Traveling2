@@ -8,9 +8,10 @@
 // 3.3 e 3.4, lendo as credenciais SOMENTE de `env` (Secrets do Worker).
 // A lista ativa vem das variáveis FLIGHT_PROVIDERS e HOTEL_PROVIDERS ("mock" por padrão).
 import { mockFlights, mockHotels } from './mock.js';
+import { createDuffelFlights } from './duffel.flights.js';
 
 const FACTORIES = {
-  flights: { mock: () => mockFlights },
+  flights: { mock: () => mockFlights, duffel: env => createDuffelFlights(env) },
   hotels: { mock: () => mockHotels }
 };
 

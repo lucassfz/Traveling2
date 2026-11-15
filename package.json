@@ -11,6 +11,7 @@
     "build:airports": "node scripts/build-airports.js",
     "build:fx": "node scripts/build-fx.js",
     "build:admin": "node scripts/build-admin.js",
-    "build:backend-airports": "node scripts/build-backend-airports.js"
+    "build:backend-airports": "node scripts/build-backend-airports.js",
+    "dev:backend": "node scripts/dev-backend.js"
   }
 }

@@ -128,8 +128,37 @@ function airportCode(value) {
 }
 
 // Procedência de uma linha sugerida pelo Traveling (nunca obrigatória).
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+
+// Oferta de fornecedor anexada à viagem (fase 3.3): só um resumo e a referência,
+// nunca a oferta inteira (o preço pode mudar; a viagem guarda a cotação daquele momento).
+function normalizeProviderOffer(source) {
+  const provider = text(source.provider, 40);
+  const offerId = text(source.offerId, 160);
+  if (!/^[a-z][a-z0-9-]{1,39}$/.test(provider) || !offerId) return null;
+  if (!['live', 'cached', 'test'].includes(source.dataSource)) return null;
+  if (!ISO_INSTANT.test(source.fetchedAt ?? '')) return null;
+  let url = null;
+  try {
+    url = source.url ? (new URL(source.url).protocol === 'https:' ? new URL(source.url).href : null) : null;
+  } catch {
+    url = null;
+  }
+  return {
+    kind: 'provider-offer',
+    provider,
+    offerId,
+    dataSource: source.dataSource,
+    fetchedAt: source.fetchedAt,
+    ...(ISO_INSTANT.test(source.expiresAt ?? '') ? { expiresAt: source.expiresAt } : {}),
+    ...(text(source.summary, 160) ? { summary: text(source.summary, 160) } : {}),
+    ...(url ? { url } : {})
+  };
+}
+
 function normalizeSource(source) {
   if (!source || typeof source !== 'object') return null;
+  if (source.kind === 'provider-offer') return normalizeProviderOffer(source);
   const kind = ['traveling-estimate', 'user'].includes(source.kind) ? source.kind : null;
   if (!kind) return null;
   const clean = { kind };

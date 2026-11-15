@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Como o Traveling trata seus dados: o que fica no seu navegador, quais serviços externos são usados e como funcionam os links de parceiros.">
+  <title>Privacidade — Traveling</title>
+  <script>
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+    } catch (error) { /* armazenamento bloqueado: tema escuro */ }
+  </script>
+  <style>
+    :root { color-scheme: dark; --bg: #05070c; --surface: #0d121c; --text: #e8edf3; --muted: #9aa8b8; --accent: #7cc9f5; --border: rgba(255, 255, 255, .1); }
+    [data-theme='light'] { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 24px; font-size: .9rem; text-decoration: none; }
+    h1 { margin: 0 0 4px; font: 600 2rem/1.2 'Playfair Display', Georgia, serif; }
+    .updated { margin: 0 0 32px; color: var(--muted); font-size: .85rem; }
+    h2 { margin: 32px 0 8px; font-size: 1.15rem; }
+    p, li { color: var(--text); }
+    .note { padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    code { font-size: .85em; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./">← Voltar ao Traveling</a>
+    <h1>Privacidade</h1>
+    <p class="updated">Atualizado em 15 de novembro de 2026.</p>
+
+    <p class="note">Resumo: o Traveling não tem contas, não pede seu nome, e-mail ou dados de pagamento, e não envia suas viagens para nenhum servidor. O que você planeja fica no seu navegador.</p>
+
+    <h2>O que fica no seu navegador</h2>
+    <p>O Traveling usa o armazenamento local do navegador (<code>localStorage</code> e <code>sessionStorage</code>) para lembrar suas escolhas. Esses dados não saem do seu aparelho e somem se você limpar os dados do site no navegador.</p>
+    <table>
+      <thead><tr><th>Dado</th><th>Para quê</th></tr></thead>
+      <tbody>
+        <tr><td>Viagens do Planner, com checklist</td><td>Continuar o planejamento depois</td></tr>
+        <tr><td>Destinos salvos</td><td>Sua lista de países, cidades e lugares</td></tr>
+        <tr><td>Países visitados e tema claro/escuro</td><td>Preferências da interface</td></tr>
+        <tr><td>Cotação do dólar do dia (<code>sessionStorage</code>)</td><td>Evitar consultar o Banco Central a cada página; apagada ao fechar a aba</td></tr>
+      </tbody>
+    </table>
+    <p>Não usamos cookies de rastreamento nem ferramentas de análise de visitantes.</p>
+
+    <h2>Serviços externos que o site usa</h2>
+    <p>Para funcionar, o navegador baixa arquivos destes serviços. Como em qualquer acesso à internet, eles recebem dados técnicos da conexão (como endereço IP e tipo de navegador), conforme as políticas de cada um:</p>
+    <table>
+      <thead><tr><th>Serviço</th><th>Quando</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Pages</a></td><td>Hospedagem do site</td></tr>
+        <tr><td><a href="https://www.jsdelivr.com/terms/privacy-policy-jsdelivr-net" target="_blank" rel="noopener noreferrer">jsDelivr</a></td><td>Bibliotecas do globo 3D e mapa-múndi</td></tr>
+        <tr><td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Fonts</a></td><td>Fontes do texto</td></tr>
+        <tr><td>Flagcdn</td><td>Bandeira, ao abrir um país</td></tr>
+        <tr><td><a href="https://foundation.wikimedia.org/wiki/Policy:Privacy_policy" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></td><td>Fotos de pontos turísticos</td></tr>
+        <tr><td><a href="https://www.bcb.gov.br/" target="_blank" rel="noopener noreferrer">Banco Central do Brasil</a></td><td>Cotação PTAX para converter valores</td></tr>
+      </tbody>
+    </table>
+    <p>Links para sites oficiais (consulados, aeroportos, programas de milhas) só são abertos quando você clica neles.</p>
+
+    <h2>Busca de preços de voos e hotéis</h2>
+    <p>Esta função está em preparação e <strong>ainda não está ativa</strong>. Quando estiver:</p>
+    <ul>
+      <li>Ao pedir uma busca, o Traveling envia ao seu serviço de busca apenas o que a busca precisa: origem e destino, datas, número de viajantes, quartos e cabine. Nada de nome, documento ou contato.</li>
+      <li>Esse serviço repassa a busca ao fornecedor indicado em cada resultado e registra só dados técnicos (horário, tipo de busca, erros), sem o seu endereço IP completo e sem o conteúdo da busca.</li>
+      <li>Cada preço mostra a origem: <strong>Ao vivo</strong>, <strong>Preço visto recentemente</strong> (pode ter mudado) ou <strong>Estimativa Traveling</strong> (não é cotação).</li>
+      <li>O Traveling não vende passagens nem reservas e não recebe pagamentos. A reserva acontece no site do parceiro, sob as regras e a política de privacidade dele.</li>
+    </ul>
+
+    <h2>Links de parceiros</h2>
+    <p>Alguns links para reservar podem ser links de afiliado: se você reservar por eles, o Traveling pode receber uma comissão do parceiro, <strong>sem custo extra para você</strong>. Esses links são identificados na própria busca. A comissão nunca muda a ordem dos resultados, que seguem o preço.</p>
+
+    <h2>Contato</h2>
+    <p>Dúvidas ou pedidos sobre este conteúdo: abra uma issue no <a href="https://github.com/lucassfz/Traveling2/issues" target="_blank" rel="noopener noreferrer">repositório do projeto</a>.</p>
+  </main>
+</body>
+</html>

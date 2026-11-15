@@ -271,4 +271,108 @@ const expectError = (fn, code, field) => {
   await assert.rejects(searchFlights(flight.request, { ...options, fetchImpl: () => Promise.reject(new TypeError('offline')) }), error => error.code === 'NETWORK_ERROR' && error.retryable);
 }
 
-console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabilidade, Worker de ponta a ponta e cliente do site verificados com fornecedores fictícios.');
+// 8. Adaptador Duffel. Resposta SINTÉTICA, montada com os nomes de campo da
+//    documentação oficial (duffel.com/docs/api/v2/offers); não é uma resposta gravada.
+{
+  const { createDuffelFlights, durationMinutes, localToOffsetIso, mapOffer } = await import('../backend/src/providers/duffel.flights.js');
+  assert.equal(localToOffsetIso('2027-04-02T22:10:00', 'America/Sao_Paulo'), '2027-04-02T22:10:00-03:00');
+  assert.equal(localToOffsetIso('2027-04-03T12:05:00', 'Europe/Lisbon'), '2027-04-03T12:05:00+01:00', 'horário de verão');
+  assert.equal(localToOffsetIso('2027-01-10T08:00:00', 'Europe/Lisbon'), '2027-01-10T08:00:00+00:00');
+  assert.equal(localToOffsetIso('2027-03-14T12:00:00', 'America/New_York'), '2027-03-14T12:00:00-04:00', 'dia da mudança');
+  assert.equal(localToOffsetIso('2027-04-02T22:10:00', 'Nao/Existe'), null);
+  assert.equal(durationMinutes('PT10H15M'), 615);
+  assert.equal(durationMinutes('P1DT2H'), 1560);
+  assert.equal(durationMinutes('10h'), null);
+
+  const airport = (iata_code, time_zone) => ({ iata_code, time_zone });
+  const tap = { name: 'TAP Air Portugal', iata_code: 'TP' };
+  const syntheticResponse = {
+    data: {
+      offers: [{
+        id: 'off_synthetic_1',
+        total_amount: '8420.50', total_currency: 'BRL', base_amount: '7100.00', base_currency: 'BRL', tax_amount: '1320.50', tax_currency: 'BRL',
+        expires_at: '2026-11-15T12:30:00.000Z',
+        owner: tap,
+        conditions: { refund_before_departure: { allowed: false }, change_before_departure: { allowed: true, penalty_amount: '450.00', penalty_currency: 'BRL' } },
+        slices: [
+          { duration: 'PT9H55M', segments: [{ origin: airport('GRU', 'America/Sao_Paulo'), destination: airport('LIS', 'Europe/Lisbon'), departing_at: '2027-04-02T22:10:00', arriving_at: '2027-04-03T12:05:00', marketing_carrier: tap, operating_carrier: tap, marketing_carrier_flight_number: '88', passengers: [{ baggages: [{ type: 'checked', quantity: 1 }, { type: 'carry_on', quantity: 1 }] }] }] },
+          { duration: 'PT12H50M', segments: [
+            { origin: airport('LIS', 'Europe/Lisbon'), destination: airport('OPO', 'Europe/Lisbon'), departing_at: '2027-04-10T09:00:00', arriving_at: '2027-04-10T10:00:00', marketing_carrier: tap, operating_carrier: tap, marketing_carrier_flight_number: '1940' },
+            { origin: airport('OPO', 'Europe/Lisbon'), destination: airport('GRU', 'America/Sao_Paulo'), departing_at: '2027-04-10T12:30:00', arriving_at: '2027-04-10T17:50:00', marketing_carrier: tap, operating_carrier: tap, marketing_carrier_flight_number: '107' }
+          ] }
+        ]
+      }, { id: 'off_broken', total_amount: 'abc', total_currency: 'BRL', slices: [] }]
+    }
+  };
+  const request = validateFlightSearch({ origin: 'GRU', destination: 'LIS', departureDate: '2027-04-02', returnDate: '2027-04-10', passengers: { adults: 2 } }, { now: NOW });
+  const mapped = mapOffer(syntheticResponse.data.offers[0], { request, searchedAt: '2026-11-15T12:00:00Z', dataSource: 'test' });
+  assert.deepEqual(checkFlightOffer(mapped), [], 'oferta Duffel convertida cumpre o modelo');
+  assert.equal(mapped.slices[0].departAt, '2027-04-02T22:10:00-03:00');
+  assert.equal(mapped.slices[0].durationMinutes, 595);
+  assert.deepEqual(mapped.slices[1].connections, ['OPO']);
+  assert.equal(mapped.slices[1].segments[1].flightNumber, 'TP107');
+  assert.deepEqual(mapped.baggage, [{ type: 'checked', quantity: 1, per: 'passenger' }, { type: 'carry_on', quantity: 1, per: 'passenger' }]);
+  assert.deepEqual(mapped.conditions, { refundable: false, changeable: true, changePenalty: { amount: '450.00', currency: 'BRL' } });
+  assert.equal(mapped.bookingUrl, undefined, 'Duffel não tem link de reserva externo');
+  assert.equal(mapOffer(syntheticResponse.data.offers[1], { request, searchedAt: '2026-11-15T12:00:00Z', dataSource: 'test' }), null, 'oferta incompleta é ignorada');
+
+  // Pedido enviado conforme a documentação; token só no cabeçalho; nunca em erros.
+  const TOKEN = `duffel_test_${'x'.repeat(24)}`;
+  let sent = null;
+  const fetchImpl = async (url, init) => {
+    sent = { url, init };
+    return new Response(JSON.stringify(syntheticResponse), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const duffel = createDuffelFlights({ DUFFEL_TOKEN: TOKEN }, { fetchImpl });
+  assert.deepEqual([duffel.mode, duffel.dataSource], ['test', 'test'], 'token de teste → dados de teste');
+  const { offers } = await duffel.searchFlights(request, { now: NOW });
+  assert.equal(offers.length, 1);
+  assert.equal(sent.url, 'https://api.duffel.com/air/offer_requests?return_offers=true&supplier_timeout=9000');
+  assert.equal(sent.init.headers.authorization, `Bearer ${TOKEN}`);
+  assert.equal(sent.init.headers['duffel-version'], 'v2');
+  assert.deepEqual(JSON.parse(sent.init.body), { data: {
+    slices: [{ origin: 'GRU', destination: 'LIS', departure_date: '2027-04-02' }, { origin: 'LIS', destination: 'GRU', departure_date: '2027-04-10' }],
+    passengers: [{ type: 'adult' }, { type: 'adult' }],
+    cabin_class: 'economy'
+  } });
+  assert.equal(createDuffelFlights({ DUFFEL_TOKEN: `duffel_live_${'y'.repeat(24)}` }, { fetchImpl }).dataSource, 'live');
+  assert.throws(() => createDuffelFlights({}), /DUFFEL_TOKEN ausente/);
+  await assert.rejects(duffel.searchFlights({ ...request, passengers: { adults: 1, children: 1, infants: 0 } }), /só adultos/);
+  const failingDuffel = createDuffelFlights({ DUFFEL_TOKEN: TOKEN }, { fetchImpl: async () => new Response(`{"errors":[{"message":"token ${TOKEN} inválido"}]}`, { status: 401 }) });
+  await assert.rejects(failingDuffel.searchFlights(request), error => error.message === 'Duffel respondeu 401' && !error.message.includes(TOKEN));
+
+  // Pelo Worker: oferta Duffel convertida chega ao front e o token não aparece na resposta.
+  registerProvider('flights', 'duffel-synthetic', env => createDuffelFlights(env, { fetchImpl }));
+  const ORIGIN = 'https://lucassfz.github.io';
+  const app = createApp({ now: () => NOW, log: () => {} });
+  const response = await app.fetch(new Request('https://api.test/api/v1/flights/search', {
+    method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN, 'cf-connecting-ip': '100.64.1.1' },
+    body: JSON.stringify({ origin: 'GRU', destination: 'LIS', departureDate: '2027-04-02', returnDate: '2027-04-10', passengers: { adults: 2 } })
+  }), { ALLOWED_ORIGINS: ORIGIN, FLIGHT_PROVIDERS: 'duffel-synthetic', DUFFEL_TOKEN: TOKEN });
+  const text = await response.text();
+  assert.equal(response.status, 200);
+  assert.ok(!text.includes(TOKEN), 'token nunca vai ao navegador');
+  assert.equal(JSON.parse(text).offers[0].provider, 'duffel');
+}
+
+console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabilidade, Worker de ponta a ponta, cliente do site e adaptador Duffel verificados (Duffel com resposta sintética da documentação).');
+
+// 9. Seção de voos do Planner: ordenação, resumo e total anexado (funções puras).
+{
+  const { sortOffers, offerSummary, attachedFlightsTotal } = await import('../js/planner/live.flights.section.js');
+  const request = validateFlightSearch({ origin: 'GRU', destination: 'LIS', departureDate: '2027-04-02', returnDate: '2027-04-10', passengers: { adults: 1 } }, { now: NOW });
+  const { offers } = await mockFlights.searchFlights(request, { now: NOW });
+  const byPrice = sortOffers(offers, 'price');
+  for (let index = 1; index < byPrice.length; index += 1) assert.ok(Number(byPrice[index - 1].price.total.amount) <= Number(byPrice[index].price.total.amount));
+  const totalMinutes = offer => offer.slices.reduce((sum, slice) => sum + slice.durationMinutes, 0);
+  const byDuration = sortOffers(offers, 'duration');
+  for (let index = 1; index < byDuration.length; index += 1) assert.ok(totalMinutes(byDuration[index - 1]) <= totalMinutes(byDuration[index]));
+  assert.equal(sortOffers(offers, 'stops')[0].slices[0].stops, 0);
+  assert.match(offerSummary(offers[0]), /^Companhia de teste · GRU→LIS · 02\/04–10\/04 · /);
+  assert.equal(attachedFlightsTotal({ lines: [
+    { category: 'flights', amountBRL: 100, source: { kind: 'provider-offer' } },
+    { category: 'flights', amountBRL: 50, source: { kind: 'traveling-estimate' } },
+    { category: 'lodging', amountBRL: 70, source: { kind: 'provider-offer' } }
+  ] }), 100);
+  console.log('Backend: seção de voos do Planner (ordenação, resumo, total) verificada.');
+}

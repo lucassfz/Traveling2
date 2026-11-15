@@ -389,3 +389,22 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(tripStatus(createTrip({ countryKey: 'Japan', idFactory })), 'planned');
   console.log('Planner: checklist por viagem, migração, duplicar, excluir e desfazer verificados.');
 }
+
+// Oferta de fornecedor anexada à viagem (fase 3.3): só resumo e referência, validados.
+{
+  let id = 0;
+  const idFactory = prefix => `${prefix}_offer${String(++id).padStart(4, '0')}`;
+  const base = createTrip({ countryKey: 'Portugal', travelers: 2, idFactory });
+  const source = { kind: 'provider-offer', provider: 'duffel', offerId: 'off_123', dataSource: 'live', fetchedAt: '2026-11-15T12:00:00Z', expiresAt: '2026-11-15T12:30:00Z', summary: 'TAP · GRU→LIS', url: 'https://example.com/reserva' };
+  const withOffer = addLine(base, { category: 'flights', status: 'quote', amountBRL: 8420.5, note: 'TAP', source }, { idFactory });
+  assert.deepEqual(withOffer.lines[0].source, source);
+  assert.equal(tripTotals(withOffer).byCategory.flights, 8420.5, 'entra no orçamento');
+  const clean = raw => addLine(base, { category: 'flights', amountBRL: 1, source: { ...source, ...raw } }, { idFactory }).lines[0].source;
+  assert.equal(clean({ url: 'http://example.com' }).url, undefined, 'só https');
+  assert.equal(clean({ url: 'javascript:alert(1)' }).url, undefined);
+  assert.equal(clean({ dataSource: 'magic' }), undefined, 'origem desconhecida descarta a referência');
+  assert.equal(clean({ fetchedAt: 'ontem' }), undefined);
+  assert.equal(clean({ provider: 'Duffel Inc' }), undefined);
+  assert.equal(clean({ expiresAt: 'logo' }).expiresAt, undefined);
+  console.log('Planner: ofertas de fornecedor anexadas à viagem verificadas.');
+}

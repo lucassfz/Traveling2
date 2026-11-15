@@ -1246,8 +1246,9 @@ function ensurePlanner() {
     import('./planner/planner.ui.js'),
     import('./planner/flight.section.js'),
     import('./planner/prep.section.js'),
-    import('./planner/currency.js')
-  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }]) => {
+    import('./planner/currency.js'),
+    import('./planner/live.flights.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSections }, { createPrepSection }, { rateTable }, { createLiveFlightsSection }]) => {
     const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
     state.planner = new PlannerUI({
       getRates,
@@ -1273,6 +1274,24 @@ function ensurePlanner() {
             originCode: origin.iata || origin.icao,
             airportCode: destination.iata || destination.icao,
             returnFocus: elements.plannerContent.querySelector('[data-planner-preview-route]'),
+            isCurrent: () => isPlannerOpen()
+          }).catch(() => {})
+        }),
+        // Busca de voos reais (fase 3.3): só aparece com o backend ligado (meta traveling-api).
+        ...createLiveFlightsSection({
+          getRates,
+          resolveAirports: async trip => {
+            const [origin, cityAirport] = await Promise.all([
+              airportRepository.resolve(trip.origin),
+              trip.city ? airportRepository.findGateway(trip.city.lat, trip.city.lng) : Promise.resolve(null)
+            ]);
+            return { origin, destination: cityAirport ?? await resolveDestinationAirport(trip.countryKey) };
+          },
+          onPreviewRoute: (origin, destination, trip) => openFlightPreview({
+            countryKey: trip.countryKey,
+            originCode: origin.iata || origin.icao,
+            airportCode: destination.iata || destination.icao,
+            returnFocus: elements.plannerContent.querySelector('[data-live-flights]'),
             isCurrent: () => isPlannerOpen()
           }).catch(() => {})
         }),
