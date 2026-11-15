@@ -23,7 +23,7 @@ import { createTripStore } from './planner/trip.store.js';
 import { createTrip } from './planner/trip.model.js';
 import { loadCities, resolveCity } from './geo/cities.js';
 import { cityHash, countryHash, pageUrl, parseHash, setHash, shareLink, shareUrl } from './share.link.js';
-import { countryPagePath } from './country.slug.js';
+import { capitalPagePath, countryPagePath } from './country.slug.js';
 import { createSavedStore } from './saved.store.js';
 import { loadSummaries, summaryFor, summaryHtml } from './summaries.js';
 
@@ -842,7 +842,12 @@ function selectCity(city, { fly = false } = {}) {
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => closeCityCard(),
     partnerLinks: city => cityPartnerLinks(city),
-    onShare: (city, button) => shareFrom(button, { title: `${city.name} no Traveling`, text: `Olha ${city.name} no globo do Traveling`, hash: cityHash(city) }),
+    onShare: (city, button) => {
+      // Capital com página própria: o link mostra foto e resumo na prévia.
+      const country = COUNTRIES[COUNTRY_BY_ALPHA2.get(city.country)];
+      const page = city.rank === 0 ? capitalPagePath(country) : '';
+      shareFrom(button, { title: `${city.name} no Traveling`, text: `Olha ${city.name} no globo do Traveling`, ...(page ? { url: pageUrl(page) } : { hash: cityHash(city) }) });
+    },
     saved: {
       isSaved: city => Boolean(savedEntryForCity(city, COUNTRY_BY_ALPHA2.get(city.country))),
       toggle: (city, countryKey) => {

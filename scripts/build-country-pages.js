@@ -13,7 +13,7 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { COUNTRIES, CONTINENT_LABELS } from '../js/countries.dataset.js';
-import { COUNTRY_PAGES_DIR, countrySlug } from '../js/country.slug.js';
+import { CITY_PAGES_DIR, COUNTRY_PAGES_DIR, capitalLandmarks, capitalPagePath, countrySlug } from '../js/country.slug.js';
 import { PARTNERS, klookUrl } from '../js/planner/partners.section.js';
 
 // Endereço público do site. Ao trocar de domínio, mude aqui e rode o gerador.
@@ -324,13 +324,9 @@ ${list.sort((a, b) => a.namePt.localeCompare(b.namePt, 'pt-BR')).map(country => 
 // ---------- Páginas das capitais (cidades/<capital>-<país>/) ----------
 // Só para capitais com pontos turísticos próprios no catálogo: sem conteúdo
 // próprio, a página repetiria a do país.
-export const CITY_PAGES_DIR = 'cidades';
-const normalizeName = value => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-export const capitalSlug = country => countrySlug(`${country.capital} ${country.namePt}`);
-
-export function capitalLandmarks(country) {
-  return (country.landmarks ?? []).filter(item => normalizeName(item.city) === normalizeName(country.capital) && httpsUrl(item.media?.url));
-}
+// O critério (e o caminho) vem de js/country.slug.js, o mesmo que o site usa
+// para compartilhar a capital.
+export const capitalSlug = country => capitalPagePath(country).slice(CITY_PAGES_DIR.length + 1, -1);
 
 function populationText(value) {
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -344,7 +340,7 @@ export function capitalPage(country, city) {
   const url = `${SITE_URL}${CITY_PAGES_DIR}/${capitalSlug(country)}/`;
   const countryPath = `../../${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/`;
   const globe = `../../#/${country.alpha2}/i${city.index}`;
-  const landmarks = capitalLandmarks(country).slice(0, 6);
+  const landmarks = capitalLandmarks(country).filter(item => httpsUrl(item.media.url)).slice(0, 6);
   const visa = visaInfo(country);
   const months = bestMonths(country);
   const image = landmarks[0]?.media.url ?? `${SITE_URL}og-image.png`;
@@ -448,7 +444,7 @@ ${faq.map(([question, answer]) => `      <h3>${escapeHtml(question)}</h3>
 export async function capitalsWithPages(countries) {
   const list = [];
   for (const country of countries) {
-    if (!country.capital || !capitalLandmarks(country).length) continue;
+    if (!capitalPagePath(country)) continue;
     let admin;
     try { admin = JSON.parse(await readFile(new URL(`data/admin/${country.alpha2}.json`, ROOT), 'utf8')); } catch { continue; }
     const index = (admin.cities ?? []).findIndex(row => row[4] === 0);
