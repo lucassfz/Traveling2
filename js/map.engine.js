@@ -318,6 +318,28 @@ function polygonToMesh(polygon, material, countryKey, continent) {
   return mesh;
 }
 
+// Junta as malhas de terra de um país (todas sem índice, com posição e
+// normal: ver sphericalGeometryFromShape) e libera as originais.
+function mergeLandGeometries(geometries) {
+  const total = geometries.reduce((sum, geometry) => sum + geometry.getAttribute('position').count, 0);
+  const positions = new Float32Array(total * 3);
+  const normals = new Float32Array(total * 3);
+  let offset = 0;
+  for (const geometry of geometries) {
+    const position = geometry.getAttribute('position');
+    positions.set(position.array, offset);
+    normals.set(geometry.getAttribute('normal').array, offset);
+    offset += position.count * 3;
+    geometry.dispose();
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
 // Countries crossing ±180° (Russia, Fiji) are cut along the antimeridian in the
 // atlas. That cut is a polygon edge, not a real border, so it is never drawn.
 function isAntimeridianCut(a, b) {
@@ -664,13 +686,24 @@ export class MapEngine {
       const childCountBefore = group.children.length;
       const meshPolygons = [];
 
+      // Desempenho: as partes do país (ilhas, exclaves) viram uma malha só,
+      // um desenho por país em vez de um por parte.
+      const pieces = [];
       for (const polygon of polygons) {
         const mesh = polygonToMesh(polygon, landMaterial, countryKey, continent);
         if (mesh) {
-          group.add(mesh);
-          this.raycastMeshes.push(mesh);
+          pieces.push(mesh.geometry);
           meshPolygons.push(polygon);
         }
+      }
+      if (pieces.length) {
+        const mesh = new THREE.Mesh(pieces.length === 1 ? pieces[0] : mergeLandGeometries(pieces), landMaterial);
+        mesh.userData.countryKey = countryKey;
+        mesh.userData.continent = continent;
+        mesh.renderOrder = 2;
+        mesh.updateMatrixWorld(true);
+        group.add(mesh);
+        this.raycastMeshes.push(mesh);
       }
 
       if (existing) {
@@ -770,6 +803,10 @@ export class MapEngine {
       collectTopologyArcIndexes(geometry.arcs, arcIndexes);
     }
 
+    // Desempenho: todos os arcos num único LineSegments (um desenho por quadro,
+    // em vez de ~600). Cada segmento é um par de pontos independente, então
+    // arcos diferentes continuam sem se ligar (a "ponte" falsa não volta).
+    const positions = [];
     for (const arcIndex of arcIndexes) {
       const rawLine = decodeTopologyArc(topology, arcIndex);
       const cleanLine = sanitizeOpenLine(rawLine);
@@ -779,12 +816,18 @@ export class MapEngine {
       const points = samples.map(([longitude, latitude]) => (
         latLngToCartesian(latitude, longitude, BORDER_RADIUS, GLOBE_YAW, GLOBE_ORIGIN)
       ));
-      if (points.length < 2) continue;
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(geometry, this.globalBorderMaterial);
-      line.renderOrder = 4;
-      this.globalBorderGroup.add(line);
+      for (let index = 0; index + 1 < points.length; index += 1) {
+        const a = points[index];
+        const b = points[index + 1];
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
     }
+    if (!positions.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const lines = new THREE.LineSegments(geometry, this.globalBorderMaterial);
+    lines.renderOrder = 4;
+    this.globalBorderGroup.add(lines);
   }
 
   // ---------- Teclado ----------
