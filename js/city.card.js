@@ -37,7 +37,7 @@ function coordinate(value, positive, negative) {
  * @param {() => void} deps.onClose
  * @param {object} [deps.saved]   { isSaved(city) → boolean, toggle(city, countryKey) → boolean }
  */
-export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, onShare = null, saved = null }) {
+export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, onShare = null, partnerLinks = null, saved = null }) {
   const byAlpha2 = new Map(Object.entries(countries).map(([key, country]) => [country.alpha2, key]));
   let current = null;
   let clock = 0;
@@ -75,6 +75,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
         ${countryKey ? `<button class="secondary-button" type="button" data-city-action="country">Guia de ${escapeHtml(country.namePt)}</button>
         <button class="primary-button" type="button" data-city-action="plan">Planejar viagem para ${escapeHtml(city.name)}</button>` : ''}
       </div>
+      ${partnerLinks ? partnerLinks(city) : ''}
       <p class="city-card__source">Dados: GeoNames (CC BY 4.0)</p>`;
     root.dataset.countryKey = countryKey ?? '';
     syncSave();

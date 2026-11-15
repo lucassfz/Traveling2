@@ -672,6 +672,40 @@ function renderCulture(country) {
 
 // A História vem de js/history.loader.js. Até carregar, a aba mostra um aviso;
 // o carregamento começa quando a aba abre (ou antes, com o navegador ocioso).
+// Links de parceiros no guia do país, com o preço de passagem visto
+// recentemente (São Paulo → país, próximo mês) quando o backend responde.
+const PARTNER_NOTE = '<small class="partner-note">Links de parceiro: o Traveling pode receber comissão, sem custo extra para você. <a href="parceiros.html" target="_blank" rel="noopener">Saiba mais</a></small>';
+function renderCountryPartners(country) {
+  const slot = document.getElementById('country-partners');
+  if (!slot) return;
+  import('./planner/partners.section.js').then(({ PARTNERS, klookUrl }) => {
+    if (state.countryKey !== country.key) return;
+    const link = (url, label) => `<a class="partner-link" href="${escapeHtml(url)}" target="_blank" rel="noopener sponsored">${escapeHtml(label)} ↗</a>`;
+    slot.innerHTML = `
+      <div class="section-heading">Planeje com parceiros</div>
+      <p class="partner-price" data-partner-price hidden></p>
+      <div class="partner-links">
+        ${link(PARTNERS.aviasales.home, 'Comparar passagens no Aviasales')}
+        ${link(klookUrl(country.namePt), `Passeios em ${country.namePt} no Klook`)}
+        ${link(PARTNERS.yesim.home, 'eSIM no Yesim')}
+      </div>
+      ${PARTNER_NOTE}`;
+    if (!country.airport || country.airport === 'GRU') return;
+    import('./api/prices.client.js').then(({ cheapestFlight }) => {
+      const next = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+      const month = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+      return cheapestFlight({ origin: 'GRU', destination: country.airport, departure: month, return: month });
+    }).then(offer => {
+      const target = slot.querySelector('[data-partner-price]');
+      if (!offer || !target || state.countryKey !== country.key) return;
+      const price = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(offer.price.amount));
+      const month = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(new Date(offer.departureAt ?? Date.now()));
+      target.innerHTML = `Passagem São Paulo → ${escapeHtml(country.namePt)}: <strong>a partir de ${escapeHtml(price)}</strong> ida e volta em ${escapeHtml(month)}, por pessoa. ${provenanceLabel('cached', { tag: 'span', detail: 'visto por outros viajantes; pode ter mudado' })} <a href="${escapeHtml(offer.url)}" target="_blank" rel="noopener sponsored">Ver no Aviasales ↗</a>`;
+      target.hidden = false;
+    }).catch(() => {});
+  }).catch(() => {});
+}
+
 function renderCountryHistory(countryKey, country) {
   const catalog = historyCatalogIfLoaded();
   if (!catalog) {
@@ -724,6 +758,7 @@ function renderCountry(countryKey) {
   renderMonths(country);
   renderCulture(country);
   renderCountryHistory(countryKey, country);
+  renderCountryPartners(country);
   elements.countryExploreStatus.textContent = '';
   primeDestinationAirport(countryKey);
   elements.panel.classList.add('country-panel--open');
@@ -744,6 +779,7 @@ function selectCity(city, { fly = false } = {}) {
     onPlan: (countryKey, city) => planTrip(countryKey, { city }),
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => closeCityCard(),
+    partnerLinks: city => cityPartnerLinks(city),
     onShare: (city, button) => shareFrom(button, { title: `${city.name} no Traveling`, text: `Olha ${city.name} no globo do Traveling`, hash: cityHash(city) }),
     saved: {
       isSaved: city => Boolean(savedEntryForCity(city, COUNTRY_BY_ALPHA2.get(city.country))),
@@ -756,6 +792,16 @@ function selectCity(city, { fly = false } = {}) {
   state.map?.selectCity(city, { fly });
   cityCard.show(city);
   setHash(cityHash(city));
+}
+
+// Links de parceiros no cartão da cidade (passeios na cidade e passagens).
+let partnersModule = null;
+import('./planner/partners.section.js').then(module => { partnersModule = module; }).catch(() => {});
+function cityPartnerLinks(city) {
+  if (!partnersModule) return '';
+  const { PARTNERS, klookUrl } = partnersModule;
+  const link = (url, label) => `<a class="partner-link" href="${escapeHtml(url)}" target="_blank" rel="noopener sponsored">${escapeHtml(label)} ↗</a>`;
+  return `<div class="partner-links">${link(klookUrl(city.name), `Passeios em ${city.name}`)}${link(PARTNERS.aviasales.home, 'Passagens')}</div>${PARTNER_NOTE}`;
 }
 
 // Compartilhar: menu do sistema no celular, senão copia o link. O botão mostra
