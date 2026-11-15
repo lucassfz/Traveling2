@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Parceiros e links de afiliado do Traveling: como funcionam e o que muda para você.">
+  <title>Parceiros — Traveling</title>
+  <script>
+    try {
+      var savedTheme = localStorage.getItem('traveling.theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+    } catch (error) { /* armazenamento bloqueado: tema escuro */ }
+  </script>
+  <!-- Travelpayouts (programa de afiliados). Fica SÓ nesta página: o script
+       altera funções do navegador e carrega código remoto, então não entra
+       no site principal (globo, Planner), que usa links de afiliado simples. -->
+  <script data-cfasync="false" data-cmp-ab="2">
+    (function () {
+      var script = document.createElement('script');
+      script.async = 1;
+      script.setAttribute('data-cmp-ab', '2');
+      script.src = 'https://tpembars.com/NjAxNDM5.js?t=601439';
+      document.head.appendChild(script);
+    })();
+  </script>
+  <style>
+    :root { color-scheme: dark; --bg: #05070c; --surface: #0d121c; --text: #e8edf3; --muted: #9aa8b8; --accent: #7cc9f5; --border: rgba(255, 255, 255, .1); }
+    [data-theme='light'] { color-scheme: light; --bg: #eef1f3; --surface: #ffffff; --text: #0b1220; --muted: #5f6f82; --accent: #0a6fa8; --border: #d3dbe1; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    a { color: var(--accent); }
+    .back { display: inline-block; margin-bottom: 24px; font-size: .9rem; text-decoration: none; }
+    h1 { margin: 0 0 4px; font: 600 2rem/1.2 'Playfair Display', Georgia, serif; }
+    .updated { margin: 0 0 32px; color: var(--muted); font-size: .85rem; }
+    h2 { margin: 32px 0 8px; font-size: 1.15rem; }
+    .note { padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./">← Voltar ao Traveling</a>
+    <h1>Parceiros</h1>
+    <p class="updated">Atualizado em 15/11/2026</p>
+
+    <p class="note">Alguns links para reservar hotéis e passagens são <strong>links de afiliado</strong>. Se você reservar por eles, o Traveling pode receber uma comissão do parceiro, <strong>sem custo extra para você</strong>. O preço é o mesmo que no site do parceiro.</p>
+
+    <h2>Quem são os parceiros</h2>
+    <p>Os links de afiliado passam pela <a href="https://www.travelpayouts.com/" rel="noopener">Travelpayouts</a>, uma rede de programas de afiliados de viagem (por exemplo, Booking.com). A reserva, o pagamento e o atendimento são feitos pelo parceiro, nunca pelo Traveling.</p>
+
+    <h2>O que não muda</h2>
+    <ul>
+      <li>A comissão não muda a ordem dos resultados nem as estimativas do Traveling.</li>
+      <li>O Traveling não recebe nem guarda dados de pagamento.</li>
+      <li>Seus planos continuam salvos só no seu navegador.</li>
+    </ul>
+
+    <h2>Nesta página</h2>
+    <p>Esta página carrega um script da Travelpayouts usado para confirmar o site no programa de afiliados. Ele não é carregado no globo nem no Planner. Mais detalhes na página de <a href="privacidade.html">privacidade</a>.</p>
+  </main>
+</body>
+</html>
