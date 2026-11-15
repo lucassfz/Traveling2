@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { geographicToCartesian } from './geospatial.js';
+import { inFlatRing, inFlatShape, nearestRegion, shapesBox } from './map.pick.js';
 
 // Camada "aproxime para ver mais". Mostra estados, cidades e contornos urbanos
 // de UM país por vez, o país em foco:
@@ -29,7 +30,10 @@ const URBAN_PREFETCH = 1.8;    // pede o arquivo de contornos um pouco antes
 const MIN_HIT_PX = 12;
 const LINE_RADIUS = 1.0105;
 const POINT_RADIUS = 1.0095;   // pontos e rótulos usam o mesmo raio: nome centrado no ponto
-const URBAN_RADIUS = 1.0098;
+// Raio das formas de cidade (contornos urbanos, regiões, destaques). O clique é
+// calculado nesta mesma esfera: sem isso, a área clicável fica deslocada da
+// desenhada (paralaxe), muito perto das bordas da tela.
+export const URBAN_RADIUS = 1.0098;
 const CACHE_SIZE = 6;
 const PICK_RADIUS_PX = 11;
 // [distância máxima, população mínima com nome]; capitais têm faixa própria.
@@ -115,16 +119,6 @@ function fillGeometry(shapes, radius) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   return geometry;
-}
-
-function inFlatRing(ring, lng, lat) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
-    const xi = ring[i]; const yi = ring[i + 1];
-    const xj = ring[j]; const yj = ring[j + 1];
-    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
 }
 
 export class AdminLayer {
@@ -359,7 +353,7 @@ export class AdminLayer {
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       record.urban = this.#add(record, new THREE.LineSegments(geometry, this.urbanMaterial));
       record.urban.renderOrder = 4.3;
-      // Áreas para o clique: caixa + anéis, das menores para as maiores.
+      // Áreas para o clique: caixa + anéis (com sobreposição, vale a cidade mais próxima; ver pick).
       record.areas = [...record.outlines].map(([index, rings]) => {
         const box = [Infinity, Infinity, -Infinity, -Infinity];
         for (const ring of rings) {
@@ -429,10 +423,13 @@ export class AdminLayer {
     const color = style.getPropertyValue(onSelectedCountry ? '--color-background' : '--color-accent').trim() || '#7cc9f5';
     line.color.set(color);
     fillMaterial.color.set(color);
-    this.#fadeTo(fillMaterial, selected ? (onSelectedCountry ? 0.3 : 0.2) : (onSelectedCountry ? 0.16 : 0.1));
-    this.#fadeTo(line, selected ? 1 : 0.85);
+    // Acende a partir do transparente. A ordem importa: com "reduzir movimento",
+    // #fadeTo já aplica a opacidade final, que não pode ser zerada depois (era o
+    // que deixava a área da cidade invisível nesses navegadores).
     fillMaterial.opacity = 0;
     line.opacity = 0;
+    this.#fadeTo(fillMaterial, selected ? (onSelectedCountry ? 0.3 : 0.2) : (onSelectedCountry ? 0.16 : 0.1));
+    this.#fadeTo(line, selected ? 1 : 0.85);
     const entry = this.#shapeGeometries(key, shapes);
     entry.users += 1;
     const objects = entry.lines.map(geometry => {
@@ -447,15 +444,14 @@ export class AdminLayer {
     this.highlights[slot] = { city, key, entry, objects, onSelected: onSelectedCountry };
   }
 
-  // Começa transparente e aproxima a opacidade alvo a cada quadro.
+  // Aproxima a opacidade do alvo a cada quadro; com "reduzir movimento", aplica na hora.
   #fadeTo(material, to) {
     if (this.reducedMotion.matches) {
       material.opacity = to;
       this.fades.delete(material);
+      this.invalidate();
       return;
     }
-    if (!this.fades.has(material) && !(material.userData.faded)) material.opacity = 0;
-    material.userData.faded = true;
     this.fades.set(material, { to });
     this.invalidate();
   }
@@ -479,14 +475,7 @@ export class AdminLayer {
     record.regionStatus = 'loading';
     fetchJson(regionUrl(record.code)).then(data => {
       record.regionAreas = data.areas.map(([name, seat, ...polygons]) => {
-        const box = [Infinity, Infinity, -Infinity, -Infinity];
-        for (const polygon of polygons) {
-          const ring = polygon[0];
-          for (let i = 0; i < ring.length; i += 2) {
-            box[0] = Math.min(box[0], ring[i]); box[2] = Math.max(box[2], ring[i]);
-            box[1] = Math.min(box[1], ring[i + 1]); box[3] = Math.max(box[3], ring[i + 1]);
-          }
-        }
+        const box = shapesBox(polygons);
         return { name, city: record.cities[seat] ?? null, polygons, box, size: (box[2] - box[0]) * (box[3] - box[1]) };
       }).sort((a, b) => a.size - b.size);
       record.regionStatus = 'ready';
@@ -691,15 +680,20 @@ export class AdminLayer {
 
   /**
    * Cidade sob o ponteiro (x, y relativos ao palco), ou null. Ordem:
-   *   1. nome visível (nome de estado → cidade principal da região);
-   *   2. mancha urbana que contém o ponto;
+   *   1. nome de cidade visível;
+   *   2. mancha urbana que contém o ponto (com sobreposição, a da cidade mais próxima);
    *   3. alvo circular de cidades visíveis sem mancha;
    *   4. região que contém o ponto → cidade principal dela (a região inteira é a
-   *      área clicável), ou a cidade mais próxima se a região não tem cidade.
+   *      área clicável), ou a cidade mais próxima se a região não tem cidade;
+   *      fora de toda região, um nome de estado sob o ponteiro vale pela região;
+   *   5. ponto do país fora de toda região (litoral, fronteira) → região mais
+   *      próxima; país sem regiões → cidade mais próxima.
    * `lastPick.region` diz se a cidade veio pela região (para destacar a área certa).
    * @param {() => {lat: number, lng: number}|null} surfacePoint  Calculado só se preciso.
+   * @param {() => string|null} [countryUnder] ISO2 do país desenhado sob o ponteiro
+   *   (o mesmo teste do clique em países); só é chamado no passo 5.
    */
-  pick(x, y, surfacePoint = () => null) {
+  pick(x, y, surfacePoint = () => null, countryUnder = null) {
     this.lastPick = null;
     const record = this.focus;
     if (!record || record.status !== 'ready') return null;
@@ -709,23 +703,40 @@ export class AdminLayer {
       this.lastPick = { city, region };
       return city;
     };
+    // Nome de cidade: escolhe a cidade. Nome de estado: só vale onde não há área
+    // (sobre o mar, por exemplo). O nome é largo e invade o estado vizinho, e
+    // some quando outro nome ocupa o lugar (o da cidade sob o ponteiro): se
+    // valesse antes da área, o mesmo ponto mudaria de cidade entre o hover e o
+    // clique. Assim, o que decide é a área, igual ao destaque.
+    let stateLabel = null;
     for (let index = this.placed.length - 1; index >= 0; index -= 1) {
       const { item, box } = this.placed[index];
       if (x < box[0] - 3 || x > box[2] + 3 || y < box[1] - 3 || y > box[3] + 3) continue;
       if (item.kind === 'city') return found(item);
-      const region = regionOf(item.name);
-      if (region?.city) return found(region.city, region);
+      stateLabel ??= regionOf(item.name);
     }
 
     let point;
     const surface = () => (point === undefined ? (point = surfacePoint()) : point);
-    const inShape = (shape, lng, lat) => inFlatRing(shape[0], lng, lat) && !shape.slice(1).some(hole => inFlatRing(hole, lng, lat));
     const inBox = (box, at) => at.lng >= box[0] && at.lng <= box[2] && at.lat >= box[1] && at.lat <= box[3];
 
     if (record.areas && surface()) {
+      // Mais de uma mancha no ponto (fontes sobrepostas, ou a cidade vizinha
+      // dentro da mancha da maior): vale a da cidade mais próxima do ponto. Uma
+      // cidade pequena dentro da metrópole continua com a sua área, e a mancha
+      // larga de uma vizinha não toma o centro da cidade grande.
+      const scale = Math.cos(THREE.MathUtils.degToRad(point.lat));
+      let nearest = null;
+      let nearestDistance = Infinity;
       for (const area of record.areas) {
-        if (inBox(area.box, point) && area.rings.some(ring => inFlatRing(ring, point.lng, point.lat))) return found(area.city);
+        if (!inBox(area.box, point) || !area.rings.some(ring => inFlatRing(ring, point.lng, point.lat))) continue;
+        const distance = ((area.city.lng - point.lng) * scale) ** 2 + (area.city.lat - point.lat) ** 2;
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearest = area;
+        }
       }
+      if (nearest) return found(nearest.city);
     }
 
     const minimum = tierPopulation(DOT_TIERS, this.distance);
@@ -744,13 +755,25 @@ export class AdminLayer {
     }
     if (best) return found(best);
 
+    const regionCity = region => (region.city ? found(region.city, region) : found(this.#nearestCity(record, point.lat, point.lng)));
     if (record.regionAreas && surface()) {
       for (const region of record.regionAreas) {
-        if (!inBox(region.box, point) || !region.polygons.some(shape => inShape(shape, point.lng, point.lat))) continue;
-        return region.city ? found(region.city, region) : found(this.#nearestCity(record, point.lat, point.lng));
+        if (inBox(region.box, point) && region.polygons.some(shape => inFlatShape(shape, point.lng, point.lat))) return regionCity(region);
       }
     }
-    return null;
+    if (stateLabel?.city) return found(stateLabel.city, stateLabel);
+
+    // 5. Borda do país: o contorno do globo (world-atlas 1:110m) é mais grosseiro
+    //    que o das regiões (Natural Earth 1:10m), e sobram faixas no litoral e nas
+    //    fronteiras fora de qualquer região. Ponto dentro do país fica com a
+    //    região mais próxima; país sem regiões, com a cidade mais próxima. Assim
+    //    todo ponto do país escolhido pertence a uma cidade. O mar, não.
+    const waiting = !record.regionStatus || record.regionStatus === 'loading';
+    if (waiting || !surface()) return null;
+    const under = countryUnder ? countryUnder() : this.countryAt(point.lat, point.lng);
+    if (under !== record.code) return null;
+    const nearest = record.regionAreas?.length ? nearestRegion(record.regionAreas, point) : null;
+    return nearest ? regionCity(nearest) : found(this.#nearestCity(record, point.lat, point.lng));
   }
 
   hide() {

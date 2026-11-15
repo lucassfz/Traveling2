@@ -17,7 +17,7 @@ import {
 import { atlasFeatureParts } from './map.topology.js';
 import { routePoint } from './flight.route.js';
 import { FlightVisualization } from './flight.visualization.js';
-import { AdminLayer } from './map.admin.layer.js';
+import { AdminLayer, URBAN_RADIUS } from './map.admin.layer.js';
 
 // Versões exatas: uma faixa (@2, @3) pode mudar a geometria ou a API sem aviso.
 const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
@@ -64,6 +64,18 @@ function latLngToCartesian(latitude, longitude, radius = 1, yaw = 0, origin = ne
   const vector = new THREE.Vector3(raw.x, raw.y, raw.z);
   if (yaw !== 0) vector.applyAxisAngle(THREE.Object3D.DEFAULT_UP, yaw);
   return vector.add(origin);
+}
+
+/** Primeiro ponto em que o raio toca a esfera (lado de frente), ou null. */
+export function rayHitsSphere(ray, center, radius) {
+  const offset = ray.origin.clone().sub(center);
+  const b = offset.dot(ray.direction);
+  const c = offset.lengthSq() - radius * radius;
+  const disc = b * b - c;
+  if (disc < 0) return null;
+  const root = Math.sqrt(disc);
+  const t = -b - root >= 0 ? -b - root : -b + root;
+  return t >= 0 ? ray.origin.clone().addScaledVector(ray.direction, t) : null;
 }
 
 function cartesianToLatLng(worldPoint, yaw = 0, origin = new THREE.Vector3()) {
@@ -779,6 +791,8 @@ export class MapEngine {
       if (this.cameraFlight || this.routePreview) return;
       // Cidades e estados (quando visíveis) têm prioridade sobre o país embaixo.
       const place = this.pickPlace(clientX, clientY);
+      // Guardado para o clique: no mesmo ponto, vale o que o destaque mostra.
+      this.hoverPick = place ? { x: clientX, y: clientY, place, pick: this.adminLayer.lastPick, camera: this.camera.position.clone() } : null;
       this.adminLayer.setHovered(place);
       if (place) {
         this.#setHovered(null);
@@ -812,6 +826,7 @@ export class MapEngine {
 
     this.renderer.domElement.addEventListener('pointerleave', () => {
       this.onPointerMove.cancel();
+      this.hoverPick = null;
       this.#setHovered(null);
       this.adminLayer.setHovered(null);
       this.stage.classList.remove('globe__stage--interactive');
@@ -837,7 +852,16 @@ export class MapEngine {
       const duration = performance.now() - this.pointerDown.startedAt;
       this.pointerDown = null;
       if (travel > 7 || duration > 650) return;
-      const place = this.pickPlace(event.clientX, event.clientY);
+      // Clique no ponto do último hover, com a câmera parada: escolhe exatamente
+      // a cidade (e a área) destacada. Senão (toque, ou a vista mudou), calcula.
+      const hover = this.hoverPick;
+      const sameSpot = hover && Math.hypot(hover.x - event.clientX, hover.y - event.clientY) <= 2
+        && hover.camera.distanceToSquared(this.camera.position) < 1e-12;
+      let place;
+      if (sameSpot) {
+        place = hover.place;
+        this.adminLayer.lastPick = hover.pick;
+      } else place = this.pickPlace(event.clientX, event.clientY);
       if (place?.kind === 'city') {
         this.callbacks.onCitySelect?.(place);
         return;
@@ -1140,17 +1164,24 @@ export class MapEngine {
   pickPlace(clientX, clientY) {
     if (!this.ready) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
-    return this.adminLayer.pick(clientX - rect.left, clientY - rect.top, () => this.#surfacePoint(clientX, clientY));
+    return this.adminLayer.pick(
+      clientX - rect.left, clientY - rect.top,
+      () => this.#surfacePoint(clientX, clientY),
+      // País desenhado sob o ponteiro: decide se um ponto da borda ainda é do país.
+      () => COUNTRIES[this.pickCountry(clientX, clientY)]?.alpha2 ?? null
+    );
   }
 
-  // Latitude/longitude do ponto da superfície sob o ponteiro (só o lado visível).
+  // Latitude/longitude sob o ponteiro (só o lado visível), na esfera onde as
+  // formas das cidades são desenhadas (URBAN_RADIUS), e não na do oceano: o
+  // ponto clicado é exatamente o ponto desenhado sob o cursor, até nas bordas.
   #surfacePoint(clientX, clientY) {
     this.#pointerToNdc(clientX, clientY);
     this.camera.updateMatrixWorld(true);
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const hit = this.raycaster.intersectObject(this.ocean, false)[0];
-    if (!hit) return null;
-    const { latitude, longitude } = cartesianToLatLng(hit.point, GLOBE_YAW, GLOBE_ORIGIN);
+    const point = rayHitsSphere(this.raycaster.ray, GLOBE_ORIGIN, URBAN_RADIUS);
+    if (!point) return null;
+    const { latitude, longitude } = cartesianToLatLng(point, GLOBE_YAW, GLOBE_ORIGIN);
     return { lat: latitude, lng: longitude };
   }
 

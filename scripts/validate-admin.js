@@ -2,6 +2,8 @@
 // o globo). Confere o índice, o formato de cada país e os limites de tamanho.
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
+import { reseatCountry } from './admin-seats.js';
+import { fixCountryUrban } from './admin-urban.js';
 
 const dir = new URL('../data/admin/', import.meta.url);
 const index = JSON.parse(await readFile(new URL('index.json', dir), 'utf8'));
@@ -81,6 +83,10 @@ for (const file of files) {
   if (regionFiles.has(file)) {
     const regionData = JSON.parse(await readFile(new URL(file, regionDir), 'utf8'));
     assert.equal(regionData.country, code, `regions/${file}: country`);
+    // A cidade principal é a de maior prioridade da região (capital primeiro), também
+    // quando o ponto dela cai fora do contorno (ilhas, litoral): ver scripts/admin-seats.js.
+    const { changes } = reseatCountry(data, regionData);
+    assert.deepEqual(changes, [], `regions/${file}: cidade principal fora da regra (${changes.map(change => `${change.region}: ${change.from} → ${change.to}`).join('; ')})`);
     for (const [name, seat, ...polygons] of regionData.areas) {
       assert.ok(typeof name === 'string' && name.trim(), `regions/${file}: região sem nome`);
       assert.ok(seat === -1 || (Number.isInteger(seat) && seat < data.cities.length), `regions/${file}: cidade principal de ${name}`);
@@ -98,6 +104,38 @@ for (const file of files) {
   divisions += data.divisions.length;
   cities += data.cities.length;
 }
+// Cada contorno urbano pertence à maior cidade dentro dele (scripts/admin-urban.js):
+// senão a mancha de uma cidade pequena rouba o clique da cidade grande.
+for (const file of urbanFiles) {
+  const admin = JSON.parse(await readFile(new URL(file, dir), 'utf8'));
+  const urban = JSON.parse(await readFile(new URL(file, urbanDir), 'utf8'));
+  const { changes } = fixCountryUrban(admin, urban);
+  assert.deepEqual(changes, [], `urban/${file}: contorno com dono errado (${changes.map(change => `${admin.cities[change.from][0]} → ${change.to === null ? 'duplicado' : admin.cities[change.to][0]}`).join('; ')})`);
+}
 assert.ok(largest < 400_000, 'nenhum país passa de 400 KB');
 assert.ok(largestUrban < 1_500_000, 'nenhum arquivo de contornos passa de 1,5 MB');
 console.log(`Admin: ${files.length} países, ${divisions} divisões, ${cities} cidades (${outlines} com contorno urbano), ${regionAreas} regiões (${regionSeats} com cidade principal); maior arquivo ${(largest / 1024).toFixed(0)} KB, maior contorno ${(largestUrban / 1024).toFixed(0)} KB.`);
+
+// Clique por região (js/map.pick.js) com os dados reais do Brasil: ponto dentro
+// do estado, enclave (Distrito Federal dentro de Goiás), faixa de litoral fora de
+// toda região (vai para a região mais próxima) e cidade principal das capitais
+// em ilha ou no litoral.
+{
+  const { inFlatShape, nearestRegion, shapesBox } = await import('../js/map.pick.js');
+  const admin = JSON.parse(await readFile(new URL('BR.json', dir), 'utf8'));
+  const areas = JSON.parse(await readFile(new URL('BR.json', regionDir), 'utf8')).areas
+    .map(([name, seat, ...polygons]) => ({ name, seat: admin.cities[seat]?.[0] ?? null, polygons, box: shapesBox(polygons) }));
+  const containing = (lat, lng) => areas.filter(area => area.polygons.some(shape => inFlatShape(shape, lng, lat))).map(area => area.name);
+  assert.deepEqual(containing(-3.12, -60.02), ['Amazonas'], 'Manaus fica no Amazonas');
+  assert.deepEqual(containing(-15.79, -47.88), ['Distrito Federal'], 'Brasília: o buraco de Goiás não conta como Goiás');
+  assert.deepEqual(containing(-27.62, -48.3), [], 'mar a leste de Florianópolis não está em nenhuma região');
+  assert.equal(nearestRegion(areas, { lat: -27.62, lng: -48.3 }).name, 'Santa Catarina', 'litoral fora do contorno vai para a região mais próxima');
+  assert.equal(nearestRegion(areas, { lat: -3.12, lng: -60.02 }).name, 'Amazonas');
+  const seat = name => areas.find(area => area.name === name).seat;
+  assert.equal(seat('Santa Catarina'), 'Florianópolis');
+  assert.equal(seat('Pará'), 'Belém');
+  assert.equal(seat('Maranhão'), 'São Luís');
+  assert.equal(seat('Espírito Santo'), 'Vitória');
+  assert.equal(seat('São Paulo'), 'São Paulo');
+  console.log('Admin: clique por região (contém, enclave, litoral → região mais próxima) e capitais em ilha verificados.');
+}

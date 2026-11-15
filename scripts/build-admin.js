@@ -17,6 +17,8 @@
 // (uma única entrada deflate) feitas aqui mesmo.
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { inflateRawSync } from 'node:zlib';
+import { regionSeat, uniqueNames } from './admin-seats.js';
+import { urbanOwners } from './admin-urban.js';
 
 const NE_COMMIT = 'ca96624a56bd078437bca8184e78163e5039ad19';
 const ADMIN1_URL = `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/${NE_COMMIT}/geojson/ne_10m_admin_1_states_provinces.geojson`;
@@ -387,7 +389,7 @@ async function main() {
     ]);
 
     // Contorno urbano: cada mancha pertence à maior cidade dentro dela.
-    const outlines = [];
+    let outlines = [];
     raw.map((city, position) => ({ city, position }))
       .sort((a, b) => b.city.population - a.city.population)
       .forEach(({ city, position }) => {
@@ -399,22 +401,32 @@ async function main() {
         places[position][7] = 1;
         outlines.push([position, ...rings]);
       });
+    // As duas fontes se sobrepõem: a mancha que contém uma cidade maior que a
+    // dona vai para ela, ou é descartada se ela já tem a sua (scripts/admin-urban.js).
+    outlines = urbanOwners(raw, outlines).outlines;
+    for (const place of places) place[7] = 0;
+    for (const [position] of outlines) places[position][7] = 1;
     outlined += outlines.length;
 
     // Regiões: polígonos (anel externo + buracos) e a cidade principal de cada
-    // uma — capital, senão sede regional, senão a maior cidade dentro dela.
+    // uma — capital, senão sede regional, senão a maior cidade da região (pelo
+    // nome da região da cidade ou dentro do polígono; ver scripts/admin-seats.js).
     const areas = [];
     if (features.length > 1) {
       const inPolygon = (polygon, lng, lat) => inRing(polygon[0], lng, lat) && !polygon.slice(1).some(hole => inRing(hole, lng, lat));
+      const unique = uniqueNames(features.map(feature => divisionName(feature.properties)).filter(Boolean));
+      const regionName = new Map(raw.map((city, position) => [city, regions[places[position][6]] ?? null]));
       for (const feature of features) {
         const name = divisionName(feature.properties);
         const polygons = polygonsOf(feature.geometry);
         if (!name || !polygons.length) continue;
         const boxes = polygons.map(polygon => ringBox(polygon[0]));
-        let seat = -1;
-        raw.forEach((city, position) => {
-          if (!polygons.some((polygon, index) => inBox(boxes[index], city.lng, city.lat) && inPolygon(polygon, city.lng, city.lat))) return;
-          if (seat < 0) seat = position; // raw já está em ordem: capital, sedes, população
+        // raw já está em ordem: capital, sedes, população.
+        const seat = regionSeat(raw, {
+          name,
+          unique: unique.has(name),
+          regionOf: city => regionName.get(city),
+          inside: city => polygons.some((polygon, index) => inBox(boxes[index], city.lng, city.lat) && inPolygon(polygon, city.lng, city.lat))
         });
         const shapes = polygons
           .map(polygon => polygon.map(ring => flatLine(simplify(ring, REGION_TOLERANCE))).filter(ring => ring && ring.length >= 8))
