@@ -14,6 +14,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { COUNTRIES, CONTINENT_LABELS } from '../js/countries.dataset.js';
 import { COUNTRY_PAGES_DIR, countrySlug } from '../js/country.slug.js';
+import { PARTNERS, klookUrl } from '../js/planner/partners.section.js';
 
 // Endereço público do site. Ao trocar de domínio, mude aqui e rode o gerador.
 export const SITE_URL = 'https://lucassfz.github.io/Traveling2/';
@@ -87,6 +88,8 @@ const STYLE = `
     .places div { padding: 10px 12px 12px; }
     .places strong { display: block; }
     .foods { padding-left: 18px; }
+    .partners { display: grid; gap: 8px; padding: 0; list-style: none; }
+    .partners a { display: block; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); text-decoration: none; font-weight: 600; }
     .list { columns: 2 180px; padding-left: 18px; }
     footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: .85rem; }`;
 
@@ -198,6 +201,14 @@ ${landmarks.map(item => `      <li>
 ${foods.map(food => `      <li><strong>${escapeHtml(food.name)}</strong>${food.desc ? `: ${escapeHtml(plain(food.desc))}` : ''}</li>`).join('\n')}
     </ul>
 ` : ''}
+    <h2>Planeje com parceiros</h2>
+    <ul class="partners">
+      <li><a href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Comparar passagens no Aviasales ↗</a></li>
+      <li><a href="${escapeHtml(klookUrl(country.namePt))}" rel="noopener sponsored">Passeios em ${escapeHtml(country.namePt)} no Klook ↗</a></li>
+      <li><a href="${escapeHtml(PARTNERS.yesim.home)}" rel="noopener sponsored">Internet no destino: eSIM no Yesim ↗</a></li>
+    </ul>
+    <p class="muted"><small>Links de parceiro: o Traveling pode receber comissão, sem custo extra para você. <a href="../../parceiros.html">Saiba mais</a></small></p>
+
     <a class="cta" href="${globe}">Ver ${escapeHtml(country.namePt)} no globo e planejar a viagem</a>
 
     <footer>
