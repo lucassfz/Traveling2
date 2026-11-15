@@ -1307,7 +1307,7 @@ function ensurePlanner() {
         // Hospedagem (fase 3.4): link do Booking.com sempre; busca com preços só com o backend ligado.
         ...createLiveHotelsSection({ getRates }),
         // Links de parceiros (Aviasales, aluguel de carro, passes, eSIM), sem script.
-        ...createPartnerSections({ routes }),
+        ...createPartnerSections({ routes, countryName: key => COUNTRIES[key]?.namePt ?? null }),
         createPrepSection({ countries: COUNTRIES }),
         // Resumo: quanto vai custar (estimativas, cotações anexadas e gastos anotados).
         createCostSection({ routes, getRates, getFx: () => state.brlPerUsd })

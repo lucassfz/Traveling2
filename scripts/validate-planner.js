@@ -484,5 +484,11 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(aviasalesUrl(trip, { origin: 'GRU', destination: 'GRU' }), PARTNERS.aviasales.home);
   assert.equal(aviasalesUrl(trip, {}), PARTNERS.aviasales.home);
   assert.ok(Object.values(PARTNERS).every(partner => partner.home.startsWith('https://')));
-  console.log('Planner: links de parceiros (Aviasales preenchido) verificados.');
+  const { klookUrl } = await import('../js/planner/partners.section.js');
+  const klook = new URL(klookUrl('São Paulo'));
+  assert.equal(klook.origin + klook.pathname, 'https://affiliate.klook.com/redirect');
+  assert.ok(klook.searchParams.get('aid').includes('806253'), 'marcador de parceiro');
+  assert.equal(new URL(klook.searchParams.get('k_site')).searchParams.get('query'), 'São Paulo', 'busca da cidade');
+  assert.equal(klookUrl(''), PARTNERS.klook.home);
+  console.log('Planner: links de parceiros (Aviasales e Klook preenchidos) verificados.');
 }

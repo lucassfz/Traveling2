@@ -13,7 +13,8 @@ export const PARTNERS = Object.freeze({
   aviasales: { name: 'Aviasales', home: 'https://aviasales.tpm.lv/YqesGlPB' },
   getrentacar: { name: 'GetRentacar', home: 'https://getrentacar.tpm.lv/nAFLYO3y' },
   yesim: { name: 'Yesim', home: 'https://yesim.tpm.lv/oOPtfYpz' },
-  gocity: { name: 'Go City', home: 'https://gocity.tpm.lv/AUS85rkb' }
+  gocity: { name: 'Go City', home: 'https://gocity.tpm.lv/AUS85rkb' },
+  klook: { name: 'Klook', home: 'https://klook.tpm.lv/cRw8FTug' }
 });
 
 const IATA = /^[A-Z]{3}$/;
@@ -38,6 +39,17 @@ export function aviasalesUrl(trip, { origin = null, destination = null } = {}) {
 
 const disclosure = '<small>Link de parceiro: o Traveling pode receber comissão, sem custo extra para você. <a href="parceiros.html" target="_blank" rel="noopener">Saiba mais</a></small>';
 
+// Klook: o link de parceiro aceita o destino em k_site, então abre a busca de
+// passeios da cidade (ou do país) da viagem.
+const KLOOK_AID = 'api|13694|06faab81c58f40e7a915a1d89-806253|pid|806253';
+
+export function klookUrl(place) {
+  const query = String(place ?? '').trim();
+  if (!query) return PARTNERS.klook.home;
+  const target = `https://www.klook.com/pt-BR/search/result/?query=${encodeURIComponent(query)}`;
+  return `https://affiliate.klook.com/redirect?aid=${encodeURIComponent(KLOOK_AID)}&k_site=${encodeURIComponent(target)}`;
+}
+
 function partnerLink(url, label) {
   return `<a class="secondary-button" href="${escapeHtml(url)}" target="_blank" rel="noopener sponsored">${escapeHtml(label)} ↗</a>`;
 }
@@ -47,7 +59,7 @@ function partnerLink(url, label) {
  * @param {object} deps.routes  createRouteEstimator compartilhado (aeroportos da viagem).
  * @returns {object[]} Seções { id, step, render, bind, refresh, slot }.
  */
-export function createPartnerSections({ routes }) {
+export function createPartnerSections({ routes, countryName = () => null }) {
   function flightHtml(trip) {
     const route = routes.get(trip);
     const ready = route?.status === 'ready';
@@ -80,10 +92,12 @@ export function createPartnerSections({ routes }) {
 
   function styleHtml(trip) {
     const car = trip.transport === 'car' || trip.transport === 'mixed';
+    const place = trip.city?.name || countryName(trip.countryKey);
     return `
       <h4 class="planner-block-title">Para a viagem</h4>
       <div class="partner-links">
         ${car ? partnerLink(PARTNERS.getrentacar.home, 'Alugar carro no GetRentacar') : ''}
+        ${partnerLink(klookUrl(place), place ? `Passeios em ${place} no Klook` : 'Passeios no Klook')}
         ${partnerLink(PARTNERS.gocity.home, 'Passes de atrações no Go City')}
       </div>
       <p class="live-hotel__external">${car ? '' : '<small>Escolheu carro alugado? O link de aluguel aparece aqui.</small>'}${disclosure}</p>`;
