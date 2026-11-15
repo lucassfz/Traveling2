@@ -8,7 +8,8 @@
 // (não commitar a meta apontando para localhost).
 //
 // Variáveis: PORT (padrão 8787), ALLOWED_ORIGINS (padrão: servidores locais comuns),
-// FLIGHT_PROVIDERS/HOTEL_PROVIDERS (padrão "mock"), DUFFEL_TOKEN (só se usar "duffel").
+// FLIGHT_PROVIDERS/HOTEL_PROVIDERS (padrão "mock"), DUFFEL_TOKEN (só se usar "duffel"),
+// TRAVELPAYOUTS_TOKEN (preços vistos recentemente em /flights/cheapest).
 import { createServer } from 'node:http';
 import { createApp } from '../backend/src/index.js';
 
@@ -18,7 +19,8 @@ const env = {
   FLIGHT_PROVIDERS: process.env.FLIGHT_PROVIDERS ?? 'mock',
   HOTEL_PROVIDERS: process.env.HOTEL_PROVIDERS ?? 'mock',
   RATE_PER_MINUTE: process.env.RATE_PER_MINUTE ?? '30',
-  ...(process.env.DUFFEL_TOKEN ? { DUFFEL_TOKEN: process.env.DUFFEL_TOKEN } : {})
+  ...(process.env.DUFFEL_TOKEN ? { DUFFEL_TOKEN: process.env.DUFFEL_TOKEN } : {}),
+  ...(process.env.TRAVELPAYOUTS_TOKEN ? { TRAVELPAYOUTS_TOKEN: process.env.TRAVELPAYOUTS_TOKEN } : {})
 };
 const app = createApp();
 

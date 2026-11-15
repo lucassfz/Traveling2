@@ -418,3 +418,28 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
   assert.equal(fallback.offers, offers, 'sem estrelas informadas, mostra todas');
   console.log('Backend: hospedagem no Planner (link Booking.com, ordenação, filtro pelo estilo) verificada.');
 }
+
+// Preços vistos recentemente (Travelpayouts Data API), com resposta sintética.
+{
+  const { cheapestFlights } = await import('../backend/src/providers/travelpayouts.prices.js');
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, token: init.headers['x-access-token'] });
+    return new Response(JSON.stringify({ data: [
+      { origin: 'SAO', destination: 'LIS', origin_airport: 'GRU', destination_airport: 'LIS', price: 4608, airline: 'TP', departure_at: '2027-04-03T22:00:00-03:00', return_at: '2027-04-10T12:00:00+01:00', transfers: 2, return_transfers: 1, duration: 1500, link: '/search/GRU0304LIS10041?search_date=13112026' },
+      { origin: 'SAO', destination: 'LIS', price: 3999, link: '/search/GRU0304LIS10041?search_date=12112026', transfers: 0 },
+      { price: 'x', link: '/search/x' },
+      { price: 100, link: 'https://evil.example/' }
+    ] }), { status: 200 });
+  };
+  const offers = await cheapestFlights({ origin: 'GRU', destination: 'LIS', departure: '2027-04-03', returnDate: '2027-04-10' }, { token: 'tok', marker: '806253', fetchImpl: fakeFetch });
+  assert.equal(calls[0].token, 'tok', 'token no cabeçalho');
+  assert.ok(!calls[0].url.includes('tok'), 'token fora da URL');
+  assert.equal(offers.length, 2, 'descarta preço inválido e link de outro domínio');
+  assert.equal(offers[0].price.amount, '3999.00', 'mais barato primeiro');
+  assert.equal(offers[1].foundOn, '2026-11-13');
+  assert.ok(offers[1].url.startsWith('https://www.aviasales.com/search/') && offers[1].url.endsWith('&marker=806253'));
+  assert.equal(offers[1].dataSource, 'cached');
+  await assert.rejects(cheapestFlights({ origin: 'GRU', destination: 'GRU', departure: '2027-04' }, { token: 'tok', fetchImpl: fakeFetch }));
+  console.log('Backend: preços vistos recentemente (Travelpayouts) verificados com resposta sintética.');
+}

@@ -18,6 +18,7 @@ import { API_VERSION, ApiError, LIMITS } from './contract.js';
 import { validateFlightSearch, validateHotelSearch } from './validate.js';
 import { checkFlightOffer, checkHotelOffer, checkHotelProperty, dedupeFlights, sortByPrice } from './models.js';
 import { allProviders, providersFor } from './providers/index.js';
+import { cheapestFlights } from './providers/travelpayouts.prices.js';
 import { CircuitBreaker, ProviderMetrics, RateLimiter, TtlCache, cacheKey, withTimeout } from './reliability.js';
 
 const TTL = Object.freeze({ live: 5 * 60_000, cached: 60 * 60_000, test: 5 * 60_000 });
@@ -200,6 +201,28 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
         searchEnabled: env.SEARCH_ENABLED !== 'false',
         providers: allProviders(env).map(provider => ({ id: provider.id, kind: provider.kind, mode: provider.mode, dataSource: provider.dataSource, status: breaker.status(`${provider.kind}:${provider.id}`, time), recent: metrics.snapshot(`${provider.kind}:${provider.id}`) }))
       });
+    }
+    // Menores preços vistos recentemente (Travelpayouts Data API), por rota e
+    // período. GET ?origin=GRU&destination=LIS&departure=2027-04[&return=2027-04].
+    if (url.pathname === `${base}/flights/cheapest`) {
+      if (request.method !== 'GET') throw new ApiError('METHOD_NOT_ALLOWED', 'Use GET.');
+      if (!env.TRAVELPAYOUTS_TOKEN || env.SEARCH_ENABLED === 'false') throw new ApiError('SEARCH_DISABLED', 'Preços indisponíveis no momento.');
+      const query = {
+        origin: (url.searchParams.get('origin') ?? '').toUpperCase(),
+        destination: (url.searchParams.get('destination') ?? '').toUpperCase(),
+        departure: url.searchParams.get('departure') ?? '',
+        returnDate: url.searchParams.get('return') || null
+      };
+      if (!/^[A-Z]{3}$/.test(query.origin) || !/^[A-Z]{3}$/.test(query.destination) || query.origin === query.destination) throw new ApiError('INVALID_AIRPORT', 'Aeroportos inválidos.', { field: 'origin' });
+      if (!/^\d{4}-\d{2}(-\d{2})?$/.test(query.departure) || (query.returnDate && !/^\d{4}-\d{2}(-\d{2})?$/.test(query.returnDate))) throw new ApiError('INVALID_DATES', 'Período inválido.', { field: 'departure' });
+      checkRate(request, env);
+      const { value, cache: cacheState } = await cache.through(
+        cacheKey('cheapest', query),
+        () => withTimeout(signal => cheapestFlights(query, { token: env.TRAVELPAYOUTS_TOKEN, marker: env.TRAVELPAYOUTS_MARKER ?? '806253', signal }), LIMITS.flightTimeoutMs)
+          .catch(() => { throw new ApiError('PROVIDER_ERROR', 'Não foi possível buscar os preços agora.'); }),
+        () => 3 * 60 * 60 * 1000
+      );
+      return json(200, { requestId, status: 'ok', dataSource: 'cached', offers: value.slice(0, 5), notice: 'Preços vistos recentemente por outros viajantes; podem ter mudado. Confira no Aviasales.' }, { 'x-cache': cacheState });
     }
     const kind = url.pathname === `${base}/flights/search` ? 'flights' : url.pathname === `${base}/hotels/search` ? 'hotels' : null;
     if (!kind) throw new ApiError('NOT_FOUND', 'Rota não encontrada.');

@@ -6,6 +6,8 @@
 // vai preenchida com origem, destino, datas e passageiros da viagem. Os demais
 // parceiros usam o link curto gerado no painel (página inicial do parceiro).
 import { escapeHtml } from '../core/html.js';
+import { provenanceLabel } from '../provenance.js';
+import { cheapestFlight, pricePeriod } from '../api/prices.client.js';
 
 export const PARTNER_MARKER = '806253';
 
@@ -81,6 +83,42 @@ function partnerLink(url, label) {
  * @returns {object[]} Seções { id, step, render, bind, refresh, slot }.
  */
 export function createPartnerSections({ routes, countryName = () => null }) {
+  // Preço visto recentemente (Travelpayouts), por rota e período.
+  const prices = new Map();
+  const priceKey = (trip, route) => {
+    const period = pricePeriod(trip);
+    return route?.status === 'ready' && period ? [trip.origin, route.destination.iata, period.departure, period.return ?? ''].join('|') : null;
+  };
+
+  function priceHtml(trip, route) {
+    const entry = prices.get(priceKey(trip, route));
+    if (!entry || entry.status !== 'done' || !entry.offer) return '';
+    const offer = entry.offer;
+    const amount = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(offer.price.amount));
+    const seen = offer.foundOn ? offer.foundOn.split('-').reverse().slice(0, 2).join('/') : null;
+    const stops = offer.transfers === 0 ? 'voo direto' : Number.isInteger(offer.transfers) ? `${offer.transfers} ${offer.transfers === 1 ? 'escala' : 'escalas'} na ida` : '';
+    return `
+      <div class="planner-fare">
+        <span class="planner-fare__label">${offer.returnAt ? 'Ida e volta' : 'Só ida'}, por pessoa, a partir de</span>
+        <strong class="planner-fare__value">${escapeHtml(amount)}</strong>
+        <small>${escapeHtml([`${offer.origin} → ${offer.destination}`, stops].filter(Boolean).join(' · '))}</small>
+      </div>
+      ${provenanceLabel('cached', { tag: 'p', detail: `${seen ? `visto em ${seen}` : 'visto recentemente'} por outros viajantes; pode ter mudado` })}
+      <p class="live-hotel__external">${partnerLink(offer.url, 'Ver esse preço no Aviasales')}</p>`;
+  }
+
+  function loadPrice(root, trip, ui, route) {
+    const key = priceKey(trip, route);
+    if (!key || prices.has(key)) return;
+    const period = pricePeriod(trip);
+    prices.set(key, { status: 'loading' });
+    cheapestFlight({ origin: trip.origin, destination: route.destination.iata, departure: period.departure, return: period.return }).then(offer => {
+      prices.set(key, { status: 'done', offer });
+      const current = ui.trip;
+      if (current && root.isConnected && priceKey(current, routes.get(current)) === key) fillFlight(root, current);
+    });
+  }
+
   function flightHtml(trip) {
     const route = routes.get(trip);
     const ready = route?.status === 'ready';
@@ -88,6 +126,7 @@ export function createPartnerSections({ routes, countryName = () => null }) {
     const filled = url !== PARTNERS.aviasales.home;
     return `
       <h4 class="planner-block-title">Comparar passagens</h4>
+      ${priceHtml(trip, route)}
       <p class="live-hotel__external">
         ${partnerLink(url, filled ? `Ver voos ${route.origin.iata} → ${route.destination.iata} no Aviasales` : 'Buscar voos no Aviasales')}
         <small>${filled ? 'Abre a busca com aeroportos, datas e passageiros da viagem.' : 'Defina datas exatas para abrir a busca já preenchida.'}</small>
@@ -103,11 +142,17 @@ export function createPartnerSections({ routes, countryName = () => null }) {
   function updateFlight(root, trip, ui) {
     fillFlight(root, trip);
     const known = routes.get(trip);
-    if (known && known.status !== 'loading') return;
+    if (known && known.status !== 'loading') {
+      loadPrice(root, trip, ui, known);
+      return;
+    }
     const key = routes.key(trip);
-    routes.load(trip).then(() => {
+    routes.load(trip).then(route => {
       const current = ui.trip;
-      if (current && routes.key(current) === key && root.isConnected) fillFlight(root, current);
+      if (current && routes.key(current) === key && root.isConnected) {
+        fillFlight(root, current);
+        loadPrice(root, current, ui, route);
+      }
     });
   }
 
