@@ -50,6 +50,27 @@ export function klookUrl(place) {
   return `https://affiliate.klook.com/redirect?aid=${encodeURIComponent(KLOOK_AID)}&k_site=${encodeURIComponent(target)}`;
 }
 
+// Cupons do painel de parceiros: só aparecem dentro da validade (até o fim do
+// dia `until`, horário de Brasília), para o site nunca anunciar cupom vencido.
+export const PROMOS = Object.freeze({
+  yesim: { url: 'https://yesim.tpm.lv/2AikNy4L', discount: '20%', until: '2027-02-28' }
+});
+
+export function activePromo(id, now = new Date()) {
+  const promo = PROMOS[id];
+  return promo && now.getTime() <= Date.parse(`${promo.until}T23:59:59-03:00`) ? promo : null;
+}
+
+export function esimHtml(now = new Date()) {
+  const promo = activePromo('yesim', now);
+  const until = promo ? promo.until.split('-').reverse().join('/') : '';
+  return `<p class="live-hotel__external">
+      ${partnerLink(promo?.url ?? PARTNERS.yesim.home, promo ? `Ver eSIM no Yesim · ${promo.discount} de desconto` : 'Ver eSIM no Yesim')}
+      ${promo ? `<small>Desconto de ${escapeHtml(promo.discount)} pelo link, válido até ${escapeHtml(until)}.</small>` : ''}
+      ${disclosure}
+    </p>`;
+}
+
 function partnerLink(url, label) {
   return `<a class="secondary-button" href="${escapeHtml(url)}" target="_blank" rel="noopener sponsored">${escapeHtml(label)} ↗</a>`;
 }
@@ -129,7 +150,7 @@ export function createPartnerSections({ routes, countryName = () => null }) {
         <section class="planner-card" aria-label="Internet no destino">
           <h4 class="planner-block-title">Internet no destino</h4>
           <p class="planner-hint">Um eSIM de viagem funciona no celular sem trocar de chip, se o aparelho for compatível.</p>
-          <p class="live-hotel__external">${partnerLink(PARTNERS.yesim.home, 'Ver eSIM no Yesim')}${disclosure}</p>
+          ${esimHtml()}
         </section>`
     }
   ];

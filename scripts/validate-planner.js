@@ -490,5 +490,10 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.ok(klook.searchParams.get('aid').includes('806253'), 'marcador de parceiro');
   assert.equal(new URL(klook.searchParams.get('k_site')).searchParams.get('query'), 'São Paulo', 'busca da cidade');
   assert.equal(klookUrl(''), PARTNERS.klook.home);
+  const { esimHtml, activePromo } = await import('../js/planner/partners.section.js');
+  assert.ok(esimHtml(new Date('2026-12-01T12:00:00Z')).includes('20% de desconto'), 'cupom dentro da validade');
+  assert.ok(activePromo('yesim', new Date('2027-02-28T23:00:00-03:00')), 'vale até o fim do último dia');
+  assert.equal(activePromo('yesim', new Date('2027-03-01T00:30:00-03:00')), null, 'some depois de vencer');
+  assert.ok(!esimHtml(new Date('2027-03-02T12:00:00Z')).includes('desconto') && esimHtml(new Date('2027-03-02T12:00:00Z')).includes(PARTNERS.yesim.home), 'sem cupom: link normal');
   console.log('Planner: links de parceiros (Aviasales e Klook preenchidos) verificados.');
 }
