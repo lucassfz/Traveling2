@@ -1,3 +1,4 @@
+import { reducedMotion } from './core/motion.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
@@ -428,7 +429,7 @@ export class MapEngine {
     this.viewInsetTarget = 0;
     this.viewInsetCurrent = 0;
     this.viewSize = { width: 1, height: 1 };
-    this.reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMotionQuery = reducedMotion;
     // Equivalent to an orthographic clipAngle(89.9): anything on the rear
     // hemisphere is clipped before land/border fragments reach the framebuffer.
     this.horizonClipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HORIZON_CLIP_EPSILON);
@@ -820,40 +821,64 @@ export class MapEngine {
     // Mira visível enquanto se usa o teclado; some ao voltar para o mouse ou o toque.
     stage.addEventListener('pointerdown', () => stage.classList.remove('globe__stage--keyboard'));
     stage.addEventListener('blur', () => stage.classList.remove('globe__stage--keyboard'));
-    stage.addEventListener('keydown', event => {
-      if (event.altKey || event.ctrlKey || event.metaKey || this.routePreview) return;
-      if (event.key !== 'Tab') stage.classList.add('globe__stage--keyboard');
-      const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
-      // Passo proporcional à altitude: perto, movimentos curtos.
-      const step = THREE.MathUtils.clamp((distance - 1) * 14, 0.6, 18) * (event.shiftKey ? 2 : 1);
-      const { latitude, longitude } = cartesianToLatLng(this.camera.position, GLOBE_YAW, GLOBE_ORIGIN);
-      const moves = { ArrowUp: [step, 0], ArrowDown: [-step, 0], ArrowLeft: [0, -step], ArrowRight: [0, step] };
-      if (moves[event.key]) {
-        event.preventDefault();
-        const [dLat, dLng] = moves[event.key];
-        this.flyTo(THREE.MathUtils.clamp(latitude + dLat, -80, 80), longitude + dLng, distance, 260);
-        this.#announceCenter(420);
-        return;
-      }
-      if (event.key === '+' || event.key === '=' || event.key === '-' || event.key === '_') {
-        event.preventDefault();
-        this.zoom(event.key === '+' || event.key === '=' ? 0.55 : 1.8);
-        this.#announceCenter(MOTION.zoom + 80);
-        return;
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        const { x, y } = this.#visibleCenter();
-        const place = this.pickPlace(x, y);
-        if (place?.kind === 'city') {
-          this.callbacks.onCitySelect?.(place);
-          return;
-        }
-        const countryKey = this.pickCountry(x, y);
-        if (countryKey && !this.#isExploring(countryKey)) this.callbacks.onSelect?.(countryKey);
-        else if (!countryKey) this.callbacks.onAnnounce?.('Nada para escolher aqui: o centro está no oceano.');
-      }
-    });
+    stage.addEventListener('keydown', event => this.handleKey(event));
+  }
+
+  /**
+   * Teclas do globo (também chamadas pelo app quando nada está em foco).
+   * @returns {boolean} true se a tecla foi usada.
+   */
+  handleKey(event) {
+    if (event.altKey || event.ctrlKey || event.metaKey || this.routePreview) return false;
+    const directions = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    let used = true;
+    if (directions[event.key]) this.nudge(directions[event.key], { fast: event.shiftKey });
+    else if (event.key === '+' || event.key === '=') this.zoomStep(1);
+    else if (event.key === '-' || event.key === '_') this.zoomStep(-1);
+    else if (event.key === 'Enter' || event.key === ' ') this.selectCenter();
+    else used = false;
+    if (used) {
+      event.preventDefault();
+      this.stage.classList.add('globe__stage--keyboard');
+    }
+    return used;
+  }
+
+  /** Gira o globo um passo (proporcional à altitude) e anuncia o centro. */
+  nudge(direction, { fast = false } = {}) {
+    if (this.routePreview) return;
+    const distance = this.camera.position.distanceTo(GLOBE_ORIGIN);
+    const step = THREE.MathUtils.clamp((distance - 1) * 14, 0.6, 18) * (fast ? 2 : 1);
+    const moves = { up: [step, 0], down: [-step, 0], left: [0, -step], right: [0, step] };
+    const move = moves[direction];
+    if (!move) return;
+    const { latitude, longitude } = cartesianToLatLng(this.camera.position, GLOBE_YAW, GLOBE_ORIGIN);
+    this.flyTo(THREE.MathUtils.clamp(latitude + move[0], -80, 80), longitude + move[1], distance, 260);
+    this.#announceCenter(420);
+  }
+
+  /** Aproxima (1) ou afasta (-1) um passo e anuncia o centro. */
+  zoomStep(direction) {
+    this.zoom(direction > 0 ? 0.55 : 1.8);
+    this.#announceCenter(MOTION.zoom + 80);
+  }
+
+  /** Escolhe o país ou a cidade no centro visível (a mira). */
+  selectCenter() {
+    const { x, y } = this.#visibleCenter();
+    const place = this.pickPlace(x, y);
+    if (place?.kind === 'city') {
+      this.callbacks.onCitySelect?.(place);
+      return;
+    }
+    const countryKey = this.pickCountry(x, y);
+    if (countryKey && !this.#isExploring(countryKey)) this.callbacks.onSelect?.(countryKey);
+    else if (!countryKey) this.callbacks.onAnnounce?.('Nada para escolher aqui: o centro está no oceano.');
+  }
+
+  /** Nome do que está no centro (país, cidade ou "Oceano"). */
+  centerLabel() {
+    return this.#centerLabel();
   }
 
   #bindPointerEvents() {
@@ -1419,26 +1444,26 @@ export class MapEngine {
     this.invalidate();
     if (!this.ready || this.disposed) return false;
     this.stopRoutePreview(false);
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = reducedMotion.matches;
     const savedCamera = this.camera.position.clone();
     const longRoute = route.angle > 1.75;
     // Begin at GRU so departure is understandable before the camera follows
     // the moving aircraft on long routes.
-    const focus = routePoint(route, longRoute && !reducedMotion ? 0 : 0.5);
+    const focus = routePoint(route, longRoute && !reduceMotion ? 0 : 0.5);
     const { latitude, longitude } = cartesianToLatLng(
       new THREE.Vector3(focus.x, focus.y, focus.z), GLOBE_YAW, GLOBE_ORIGIN
     );
     const distance = longRoute ? 3.35 : 2.9;
-    const preflightMs = reducedMotion ? 0 : 950;
+    const preflightMs = reduceMotion ? 0 : 950;
     const startedAt = performance.now() + preflightMs;
     const savedSelection = this.selectedCountry;
-    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reducedMotion, distance, startedAt, lastProgress: -1, arrivalReported: false };
+    this.routePreview = { route, savedCamera, savedSelection, longRoute: longRoute && !reduceMotion, distance, startedAt, lastProgress: -1, arrivalReported: false };
     // Keep the thin cyan route legible over the destination's selected fill.
     // Restore selection on exit; neither visited state nor filters are changed.
     this.clearSelection();
     this.#setHovered(null);
     this.callbacks.onHover?.(null);
-    this.flightVisualization.start(route, startedAt, reducedMotion);
+    this.flightVisualization.start(route, startedAt, reduceMotion);
     this.flyTo(latitude, longitude, distance, preflightMs);
     this.controls.enabled = false;
     return true;

@@ -1,6 +1,7 @@
 // Cartão de cidade: abre ao clicar numa cidade do globo (pontos e nomes da
 // camada de zoom). Mostra só fatos do GeoNames: estado, país, população,
 // hora local e coordenadas. Ações: aproximar, abrir o guia do país e planejar.
+import { reducedMotion } from './core/motion.js';
 import { escapeHtml } from './core/html.js';
 import { flagImageUrl } from './country.exploration.js';
 
@@ -101,7 +102,6 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
   });
 
   let leaving = 0;
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function show(city) {
     current = city;

@@ -1,3 +1,5 @@
+import { reducedMotion } from './core/motion.js';
+
 const SEEN_KEY = 'traveling.splash.seen';
 
 function readSeen() {
@@ -44,7 +46,7 @@ export class SplashEngine {
     }
     markSeen();
     this.state = 'flying';
-    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = reducedMotion.matches;
     const duration = prefersReducedMotion ? 180 : 1100;
     this.finishTimer = window.setTimeout(() => this.exit(), duration);
   }
@@ -71,3 +73,4 @@ export class SplashEngine {
     this.#remove();
   }
 }
+

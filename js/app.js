@@ -1,3 +1,4 @@
+import { reducedMotion } from './core/motion.js';
 import { AirportRepository } from './airports.repository.js';
 import { createCityCard } from './city.card.js';
 import { attachIndicator } from './core/indicator.js';
@@ -1095,6 +1096,73 @@ function bindUiEvents() {
   });
   elements.milesClose.addEventListener('click', () => setMilesOpen(false, true));
 
+  // ---------- Acessibilidade ----------
+  // Teclas do globo funcionam com o site em foco (nada selecionado), sem
+  // precisar chegar ao globo com Tab.
+  document.addEventListener('keydown', event => {
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== document.documentElement) return;
+    if (event.key === 'Enter' || event.key === ' ') return; // Enter solto não escolhe nada por engano
+    state.map?.handleKey(event);
+  });
+  // Painel de acessibilidade: voz, leitura em voz alta e ajustes visuais.
+  const a11yButton = document.getElementById('a11y-button');
+  const a11yPanel = document.getElementById('a11y-panel');
+  if (a11yButton && a11yPanel) {
+    import('./accessibility.js').then(({ createAccessibility, normalize }) => {
+      const countryIndex = Object.entries(COUNTRIES).map(([key, country]) => ({ key, names: [normalize(country.namePt), normalize(key)] }));
+      const findCountry = phrase => {
+        const query = normalize(phrase);
+        if (query.length < 3) return null;
+        return countryIndex.find(item => item.names.includes(query))
+          ?? countryIndex.find(item => item.names.some(name => name.startsWith(query) || query.startsWith(`${name} `) || query.endsWith(` ${name}`)))
+          ?? countryIndex.find(item => item.names.some(name => name.length >= 4 && query.includes(name)))
+          ?? null;
+      };
+      const announce = text => { const slot = document.getElementById('globe-announcer'); if (slot) slot.textContent = text; };
+      const visibleText = element => (element?.innerText ?? '').replace(/\n{2,}/g, '\n').trim();
+      state.accessibility = createAccessibility({
+        button: a11yButton,
+        panel: a11yPanel,
+        announce,
+        commands: {
+          openCountry: phrase => {
+            const match = findCountry(phrase);
+            if (!match) return null;
+            selectCountry(match.key);
+            return COUNTRIES[match.key].namePt;
+          },
+          plan: () => {
+            if (!state.countryKey) return false;
+            planTrip(state.countryKey);
+            return true;
+          },
+          close: () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+          home: () => resetToGlobe(),
+          zoom: direction => state.map?.zoomStep(direction),
+          rotate: direction => state.map?.nudge(direction),
+          select: () => state.map?.selectCenter(),
+          discover: () => discoverDestination(),
+          tab: name => {
+            if (!state.countryKey || !elements.panel.classList.contains('country-panel--open')) return false;
+            switchTab(name);
+            return true;
+          },
+          readTarget: () => {
+            if (cityCard?.isOpen) return visibleText(document.getElementById('city-card'));
+            if (elements.panel.classList.contains('country-panel--open')) {
+              const country = COUNTRIES[state.countryKey];
+              return `${country?.namePt ?? ''}. ${visibleText(elements.panel.querySelector('.country-tab--active'))}`;
+            }
+            if (isPlannerOpen()) return visibleText(elements.plannerContent);
+            if (state.discovery?.isOpen) return visibleText(document.getElementById('discovery-panel'));
+            return `No centro do globo: ${state.map?.centerLabel() ?? 'carregando'}. Para abrir um país, diga "abrir" e o nome dele, ou use a busca.`;
+          }
+        }
+      });
+    }).catch(() => { a11yButton.hidden = true; });
+  }
+
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
     if (closeCityCard()) return;
@@ -1133,7 +1201,7 @@ async function initializeMap() {
           closeFlightPreview(true);
           switchTab('overview');
           elements.countryName.focus({ preventScroll: true });
-        }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 650 : 1100);
+        }, reducedMotion.matches ? 650 : 1100);
       },
       onProgress: message => { elements.globeStatus.lastElementChild.textContent = message; },
       onReady: () => {

@@ -3750,3 +3750,60 @@ body.route-mode .city-card { visibility: hidden; }
 .globe-keys { background: var(--color-surface, #0d121c); }
 .globe__stage:focus-visible ~ .globe-hint,
 .globe__stage--keyboard ~ .globe-hint { visibility: hidden; }
+
+/* ---------- Acessibilidade ---------- */
+.a11y-panel { position: fixed; z-index: 260; top: calc(var(--header-height) + 8px); right: 12px; display: grid; gap: 14px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - var(--header-height) - 24px); overflow: auto; padding: 16px 18px 18px; border: 1px solid var(--color-border); border-radius: 22px; background: var(--color-background-elevated, var(--color-background)); color: var(--color-text); box-shadow: 0 18px 50px var(--color-shadow); }
+.a11y-panel[hidden] { display: none; }
+.a11y-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.a11y-panel__head h2 { margin: 0; font: 600 1.35rem/1.2 var(--font-display, Georgia, serif); }
+.a11y-panel__head h2:focus { outline: none; }
+.a11y-panel__group { display: grid; gap: 8px; }
+.a11y-panel__group h3 { margin: 0; color: var(--color-text-muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.a11y-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.a11y-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 46px; padding: 8px 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface-raised); color: inherit; font: inherit; font-size: .95rem; text-align: left; cursor: pointer; }
+.a11y-toggle small { color: var(--color-text-muted); font-size: .76rem; }
+.a11y-toggle--on { border-color: var(--color-accent); background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.a11y-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface-raised); color: inherit; font: inherit; font-size: .88rem; cursor: pointer; }
+.a11y-chip[aria-pressed='true'] { border-color: var(--color-accent); background: var(--color-accent-soft); font-weight: 600; }
+.a11y-panel .secondary-button { min-height: 40px; padding: 0 14px; }
+.a11y-panel__heard { margin: 0; color: var(--color-text-secondary); font-size: .85rem; }
+.a11y-panel__help summary { cursor: pointer; font-size: .88rem; }
+.a11y-panel__help ul { margin: 6px 0 0; padding-left: 18px; font-size: .86rem; }
+.a11y-panel__status { margin: 0; min-height: 1.2em; color: var(--color-accent); font-size: .88rem; font-weight: 600; }
+.a11y-panel__note { margin: 0; color: var(--color-text-muted); font-size: .76rem; line-height: 1.45; }
+.header-action--live { position: relative; }
+.header-action--live::after { content: ''; position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 2px var(--color-background); }
+
+/* Texto maior: escala o que usa rem e o texto do corpo. */
+html[data-text='large'] { font-size: 112.5%; }
+html[data-text='large'] body { font-size: 18px; }
+html[data-text='xlarge'] { font-size: 125%; }
+html[data-text='xlarge'] body { font-size: 20px; }
+
+/* Alto contraste: textos secundários e bordas bem mais fortes. */
+html[data-contrast='high'][data-theme='dark'], html[data-contrast='high']:not([data-theme]) {
+  --color-text: #ffffff; --color-text-secondary: #eef3f8; --color-text-muted: #d5dde6;
+  --color-border: rgba(255, 255, 255, .6); --color-border-soft: rgba(255, 255, 255, .45); --color-border-strong: rgba(255, 255, 255, .8);
+  --color-accent: #9fd8ff; --color-focus: #ffd75e;
+}
+html[data-contrast='high'][data-theme='light'] {
+  --color-text: #000000; --color-text-secondary: #111a24; --color-text-muted: #26323f;
+  --color-border: #4d5b67; --color-border-soft: #6b7883; --color-border-strong: #2c3843;
+  --color-accent: #004b75; --color-focus: #b45309;
+}
+html[data-contrast='high'] .provenance,
+html[data-contrast='high'] small { opacity: 1; }
+
+/* Sem animações (opção do site; o sistema já é respeitado em cada componente). */
+html[data-motion='reduce'] *, html[data-motion='reduce'] *::before, html[data-motion='reduce'] *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important; scroll-behavior: auto !important;
+}
+
+/* Topo estreito: o tema vai para o painel de Acessibilidade (Visual), para os botões caberem. */
+.a11y-theme { display: none; }
+@media (max-width: 480px) {
+  .header-action--theme { display: none; }
+  .a11y-theme { display: flex; }
+}
+body:has(.a11y-panel:not([hidden])) .globe-hint { visibility: hidden; }

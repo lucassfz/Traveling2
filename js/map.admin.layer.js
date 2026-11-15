@@ -1,3 +1,4 @@
+import { reducedMotion } from './core/motion.js';
 import * as THREE from 'three';
 import { geographicToCartesian } from './geospatial.js';
 import { inFlatRing, inFlatShape, nearestRegion, shapesBox } from './map.pick.js';
@@ -153,7 +154,7 @@ export class AdminLayer {
     this.freeLabels = [];          // elementos livres para reaproveitar
     this.fades = new Map();        // material → { to } (transição de opacidade dos destaques)
     this.lastFrame = performance.now();
-    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMotion = reducedMotion;
     this.placed = [];
     this.cache = new Map();        // ISO2 → registro (LRU pela ordem de inserção)
     this.selectedCode = null;      // país selecionado no app

@@ -34,6 +34,13 @@
         if (savedTheme === 'light') document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#eef1f3');
       }
     } catch (error) { /* armazenamento bloqueado: segue o padrão escuro */ }
+    // Ajustes de acessibilidade (texto, contraste, animações) antes da primeira pintura.
+    try {
+      var a11y = JSON.parse(localStorage.getItem('traveling.a11y') || 'null');
+      if (a11y && (a11y.text === 'large' || a11y.text === 'xlarge')) document.documentElement.dataset.text = a11y.text;
+      if (a11y && a11y.contrast === true) document.documentElement.dataset.contrast = 'high';
+      if (a11y && a11y.motion === true) document.documentElement.dataset.motion = 'reduce';
+    } catch (error) { /* sem ajustes salvos */ }
   </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2215%22 fill=%22%2305070c%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%229.5%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.6%22/%3E%3Cpath d=%22M6.5 16h19M16 6.5c3.2 3.4 3.2 15.6 0 19M16 6.5c-3.2 3.4-3.2 15.6 0 19%22 fill=%22none%22 stroke=%22%237cc9f5%22 stroke-width=%221.2%22/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +52,7 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.31">
+  <link rel="stylesheet" href="styles.css?v=2026.12.02">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -59,6 +66,7 @@
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4-6 4V4.8a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-access" viewBox="0 0 24 24"><circle cx="12" cy="4.6" r="1.9"/><path d="M4.5 8.6 12 10l7.5-1.4"/><path d="M12 10v4.6l-3.4 6M12 14.6l3.4 6"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5v-11"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5v6a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-6"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.6c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></symbol>
   </svg>
@@ -112,6 +120,9 @@
       </button>
       <button class="header-action" id="miles-launcher" type="button" aria-expanded="false" aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos">
         <svg class="icon" aria-hidden="true"><use href="#i-plane"/></svg><span class="header-action__label">Milhas</span>
+      </button>
+      <button class="header-action" id="a11y-button" type="button" aria-expanded="false" aria-controls="a11y-panel" aria-label="Acessibilidade: voz, leitura em voz alta, texto maior" title="Acessibilidade">
+        <svg class="icon" aria-hidden="true"><use href="#i-access"/></svg>
       </button>
       <button class="header-action header-action--theme" id="theme-button" type="button" aria-label="Ativar modo claro">
         <svg class="icon icon--sun" aria-hidden="true"><use href="#i-sun"/></svg>
@@ -198,6 +209,8 @@
     </header>
     <div class="saved-list" id="saved-content"></div>
   </aside>
+
+  <aside class="a11y-panel" id="a11y-panel" role="dialog" aria-labelledby="a11y-title" hidden></aside>
 
   <aside class="country-panel" id="country-panel" aria-label="Guia do país" inert>
     <header class="country-panel__toolbar">
@@ -297,6 +310,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.31"></script>
+  <script type="module" src="js/app.js?v=2026.12.02"></script>
 </body>
 </html>
