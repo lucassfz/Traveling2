@@ -88,3 +88,24 @@ assert.equal(memory.has('traveling.trips'), false, 'salvar não cria viagem');
 }
 
 console.log('Salvos: identificadores, migração da lista antiga, duplicados, remoção, persistência e cidades após regenerar o arquivo verificados.');
+
+// Links compartilháveis (#/PT, #/PT/c123, #/PT/i4).
+{
+  const { cityHash, countryHash, parseHash, shareUrl, shareLink } = await import('../js/share.link.js');
+  const assert = (await import('node:assert/strict')).default;
+  assert.equal(countryHash('PT'), '#/PT');
+  assert.equal(countryHash('pt'), '');
+  assert.equal(cityHash({ country: 'BR', geonameId: 3448439, index: 1 }), '#/BR/c3448439', 'geonameId primeiro');
+  assert.equal(cityHash({ country: 'BR', geonameId: null, index: 1 }), '#/BR/i1');
+  assert.deepEqual(parseHash('#/PT'), { alpha2: 'PT' });
+  assert.deepEqual(parseHash('#/BR/c3448439'), { alpha2: 'BR', geonameId: 3448439 });
+  assert.deepEqual(parseHash('#/BR/i1'), { alpha2: 'BR', index: 1 });
+  for (const bad of ['', '#', '#/', '#/xx', '#/BR/x1', '#/BR/i1/extra', '#/<script>']) assert.equal(parseHash(bad), null, `rejeita ${bad}`);
+  assert.equal(shareUrl('#/PT', { origin: 'https://lucassfz.github.io', pathname: '/Traveling2/' }), 'https://lucassfz.github.io/Traveling2/#/PT');
+  const copied = [];
+  assert.equal(await shareLink({ url: 'u' }, { clipboard: { writeText: async text => copied.push(text) } }), 'copied');
+  assert.deepEqual(copied, ['u']);
+  assert.equal(await shareLink({ url: 'u' }, { maxTouchPoints: 5, share: async () => {}, clipboard: {} }), 'shared', 'celular: menu do sistema');
+  assert.equal(await shareLink({ url: 'u' }, {}), 'failed');
+  console.log('Salvos: links compartilháveis verificados.');
+}

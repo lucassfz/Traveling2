@@ -36,7 +36,7 @@ function coordinate(value, positive, negative) {
  * @param {() => void} deps.onClose
  * @param {object} [deps.saved]   { isSaved(city) → boolean, toggle(city, countryKey) → boolean }
  */
-export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, saved = null }) {
+export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, onShare = null, saved = null }) {
   const byAlpha2 = new Map(Object.entries(countries).map(([key, country]) => [country.alpha2, key]));
   let current = null;
   let clock = 0;
@@ -70,6 +70,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
       </dl>
       <div class="city-card__actions">
         <button class="secondary-button" type="button" data-city-action="zoom">Aproximar</button>
+        ${onShare ? '<button class="secondary-button" type="button" data-city-action="share">Compartilhar</button>' : ''}
         ${countryKey ? `<button class="secondary-button" type="button" data-city-action="country">Guia de ${escapeHtml(country.namePt)}</button>
         <button class="primary-button" type="button" data-city-action="plan">Planejar viagem para ${escapeHtml(city.name)}</button>` : ''}
       </div>
@@ -93,6 +94,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     const countryKey = root.dataset.countryKey;
     if (action === 'close') hide(true);
     if (action === 'zoom') onZoom(current);
+    if (action === 'share' && current) onShare?.(current, event.target.closest('[data-city-action]'));
     if (action === 'save' && countryKey) { saved?.toggle(current, countryKey); syncSave(); }
     if (action === 'country' && countryKey) { hide(); onShowCountry(countryKey); }
     if (action === 'plan' && countryKey) { const city = current; hide(); onPlan(countryKey, city); }

@@ -45,7 +45,7 @@
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
-  <link rel="stylesheet" href="styles.css?v=2026.11.25">
+  <link rel="stylesheet" href="styles.css?v=2026.11.26">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -59,6 +59,7 @@
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 2.6 14.6 0 17M12 3.5c-2.6 2.4-2.6 14.6 0 17"/></symbol>
     <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.8h10a1 1 0 0 1 1 1v15.4l-6-4-6 4V4.8a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5v-11"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5v6a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-6"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 18.5 6v5.6c0 4.2-2.7 7.3-6.5 8.9-3.8-1.6-6.5-4.7-6.5-8.9V6z"/><path d="m9.2 12 2 2 3.8-3.9"/></symbol>
   </svg>
 
@@ -199,6 +200,7 @@
     <header class="country-panel__toolbar">
       <button class="icon-button" id="country-panel-close" type="button" aria-label="Fechar painel"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
       <span class="country-panel__spacer"></span>
+      <button class="visit-button share-button" id="country-share-button" type="button" aria-label="Compartilhar este país"><svg class="icon" aria-hidden="true"><use href="#i-share"/></svg><span>Compartilhar</span></button>
       <button class="visit-button save-toggle" id="country-save-button" type="button" aria-pressed="false">Salvar</button>
       <button class="visit-button" id="visit-button" type="button">Marcar visitado</button>
     </header>
@@ -292,6 +294,6 @@
     }
   }
   </script>
-  <script type="module" src="js/app.js?v=2026.11.25"></script>
+  <script type="module" src="js/app.js?v=2026.11.26"></script>
 </body>
 </html>

@@ -3095,6 +3095,7 @@ body.route-mode .globe-zoom, body.route-mode .globe-hint { visibility: hidden; }
 .city-card__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .city-card__actions .primary-button { grid-column: 1 / -1; }
 .city-card__actions .secondary-button:only-child { grid-column: 1 / -1; }
+.city-card__actions [data-city-action="country"] { grid-column: 1 / -1; }
 .city-card__source { margin: 0; color: var(--color-text-muted); font-size: .68rem; }
 body.route-mode .city-card { visibility: hidden; }
 @media (max-width: 600px) {
@@ -3683,3 +3684,11 @@ body.route-mode .city-card { visibility: hidden; }
 /* Links de parceiros no Planner */
 .partner-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 .partner-links .secondary-button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; text-decoration: none; font-size: .82rem; }
+
+/* Compartilhar: ícone + texto; no celular só o ícone (a barra não cabe). */
+.share-button { display: inline-flex; align-items: center; gap: 6px; }
+.share-button .icon { width: 16px; height: 16px; }
+@media (max-width: 600px) {
+  .share-button:not(.share-button--done) span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .share-button:not(.share-button--done) { padding: 0 10px; }
+}

@@ -21,6 +21,7 @@ import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js'
 import { createTripStore } from './planner/trip.store.js';
 import { createTrip } from './planner/trip.model.js';
 import { loadCities, resolveCity } from './geo/cities.js';
+import { cityHash, countryHash, parseHash, setHash, shareLink, shareUrl } from './share.link.js';
 import { createSavedStore } from './saved.store.js';
 import { loadSummaries, summaryFor, summaryHtml } from './summaries.js';
 
@@ -48,6 +49,7 @@ const elements = {
   panelClose: document.getElementById('country-panel-close'),
   visitButton: document.getElementById('visit-button'),
   countrySaveButton: document.getElementById('country-save-button'),
+  countryShareButton: document.getElementById('country-share-button'),
   countryIntro: document.getElementById('country-intro'),
   savedLauncher: document.getElementById('saved-launcher'),
   savedCount: document.getElementById('saved-count'),
@@ -698,6 +700,7 @@ function renderCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
   state.countryKey = countryKey;
+  setHash(countryHash(country.alpha2));
   state.continent = country.continent;
   const flagUrl = flagImageUrl(country.alpha2);
   elements.countryFlag.classList.toggle('country-panel__flag--nepal', country.alpha2 === 'NP');
@@ -738,7 +741,8 @@ function selectCity(city, { fly = false } = {}) {
     onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
     onPlan: (countryKey, city) => planTrip(countryKey, { city }),
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
-    onClose: () => state.map?.selectCity(null),
+    onClose: () => closeCityCard(),
+    onShare: (city, button) => shareFrom(button, { title: `${city.name} no Traveling`, text: `Olha ${city.name} no globo do Traveling`, hash: cityHash(city) }),
     saved: {
       isSaved: city => Boolean(savedEntryForCity(city, COUNTRY_BY_ALPHA2.get(city.country))),
       toggle: (city, countryKey) => {
@@ -749,12 +753,47 @@ function selectCity(city, { fly = false } = {}) {
   });
   state.map?.selectCity(city, { fly });
   cityCard.show(city);
+  setHash(cityHash(city));
+}
+
+// Compartilhar: menu do sistema no celular, senão copia o link. O botão mostra
+// o resultado por 2 s.
+async function shareFrom(button, { title, text, hash }) {
+  if (!hash) return;
+  const result = await shareLink({ title, text, url: shareUrl(hash) });
+  if (!button || result === 'shared' || result === 'cancelled') return;
+  // O texto fica num <span> quando o botão tem ícone (no celular só o ícone aparece).
+  const target = button.querySelector('span') ?? button;
+  const label = button.dataset.label ?? (button.dataset.label = target.textContent);
+  target.textContent = result === 'copied' ? '✓ Link copiado' : 'Não deu para copiar';
+  button.classList.add('share-button--done');
+  clearTimeout(button.shareTimer);
+  button.shareTimer = setTimeout(() => { target.textContent = label; button.classList.remove('share-button--done'); }, 2000);
+}
+
+// Link recebido (#/PT ou #/PT/c123): abre o país e, se houver, a cidade.
+async function openFromHash() {
+  const target = parseHash(location.hash);
+  const countryKey = target ? COUNTRY_BY_ALPHA2.get(target.alpha2) : null;
+  if (!countryKey) return;
+  const wantsCity = target.geonameId !== undefined || target.index !== undefined;
+  // No celular o painel do país cobre a tela inteira: link de cidade abre só o
+  // cartão da cidade sobre o globo (o guia do país fica a um toque).
+  const narrow = window.matchMedia('(max-width: 760px)').matches;
+  if (state.countryKey !== countryKey && !(wantsCity && narrow)) selectCountry(countryKey);
+  if (!wantsCity) return;
+  const cities = await loadCities(target.alpha2).catch(() => []);
+  const city = target.geonameId !== undefined
+    ? cities.find(item => item.geonameId === target.geonameId) ?? null
+    : cities.find(item => item.index === target.index) ?? null;
+  if (city && (narrow || state.countryKey === countryKey)) selectCity(city, { fly: true });
 }
 
 // Fecha o cartão e tira o destaque da cidade no globo. O destaque também pode
 // ter vindo de "Ver no globo" (Estados), sem cartão aberto: limpa sempre.
 function closeCityCard() {
   state.map?.selectCity(null);
+  setHash(state.countryKey && elements.panel.classList.contains('country-panel--open') ? countryHash(COUNTRIES[state.countryKey]?.alpha2) : '');
   if (!cityCard?.isOpen) return false;
   cityCard.hide();
   return true;
@@ -787,6 +826,7 @@ function closeCountryPanel(restoreFocus = false) {
   clearMedia();
   state.map?.clearSelection();
   state.countryKey = null;
+  setHash('');
   if (restoreFocus) elements.searchInput.focus({ preventScroll: true });
 }
 
@@ -795,6 +835,7 @@ function selectContinent(continent) {
   state.discovery?.close();
   state.continent = continent;
   state.countryKey = null;
+  setHash('');
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
@@ -813,6 +854,7 @@ function home() {
   elements.panel.classList.remove('country-panel--open');
   elements.panel.setAttribute('inert', '');
   clearMedia();
+  setHash('');
   state.map?.home();
   if (state.isVisaFreeBRFilterActive) {
     state.isVisaFreeBRFilterActive = false;
@@ -973,6 +1015,12 @@ function bindUiEvents() {
   elements.panelClose.addEventListener('click', resetToGlobe);
   elements.visitButton.addEventListener('click', toggleVisited);
   elements.countrySaveButton.addEventListener('click', toggleCountrySaved);
+  elements.countryShareButton?.addEventListener('click', () => {
+    const country = COUNTRIES[state.countryKey];
+    if (country) shareFrom(elements.countryShareButton, { title: `${country.namePt} no Traveling`, text: `Olha ${country.namePt} no globo do Traveling`, hash: countryHash(country.alpha2) });
+  });
+  // Link colado com o site já aberto.
+  window.addEventListener('hashchange', () => openFromHash());
   elements.media.addEventListener('click', event => {
     const button = event.target.closest('[data-save-landmark]');
     if (!button || !state.countryKey) return;
@@ -1088,6 +1136,7 @@ async function initializeMap() {
         elements.globeStatus.classList.add('globe__status--hidden');
         document.getElementById('globe')?.classList.add('globe--ready');
         updateFlightPreviewAvailability();
+        openFromHash();
       }
     });
     state.map.setVisitedCountries?.(state.visited);
@@ -1103,6 +1152,7 @@ async function initializeMap() {
     elements.globeFallback.classList.add('globe__fallback--visible');
     const detail = elements.globeFallback.querySelector('span');
     if (detail) detail.textContent = 'O mapa 3D não carregou. A busca, os guias, voos e o hub de milhas continuam disponíveis.';
+    openFromHash();
   }
 }
 
