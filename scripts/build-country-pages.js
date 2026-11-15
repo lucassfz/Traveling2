@@ -116,6 +116,8 @@ const STYLE = `
     .places div { padding: 10px 12px 12px; }
     .places strong { display: block; }
     .foods { padding-left: 18px; }
+    .faq h3 { margin: 18px 0 4px; font-size: 1rem; }
+    .faq p { margin: 0; color: var(--muted); }
     .price { margin-top: 28px; padding: 4px 18px 8px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
     .price h2 { margin-top: 16px; }
     .price__value { font-size: 1.8rem; }
@@ -183,14 +185,33 @@ export function countryPage(country, summary) {
     ['Tomada', country.voltage],
     ['Aeroporto principal', country.airport ? `${country.airport}${country.airportCity ? ` · ${country.airportCity}` : ''}` : null]
   ].filter(([, value]) => value);
+  // Perguntas frequentes, respondidas com os mesmos dados da página.
+  const sentence = text => (/[.!?]$/.test(text) ? text : `${text}.`);
+  const faq = [
+    [`${country.namePt}: brasileiro precisa de visto?`, visa.domestic
+      ? 'Não. É destino nacional: basta documento de identidade válido.'
+      : `${sentence(visa.detail)}${visa.verified ? ` Regra conferida em ${visa.verified} na fonte oficial.` : ''} Regras mudam: confirme antes de comprar a passagem.`],
+    [`${country.namePt}: qual a melhor época para ir?`, country.bestTime ? `${sentence(plain(country.bestTime))}${months.length ? ` Meses mais indicados: ${months.join(', ')}.` : ''}` : ''],
+    [`${country.namePt}: qual a moeda?`, country.currency ? sentence(plain(country.currency)) : ''],
+    [`${country.namePt}: que tomada e voltagem usa?`, country.voltage ? sentence(plain(country.voltage)) : ''],
+    [`${country.namePt}: qual o fuso horário?`, country.timezoneLabel ? sentence(plain(country.timezoneLabel)) : '']
+  ].filter(([, answer]) => answer);
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'TouristDestination',
-    name: country.namePt,
-    description,
-    url,
-    image,
-    containedInPlace: { '@type': 'Place', name: CONTINENT_LABELS[country.continent] ?? country.region }
+    '@graph': [
+      {
+        '@type': 'TouristDestination',
+        name: country.namePt,
+        description,
+        url,
+        image,
+        containedInPlace: { '@type': 'Place', name: CONTINENT_LABELS[country.continent] ?? country.region }
+      },
+      {
+        '@type': 'FAQPage',
+        mainEntity: faq.map(([question, answer]) => ({ '@type': 'Question', name: question, acceptedAnswer: { '@type': 'Answer', text: answer } }))
+      }
+    ]
   };
 
   return `${head({ title, description, url, image, imageAlt, jsonLd })}
@@ -241,7 +262,13 @@ ${country.airport && country.airport !== 'GRU' ? `    <section class="price" id=
       <p><a class="cta" href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Ver esse preço no Aviasales ↗</a></p>
     </section>
     ${PRICE_SCRIPT}
-` : ''}    <h2>Planeje com parceiros</h2>
+` : ''}    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+${faq.map(([question, answer]) => `      <h3>${escapeHtml(question)}</h3>
+      <p>${escapeHtml(answer)}</p>`).join('\n')}
+    </div>
+
+    <h2>Planeje com parceiros</h2>
     <ul class="partners">
       <li><a href="${escapeHtml(PARTNERS.aviasales.home)}" rel="noopener sponsored">Comparar passagens no Aviasales ↗</a></li>
       <li><a href="${escapeHtml(klookUrl(country.namePt))}" rel="noopener sponsored">Passeios em ${escapeHtml(country.namePt)} no Klook ↗</a></li>
