@@ -850,6 +850,8 @@ function closeCityCard() {
 function selectCountry(countryKey) {
   const country = COUNTRIES[countryKey];
   if (!country) return;
+  state.tour?.close();
+  state.tour = null;
   closeCityCard();
   closeFlightPreview(false);
   state.discovery?.close();
@@ -1299,6 +1301,8 @@ async function initializeMap() {
         document.getElementById('globe')?.classList.add('globe--ready');
         updateFlightPreviewAvailability();
         openFromHash();
+        // Primeira visita: tour curto (não aparece quem chegou por link de país ou cidade).
+        if (!location.hash && !state.tourStarted && (state.tourStarted = true)) setTimeout(() => { if (!state.countryKey) import('./tour.js').then(({ startTour }) => { state.tour = state.tour ?? startTour(); }).catch(() => {}); }, 900);
       }
     });
     state.map.setVisitedCountries?.(state.visited);

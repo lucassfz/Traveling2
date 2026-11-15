@@ -3820,3 +3820,14 @@ body:has(.a11y-panel:not([hidden])) .globe-hint { visibility: hidden; }
 .partner-price { margin: 0 0 10px; font-size: .9rem; line-height: 1.5; }
 .city-card .partner-links { margin-top: 2px; }
 .planner-backup { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; }
+
+/* Tour de boas-vindas (primeira visita) */
+.tour { position: fixed; z-index: 240; left: 50%; bottom: 96px; width: min(380px, calc(100vw - 24px)); padding: 16px 18px; border: 1px solid var(--color-border); border-radius: 20px; background: var(--color-background-elevated, var(--color-background)); color: var(--color-text); box-shadow: 0 18px 50px var(--color-shadow); transform: translateX(-50%); }
+.tour h2 { margin: 2px 0 6px; font: 600 1.2rem/1.25 var(--font-display, Georgia, serif); }
+.tour h2:focus { outline: none; }
+.tour p { margin: 0 0 12px; color: var(--color-text-secondary); font-size: .92rem; line-height: 1.5; }
+.tour__count { color: var(--color-text-muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.tour__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tour__actions button { min-height: 40px; padding: 0 16px; }
+.tour-target { position: relative; z-index: 1; box-shadow: 0 0 0 3px var(--color-accent), 0 0 0 7px var(--color-accent-soft) !important; border-radius: 999px; }
+body:has(.tour) .globe-hint { visibility: hidden; }
