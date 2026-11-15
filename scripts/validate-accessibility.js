@@ -34,6 +34,11 @@ const cases = [
   ['fechar', { action: 'close' }],
   ['voltar ao globo', { action: 'home' }],
   ['ajuda', { action: 'help' }],
+  ['próximo', { action: 'step', value: 'next' }],
+  ['continuar', { action: 'step', value: 'next' }],
+  ['anterior', { action: 'step', value: 'prev' }],
+  ['voltar etapa', { action: 'step', value: 'prev' }],
+  ['repetir', { action: 'repeat' }],
   ['', { action: 'none' }]
 ];
 for (const [phrase, expected] of cases) assert.deepEqual(parseVoiceCommand(phrase), expected, `"${phrase}"`);

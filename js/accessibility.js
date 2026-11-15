@@ -19,6 +19,8 @@ export const VOICE_EXAMPLES = [
   'Descobrir destino'
 ];
 export const VOICE_MORE = [
+  'No planejamento: próximo, ou anterior',
+  'Repetir, para ouvir de novo',
   'Aproximar, ou afastar',
   'Girar para a direita, esquerda, cima ou baixo',
   'Escolher, para abrir o que está no centro',
@@ -55,6 +57,9 @@ export function parseVoiceCommand(phrase) {
   if (/\b(desligar?|desliga|parar?|pare)\b.*\b(microfone|comandos?|voz|ouvir)\b/.test(text)) return { action: 'stop-listening' };
   if (/^(parar?|pare|silencio|chega|cala)\b/.test(text)) return { action: 'stop-speaking' };
   if (/\b(ajuda|comandos|o que (eu )?posso)\b/.test(text)) return { action: 'help' };
+  if (/^(repetir|repete|repita|de novo|outra vez)\b/.test(text)) return { action: 'repeat' };
+  if (/^(proxim[oa]|continuar|continua|avancar|avanca|seguinte|proxima etapa)\b/.test(text)) return { action: 'step', value: 'next' };
+  if (/^(anterior|etapa anterior|voltar etapa|volta etapa|voltar uma etapa)\b/.test(text)) return { action: 'step', value: 'prev' };
   const plan = PLAN.exec(text);
   if (plan) return stripLead(plan[1]) ? { action: 'plan', value: stripLead(plan[1]) } : { action: 'plan' };
   const read = READ.exec(text);
@@ -142,8 +147,10 @@ export function createAccessibility({ button, panel, commands, announce = () => 
   const currentVoice = () => voices().find(voice => voice.voiceURI === settings.voice) ?? voices()[0] ?? null;
   if (canSpeak) speechSynthesis.addEventListener?.('voiceschanged', () => { if (!panel.hidden) render(); });
 
+  let lastSpoken = '';
   function speak(text) {
     if (!canSpeak || !text) return;
+    lastSpoken = text;
     speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text.slice(0, 4000));
     utterance.lang = 'pt-BR';
@@ -183,6 +190,14 @@ export function createAccessibility({ button, panel, commands, announce = () => 
         return speak(commands.readTarget());
       }
       case 'home': commands.home(); return say('Voltando ao globo inteiro.');
+      case 'repeat': return lastSpoken ? speak(lastSpoken) : say('Ainda não li nada.');
+      case 'step': {
+        const moved = commands.step(value);
+        if (!moved) return say('Abra o planejamento de uma viagem antes. Diga, por exemplo: planejar viagem para o Brasil.');
+        if (moved === 'edge') return say(value === 'prev' ? 'Esta já é a primeira etapa.' : 'Esta já é a última etapa.');
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return speak(commands.readTarget());
+      }
       case 'close': commands.close(); return say('Fechado.');
       case 'zoom-in': commands.zoom(1); return say('Aproximando.');
       case 'zoom-out': commands.zoom(-1); return say('Afastando.');

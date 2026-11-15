@@ -1316,6 +1316,16 @@ function bindUiEvents() {
           zoom: direction => state.map?.zoomStep(direction),
           rotate: direction => state.map?.nudge(direction),
           select: () => state.map?.selectCenter(),
+          // Etapas do planejamento: "próximo" e "anterior".
+          step: direction => {
+            if (!isPlannerOpen()) return false;
+            // Na confirmação de uma viagem nova, "próximo" cria a viagem.
+            const button = elements.plannerContent.querySelector(`[data-planner-action="${direction}"]`)
+              ?? (direction === 'next' ? elements.plannerContent.querySelector('[data-planner-action="draft-create"]') : null);
+            if (!button) return 'edge';
+            button.click();
+            return true;
+          },
           discover: () => discoverDestination(),
           tab: name => {
             if (!state.countryKey || !elements.panel.classList.contains('country-panel--open')) return false;
