@@ -3819,3 +3819,4 @@ body:has(.a11y-panel:not([hidden])) .globe-hint { visibility: hidden; }
 .partner-note { display: block; margin-top: 8px; color: var(--color-text-muted); font-size: .72rem; }
 .partner-price { margin: 0 0 10px; font-size: .9rem; line-height: 1.5; }
 .city-card .partner-links { margin-top: 2px; }
+.planner-backup { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 12px; }

@@ -247,6 +247,11 @@ export class PlannerUI {
           <button class="primary-button" type="button" data-planner-action="new">＋ Nova viagem</button>
         </div>
         <ul class="planner-trip-list">${cards}</ul>
+        <div class="planner-backup">
+          <button class="planner-text-action" type="button" data-planner-action="export">Baixar backup das viagens</button>
+          <button class="planner-text-action" type="button" data-planner-action="import">Importar backup</button>
+        </div>
+        <p class="planner-hint" data-planner-home-status role="status" aria-live="polite"></p>
         ${this.#savedNote()}
       </div>`;
   }
@@ -724,6 +729,43 @@ export class PlannerUI {
       : `<span class="${className} planner-flag-fallback" aria-hidden="true">${escapeHtml(country?.alpha2 || '🌍')}</span>`;
   }
 
+  // Backup das viagens: arquivo JSON para guardar ou levar para outro aparelho.
+  #homeStatus(text) {
+    const slot = this.element.querySelector('[data-planner-home-status]');
+    if (slot) slot.textContent = text;
+  }
+
+  #exportBackup() {
+    const blob = new Blob([JSON.stringify(this.store.exportData(), null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `traveling-viagens-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    this.#homeStatus('Backup baixado. Guarde o arquivo; para recuperar, use "Importar backup" em qualquer navegador.');
+  }
+
+  #importBackup() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        if (file.size > 2_000_000) throw new Error('grande demais');
+        const count = this.store.importData(JSON.parse(await file.text()));
+        this.render();
+        this.#homeStatus(count ? `${count} ${count === 1 ? 'viagem importada' : 'viagens importadas'}.` : 'Nenhuma viagem nova nesse arquivo.');
+      } catch {
+        this.#homeStatus('Não foi possível ler esse arquivo. Use um backup baixado pelo Traveling.');
+      }
+    });
+    input.click();
+  }
+
   #savedNote() {
     return this.store.persistent
       ? '<p class="planner-saved">Salvo neste navegador. Limpar os dados do navegador apaga as viagens. <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>'
@@ -933,6 +975,8 @@ export class PlannerUI {
       this.view = 'home';
       this.render();
     }
+    if (action === 'export') this.#exportBackup();
+    if (action === 'import') this.#importBackup();
     if (action === 'discover') this.onDiscover?.();
     if (action === 'undo-delete' && this.undo) {
       const restored = this.store.restore(this.undo.removed);

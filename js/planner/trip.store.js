@@ -76,6 +76,25 @@ export function createTripStore({ countries = null, read = readJsonStorage, writ
       commit({ ...data, trips, activeTripId: copy.id });
       return this.get(copy.id);
     },
+    // Backup: o conteúdo salvo, para baixar como arquivo.
+    exportData() {
+      return { app: 'traveling', exportedAt: new Date().toISOString(), ...data };
+    },
+    // Importa um backup: acrescenta as viagens que ainda não existem (id igual
+    // e conteúdo igual é ignorado; id igual e conteúdo diferente vira cópia).
+    // Tudo passa pela mesma normalização do armazenamento. Devolve quantas entraram.
+    importData(raw) {
+      const incoming = normalizeStore(raw, { countries }).trips;
+      const byId = new Map(data.trips.map(trip => [trip.id, trip]));
+      const added = [];
+      for (const trip of incoming) {
+        const existing = byId.get(trip.id);
+        if (existing && JSON.stringify(existing) === JSON.stringify(trip)) continue;
+        added.push(existing ? duplicateTrip(trip) : trip);
+      }
+      if (added.length) commit({ ...data, trips: [...data.trips, ...added], activeTripId: data.activeTripId ?? added[0].id });
+      return added.length;
+    },
     setActive(id) {
       if (data.trips.some(trip => trip.id === id)) commit({ ...data, activeTripId: id });
     },

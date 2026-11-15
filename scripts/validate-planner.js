@@ -497,3 +497,24 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.ok(!esimHtml(new Date('2027-03-02T12:00:00Z')).includes('desconto') && esimHtml(new Date('2027-03-02T12:00:00Z')).includes(PARTNERS.yesim.home), 'sem cupom: link normal');
   console.log('Planner: links de parceiros (Aviasales e Klook preenchidos) verificados.');
 }
+
+// Backup das viagens: exportar e importar sem duplicar nem perder dados.
+{
+  let saved = null;
+  const store = createTripStore({ read: () => null, write: (key, value) => { saved = value; return true; } });
+  const trip = store.save(createTrip({ countryKey: 'Japan', travelers: 2 }));
+  const backup = JSON.parse(JSON.stringify(store.exportData()));
+  assert.equal(backup.app, 'traveling');
+  assert.equal(store.importData(backup), 0, 'mesma viagem não entra de novo');
+  const other = createTripStore({ read: () => null, write: () => true });
+  assert.equal(other.importData(backup), 1, 'outro navegador recebe a viagem');
+  assert.equal(other.trips[0].countryKey, 'Japan');
+  const changed = { ...backup, trips: [{ ...backup.trips[0], travelers: 5 }] };
+  assert.equal(store.importData(changed), 1, 'mesmo id com conteúdo diferente vira cópia');
+  assert.equal(store.trips.length, 2);
+  assert.notEqual(store.trips[1].id, trip.id);
+  assert.equal(store.importData({ lixo: true }), 0, 'arquivo estranho não importa nada');
+  assert.equal(store.importData(null), 0);
+  assert.ok(saved);
+  console.log('Planner: backup das viagens (exportar e importar) verificado.');
+}
