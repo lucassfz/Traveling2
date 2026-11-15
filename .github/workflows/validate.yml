@@ -40,3 +40,18 @@ jobs:
           node-version: 22
       - name: Run online validators
         run: npm run validate:online
+
+  browser:
+    # Abre o site num Chrome sem janela: globo carrega, link #/BR, área
+    # clicável das cidades no Brasil e página de país. Usa a CDN do three.js.
+    name: Browser smoke test (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Run browser smoke test
+        run: npm run test:browser
