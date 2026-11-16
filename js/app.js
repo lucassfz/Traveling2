@@ -1628,6 +1628,18 @@ function ensureDiscovery() {
         selectCountry(match.countryKey);
         elements.countryName.focus({ preventScroll: true });
       },
+      // Salvar no Descobrir: a cidade escolhida (mesmo id do globo) ou o país.
+      saved: {
+        isSaved: (match, city) => (city ? Boolean(savedEntryForCity(city, match.countryKey)) : savedStore.has(`country:${match.countryKey}`)),
+        toggle: (match, city) => {
+          if (city) {
+            const existing = savedEntryForCity(city, match.countryKey);
+            return existing ? savedStore.remove(existing.id) : savedStore.save(cityCardEntry(city, match.countryKey));
+          }
+          const country = COUNTRIES[match.countryKey];
+          return savedStore.toggle({ id: `country:${match.countryKey}`, type: 'country', countryKey: match.countryKey, name: country.namePt, context: match.profile.region || country.region || '' });
+        }
+      },
       onRoute: (match, button) => openFlightPreview({
         countryKey: match.countryKey, airportCode: match.profile.airport, returnFocus: button,
         isCurrent: () => state.discovery.isOpen && state.discovery.step === 'result'

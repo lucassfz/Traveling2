@@ -4,7 +4,12 @@
 //   2. o link #/BR abre o Brasil;
 //   3. todo ponto do Brasil desenhado no globo escolhe uma cidade (a área
 //      clicável das cidades, que já regrediu uma vez);
-//   4. uma página de país (paises/japao/) abre com título e link para o globo.
+//   4. uma página de país (paises/japao/) abre com título e link para o globo;
+//   5. nomes de país na vista ampla, sem nomes sobrepostos (Fase 4.2);
+//   6. link antigo de cidade (#/BR/i174, posição no arquivo) e link novo
+//      (#/BR/c3452640) abrem a mesma cidade (Fase 4.1);
+//   7. regiões de um país sem data/geo (França), salvar região sem criar viagem
+//      e "＋ Roteiro" no cartão da cidade (Fases 4.3–4.5).
 //
 //   node scripts/smoke-browser.js        (CHROME_PATH=... para outro Chrome)
 //
@@ -107,6 +112,20 @@ try {
     return true;
   })`);
 
+  // 5. Nomes de país na vista ampla, sem sobreposição.
+  await sleep(1500);
+  const labels = await evaluate(`(() => {
+    const boxes = [...document.querySelectorAll('.globe-label--country:not([hidden]) .globe-label__text')].map(element => element.getBoundingClientRect()).filter(box => box.width);
+    let overlaps = 0;
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i], b = boxes[j];
+      if (a.left < b.right - 1 && a.right - 1 > b.left && a.top < b.bottom - 1 && a.bottom - 1 > b.top) overlaps += 1;
+    }
+    return { count: boxes.length, overlaps };
+  })()`);
+  check(labels && labels.count >= 20, `nomes de país na vista ampla (${labels?.count ?? 0})`);
+  check(labels && labels.overlaps === 0, `nomes de país sem sobreposição (${labels?.overlaps ?? '?'} sobrepostos)`);
+
   // 2. Link de país.
   await evaluate("location.hash = '#/BR'");
   check(await waitFor("document.getElementById('country-name')?.textContent === 'Brasil'", 10000), 'link #/BR abre o Brasil');
@@ -129,6 +148,34 @@ try {
   })()`);
   check(coverage && coverage.inside > 200, `Brasil visível no globo (${coverage?.inside ?? 0} pontos testados)`);
   check(coverage && coverage.missing === 0, `todo ponto do Brasil escolhe uma cidade (${coverage?.missing ?? '?'} sem cidade)`);
+
+  // 6. Links de cidade: antigo (posição no arquivo antes da Fase 4.1) e novo (geonameid).
+  for (const hash of ['#/BR/i174', '#/BR/c3452640']) {
+    await evaluate(`location.hash = '${hash}'`);
+    check(await waitFor("document.querySelector('#city-card:not([hidden]) #city-card-title')?.textContent === 'Porto Seguro'", 15000), `link ${hash} abre Porto Seguro`);
+    await evaluate("location.hash = ''");
+    await sleep(300);
+  }
+
+  // 7. Regiões da França, salvar região e "＋ Roteiro".
+  await evaluate("location.hash = '#/FR'");
+  check(await waitFor("document.querySelectorAll('#country-regions:not([hidden]) [data-geo-region]').length > 5", 15000), 'França mostra as regiões (Natural Earth)');
+  await evaluate("document.querySelector('#country-regions [data-geo-region]').click()");
+  await sleep(400);
+  await evaluate("document.querySelector('#country-regions [data-geo-save-region]').click()");
+  await sleep(200);
+  const stored = await evaluate("({ saved: JSON.parse(localStorage.getItem('traveling.saved') || '{}').items?.filter(item => item.type === 'region').map(item => item.id) ?? [], trips: JSON.parse(localStorage.getItem('traveling.trips') || '{}').trips?.length ?? 0 })");
+  check(stored.saved.length === 1 && /^region:FR-/.test(stored.saved[0]), `região salva com id ISO 3166-2 (${stored.saved.join(', ')})`);
+  check(stored.trips === 0, 'salvar região não cria viagem');
+  await evaluate("document.querySelector('#country-regions [data-geo-city]').click()");
+  check(await waitFor("Boolean(document.querySelector('#city-card:not([hidden]) [data-city-action=itinerary]'))", 10000), 'cartão da cidade tem "＋ Roteiro"');
+  await evaluate("document.querySelector('#city-card [data-city-action=itinerary]').click()");
+  check(await waitFor("document.querySelector('dialog.itinerary-add')?.open === true", 8000), 'diálogo "Adicionar ao roteiro" abre');
+  await evaluate("document.querySelector('dialog.itinerary-add [data-add-action=create]').click()");
+  await sleep(300);
+  const itinerary = await evaluate("JSON.parse(localStorage.getItem('traveling.trips') || '{}').trips?.[0]?.itinerary ?? []");
+  check(itinerary.length === 1 && /^city:FR-gn\d+$/.test(itinerary[0].ref) && itinerary[0].day === 1, 'cidade entra no dia 1 do roteiro com id estável');
+  await evaluate("document.querySelector('dialog.itinerary-add')?.close()");
 
   // 4. Página de país.
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/paises/japao/` });

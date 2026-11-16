@@ -42,6 +42,11 @@ export function createItineraryAdder({ store, countries, onOpenTrip }) {
       event.preventDefault();
       addToSelected();
     });
+    // Esc fecha só o diálogo: não pode chegar aos atalhos do app (que fecham o
+    // cartão da cidade de onde o diálogo foi aberto e levam o foco embora).
+    dialog.addEventListener('keydown', event => {
+      if (event.key === 'Escape') event.stopPropagation();
+    });
     dialog.addEventListener('close', () => {
       returnFocus?.focus?.({ preventScroll: true });
       returnFocus = null;

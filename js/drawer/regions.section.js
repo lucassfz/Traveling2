@@ -362,6 +362,12 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan, o
 
   return {
     async show(next) {
+      // O mesmo país de novo (o globo confirma a seleção depois do voo): mantém
+      // a região ou cidade aberta em vez de voltar à lista.
+      if (next?.alpha2 && next.alpha2 === country?.alpha2 && (geo || admin)) {
+        root.hidden = false;
+        return;
+      }
       const current = ++token;
       geo = null;
       admin = null;
@@ -417,6 +423,7 @@ export function createRegionsSection({ root, getMap, onWorld, onPlace, onPlan, o
       token += 1;
       geo = null;
       admin = null;
+      country = null;
       root.hidden = true;
       root.innerHTML = '';
     }

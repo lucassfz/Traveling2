@@ -35,8 +35,9 @@ export class DiscoveryUI {
    */
   filtersOpen = false;
 
-  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport = async () => null, onCity = () => {} }) {
-    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport, onCity });
+  constructor({ element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport = async () => null, onCity = () => {}, saved = null }) {
+    // saved: { isSaved(match, city) → boolean, toggle(match, city) } — salva a cidade escolhida ou o país.
+    Object.assign(this, { element, trigger, countries, onHighlight, onExplore, onRoute, onPlan, onClose, resolveAirport, onCity, saved });
     this.regionCities = new Map(); // id do perfil → cidades da região (ou 'error')
     this.city = null;
     this.preferences = { interests: [], climate: 'any', budget: 'any', month: new Date().getMonth(), visaFree: false };
@@ -154,10 +155,17 @@ export class DiscoveryUI {
               <button class="primary-button" type="button" data-action="explore">Explorar ${escape(match.country.namePt)}</button>
               <button class="secondary-button" type="button" data-action="route">✈ Ver rota</button>
               ${this.onPlan ? `<button class="secondary-button" type="button" data-action="plan">＋ Planejar${this.city ? ` ${escape(this.city.name)}` : ''}</button>` : ''}
+              ${this.saved ? this.#saveButton(match) : ''}
             </div>
             <p class="discovery-feedback" role="status"></p>
           </div>` : ''}
       </li>`;
+  }
+
+  #saveButton(match) {
+    const isSaved = this.saved.isSaved(match, this.city);
+    const name = this.city?.name ?? match.country.namePt;
+    return `<button class="save-toggle" type="button" data-action="save" aria-pressed="${isSaved}" aria-label="${isSaved ? 'Remover dos salvos' : 'Salvar'}: ${escape(name)}">${isSaved ? '✓ Salvo' : `Salvar ${escape(name)}`}</button>`;
   }
 
   #results() {
@@ -283,6 +291,12 @@ export class DiscoveryUI {
     const match = this.matches[this.index];
     if (!match) return;
     if (action === 'explore') { this.onExplore(match, prefs); return; }
+    if (action === 'save' && this.saved) {
+      this.saved.toggle(match, this.city);
+      this.render(false);
+      this.element.querySelector('[data-action="save"]')?.focus({ preventScroll: true });
+      return;
+    }
     if (action === 'plan' && this.onPlan) {
       const budgetCeiling = BUDGETS.find(band => band.id === prefs.budget)?.ceiling ?? Infinity;
       this.onPlan(match, { ...prefs, budgetCeiling, city: this.city });
