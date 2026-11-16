@@ -45,9 +45,9 @@ const CITY_TIERS = [[1.13, 0], [1.22, 50000], [1.36, 180000], [1.6, 600000], [1.
 const DOT_TIERS = [[1.25, 0], [1.4, 40000], [1.65, 150000], [1.95, 500000]];
 const CAPITAL_DISTANCE = 2.15;
 const STATE_CAPITAL_DISTANCE = 1.6;
-// Nomes de país: na vista ampla (sem país em foco) disputam espaço pela área;
-// no zoom médio só os vizinhos aparecem, abaixo dos nomes do país em foco;
-// perto disso somem (o país em foco já mostra estados e cidades).
+// Nome de país: só o do país selecionado, com a câmera afastada (todos de uma
+// vez poluíam o globo; sob o ponteiro, a dica do app já mostra o nome). Perto,
+// some: o país em foco já mostra estados e cidades.
 const COUNTRY_LABEL_DISTANCE = 1.45;
 const MAX_COUNTRY_LABELS = 70;
 
@@ -629,9 +629,10 @@ export class AdminLayer {
     };
     if (distance > COUNTRY_LABEL_DISTANCE) {
       for (const country of this.countryLabels) {
+        const selected = country.alpha2 === this.selectedCode;
+        if (!selected) continue;
         // O país em foco já se apresenta pelos estados e cidades.
         if (record && country.alpha2 === record.code) continue;
-        const selected = country.alpha2 === this.selectedCode;
         // Vista ampla: país acima de tudo. Zoom médio: vizinhos abaixo das cidades do país em foco.
         consider(country, (selected ? 1e13 : 0) + (record ? 0 : 1e10) + country.area);
       }

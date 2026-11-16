@@ -5,7 +5,7 @@
 //   3. todo ponto do Brasil desenhado no globo escolhe uma cidade (a área
 //      clicável das cidades, que já regrediu uma vez);
 //   4. uma página de país (paises/japao/) abre com título e link para o globo;
-//   5. nomes de país na vista ampla, sem nomes sobrepostos (Fase 4.2);
+//   5. globo limpo: nenhum nome de país até escolher um (Fase 4.2);
 //   6. link antigo de cidade (#/BR/i174, posição no arquivo) e link novo
 //      (#/BR/c3452640) abrem a mesma cidade (Fase 4.1);
 //   7. regiões de um país sem data/geo (França), salvar região sem criar viagem
@@ -123,8 +123,7 @@ try {
     }
     return { count: boxes.length, overlaps };
   })()`);
-  check(labels && labels.count >= 20, `nomes de país na vista ampla (${labels?.count ?? 0})`);
-  check(labels && labels.overlaps === 0, `nomes de país sem sobreposição (${labels?.overlaps ?? '?'} sobrepostos)`);
+  check(labels && labels.count === 0, `globo sem nomes de país até escolher um (${labels?.count ?? '?'} visíveis)`);
 
   // 2. Link de país.
   await evaluate("location.hash = '#/BR'");

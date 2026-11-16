@@ -47,7 +47,7 @@ Base auditada: `origin/main` em `a93eae8` (16/11/2026). CI do GitHub verde nesse
 | Etapa | Situação | Observação |
 |---|---|---|
 | 4.1 | Feita | `data/admin` regenerado (geonameid e ISO 3166-2), id único em `js/geo/destination.id.js`, migração com backup e relatório, links antigos traduzidos. |
-| 4.2 | Feita | Nomes de país sem sobreposição em 320–1440 px (teste de fumaça confere). Capitais e cidades continuam pelas faixas de zoom existentes. |
+| 4.2 | Feita | Só o nome do país selecionado, com a câmera afastada (todos de uma vez poluíam o globo; sob o ponteiro, a dica já mostra o nome). Capitais e cidades continuam pelas faixas de zoom existentes. |
 | 4.3 | Parcial | Regiões e cidades para todos os países; cidade sempre no mesmo cartão. Falta: "Quando ir" por região, informações práticas por região e as páginas `cidades/` levarem ao cartão (hoje levam ao globo pelo link estável). |
 | 4.4 | Feita | Salvar região, "＋ Roteiro" em cidade, região, lugar e salvos; salvar no Descobrir. |
 | 4.5 | Feita | Roteiro por dia no Resumo do Planner, no backup, na impressão e no link compartilhado. Sem custos (de propósito). |
