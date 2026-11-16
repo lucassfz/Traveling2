@@ -3887,3 +3887,56 @@ html[data-contrast='high'] :is(.visit-button, .secondary-button, .icon-button, .
   body.printing-trip .planner-card { border: 1px solid #999 !important; break-inside: avoid; }
   html, body { overflow: visible !important; height: auto !important; }
 }
+
+/* ---------- Fase 4: roteiro por dia, "＋ Roteiro" e regiões ---------- */
+.itinerary__days { display: grid; gap: var(--space-3); }
+.itinerary__day { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); background: var(--color-surface); }
+.itinerary__day--outside { border-style: dashed; }
+.itinerary__day-title { margin: 0; color: var(--color-text); font-size: .9rem; font-weight: 600; }
+.itinerary__day-title small { color: var(--color-text-secondary); font-weight: 400; }
+.itinerary__items { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; counter-reset: itinerary; }
+.itinerary__item { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm, 10px); background: var(--color-surface-raised); }
+.itinerary__main { display: grid; gap: 2px; min-width: 0; }
+.itinerary__type { color: var(--color-accent-strong); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.itinerary__name { color: var(--color-text); font-size: .92rem; overflow-wrap: anywhere; }
+.itinerary__context { color: var(--color-text-secondary); font-size: .78rem; }
+.itinerary__fields { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 8px; }
+.itinerary__field { display: grid; gap: 2px; color: var(--color-text-secondary); font-size: .72rem; }
+.itinerary__field input, .itinerary__day-pick select, .itinerary__add select, .itinerary__add input, .itinerary-add__field select {
+  min-height: 40px; min-width: 0; width: 100%; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 10px;
+  background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 16px;
+}
+.itinerary__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.itinerary__move { width: 40px; height: 40px; }
+.itinerary__day-pick select { width: auto; }
+.itinerary__empty { margin: 0; color: var(--color-text-secondary); font-size: .82rem; }
+.itinerary__add { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.itinerary__add > label { flex: 1 1 12rem; min-width: 0; }
+.itinerary__add .secondary-button { flex: 0 0 auto; }
+@media (max-width: 420px) {
+  .itinerary__fields { grid-template-columns: 1fr; }
+  .itinerary__add .secondary-button { flex: 1 1 100%; }
+}
+
+/* Diálogo "Adicionar ao roteiro" (<dialog> nativo, acima de tudo, inclusive do painel de acessibilidade). */
+.itinerary-add { width: min(420px, calc(100vw - 32px)); max-width: none; padding: 0; border: 0; background: transparent; color: var(--color-text); }
+.itinerary-add::backdrop { background: color-mix(in srgb, var(--color-background) 62%, transparent); }
+.itinerary-add__box { width: 100%; }
+.itinerary-add__field { display: grid; gap: 4px; color: var(--color-text-secondary); font-size: .8rem; }
+.itinerary-add__status:empty { display: none; }
+
+.media-card__tools { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.city-card__region { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.city-card__region:hover { color: var(--color-accent-strong); }
+
+@media print {
+  body.printing-trip :is(.itinerary__add, .itinerary__tools, [data-itin-extra-day]) { display: none !important; }
+  body.printing-trip .itinerary__field input { border: 0 !important; padding: 0 !important; min-height: 0 !important; }
+  body.printing-trip .itinerary__day { break-inside: avoid; border: 1px solid #999 !important; }
+}
+
+/* 320 px: as ações do país e a barra de cima quebram linha em vez de sair da tela. */
+@media (max-width: 360px) {
+  .country-actions { flex-wrap: wrap; }
+  .country-panel__toolbar { flex-wrap: wrap; row-gap: var(--space-1); }
+}

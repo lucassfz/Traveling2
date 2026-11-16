@@ -337,12 +337,13 @@ export class AdminLayer {
     }));
     const zones = data.zones ?? [];
     const regions = data.regions ?? [];
+    const regionCodes = new Map(record.divisions.map(division => [division.name, division.code]));
     // id estável pelo geonameid (geo/destination.id.js); index = posição no arquivo,
     // usada só para os contornos urbanos e as regiões deste mesmo arquivo.
     record.cities = data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
       id: cityIdOf(record.code, geonameId, index), index, name: displayCityName(record.code, rank, name), population, rank, lat, lng, kind: 'city', country: record.code,
       geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
-      timeZone: zones[zone] ?? null, region: regions[region] ?? null, hasOutline: urban === 1,
+      timeZone: zones[zone] ?? null, region: regions[region] ?? null, regionCode: regionCodes.get(regions[region]) ?? null, hasOutline: urban === 1,
       position: toVector(lat, lng, POINT_RADIUS)
     }));
     const byPopulation = [...record.cities].sort((a, b) => b.population - a.population);

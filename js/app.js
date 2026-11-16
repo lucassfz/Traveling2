@@ -187,6 +187,17 @@ const regionsSection = createRegionsSection({
   root: elements.regions,
   getMap: () => state.map,
   onWorld: () => resetToGlobe(),
+  onCity: city => selectCity(city, { fly: true }),
+  regions: {
+    isSaved: code => savedStore.has(`region:${code}`),
+    toggle: entry => savedStore.toggle(entry)
+  },
+  // Região: { type: 'region', ref, … }; cidade do Brasil: { place, division }.
+  onAddToItinerary: async (entry, trigger) => {
+    if (entry.type === 'region') return addToItinerary(entry, trigger);
+    const city = await regionCityEntry(entry.place, entry.division);
+    addToItinerary(savedItineraryEntry(city), trigger);
+  },
   onPlace: async (place, division) => {
     const countryKey = state.countryKey;
     const city = await matchGlobeCity(COUNTRIES[countryKey], place, division);
@@ -450,7 +461,7 @@ function landmarkEntry(countryKey, item) {
 function landmarkSaveButton(countryKey, item) {
   if (!item.wikidataId) return '';
   const saved = savedStore.has(`place:${item.wikidataId}`);
-  return `<button class="save-toggle save-toggle--small" type="button" data-save-landmark="${escapeHtml(item.wikidataId)}" aria-pressed="${saved}" aria-label="${saved ? 'Remover dos salvos' : 'Salvar'}: ${escapeHtml(item.name)}">${saved ? '✓ Salvo' : 'Salvar'}</button>`;
+  return `<span class="media-card__tools"><button class="save-toggle save-toggle--small" type="button" data-save-landmark="${escapeHtml(item.wikidataId)}" aria-pressed="${saved}" aria-label="${saved ? 'Remover dos salvos' : 'Salvar'}: ${escapeHtml(item.name)}">${saved ? '✓ Salvo' : 'Salvar'}</button><button class="save-toggle save-toggle--small" type="button" data-itinerary-landmark="${escapeHtml(item.wikidataId)}" aria-label="Adicionar ao roteiro: ${escapeHtml(item.name)}">＋ Roteiro</button></span>`;
 }
 
 // Introdução do país (abertura do artigo da Wikipédia), quando existe.
@@ -479,7 +490,7 @@ function toggleCountrySaved() {
 
 // ---------- Destinos salvos ----------
 
-const SAVED_TYPES = { country: 'País', city: 'Cidade', place: 'Lugar' };
+const SAVED_TYPES = { country: 'País', region: 'Região', city: 'Cidade', place: 'Lugar' };
 
 function savedThumb(item) {
   if (item.image) return `<img class="saved-item__image" src="${escapeHtml(item.image)}" alt="" loading="lazy" decoding="async">`;
@@ -512,6 +523,7 @@ function renderSaved() {
             <div class="saved-item__actions">
               <button class="secondary-button" type="button" data-saved-open="${escapeHtml(item.id)}">Abrir</button>
               <button class="secondary-button" type="button" data-saved-plan="${escapeHtml(item.id)}">Planejar viagem</button>
+              ${item.type === 'country' ? '' : `<button class="secondary-button" type="button" data-saved-itinerary="${escapeHtml(item.id)}" aria-label="Adicionar ${escapeHtml(item.name)} ao roteiro">＋ Roteiro</button>`}
               <button class="planner-text-button" type="button" data-saved-remove="${escapeHtml(item.id)}" aria-label="Remover ${escapeHtml(item.name)} dos salvos">Remover</button>
             </div>
           </div>
@@ -520,7 +532,7 @@ function renderSaved() {
     ${savedStore.persistent ? '<p class="planner-saved">Salvo neste navegador. Remover daqui não mexe nas suas viagens.</p>' : '<p class="planner-saved planner-saved--warning" role="status">Este navegador não permite salvar. A lista fica só até fechar a página.</p>'}` : `
     <div class="saved-empty">
       <strong>Nada salvo ainda</strong>
-      <p>Toque em "Salvar" num país, numa cidade ou num lugar em destaque para guardar aqui.</p>
+      <p>Toque em "Salvar" num país, numa região, numa cidade ou num lugar em destaque para guardar aqui.</p>
     </div>`;
 }
 
@@ -607,9 +619,24 @@ async function openSaved(item) {
       if (city) state.map?.selectCity(city);
       else if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, 1.7);
     }
+  } else if (item.type === 'region') {
+    // Região: abre a navegação do país nela e aproxima o globo.
+    if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, 2);
+    await regionsSection.open({ regionCode: item.regionCode ?? item.id.slice('region:'.length) });
   } else if (item.type === 'place' && Number.isFinite(item.lat)) {
     state.map?.flyTo(item.lat, item.lng, 1.6);
   }
+}
+
+// Região da cidade (cartão da cidade): abre o país na região dela.
+async function openCityRegion(city) {
+  const countryKey = COUNTRY_BY_ALPHA2.get(city.country);
+  if (!countryKey) return;
+  cityCard?.hide();
+  state.map?.selectCity(null);
+  selectCountry(countryKey);
+  // Brasil: o estado tem o código do IBGE (BR-BA), igual ao ISO 3166-2.
+  if (city.regionCode) await regionsSection.open({ regionCode: city.regionCode });
 }
 
 async function planSaved(item) {
@@ -861,6 +888,8 @@ function selectCity(city, { fly = false } = {}) {
     countries: COUNTRIES,
     onShowCountry: countryKey => { state.map?.selectCity(null); selectCountry(countryKey); },
     onPlan: (countryKey, city) => planTrip(countryKey, { city }),
+    onAddToItinerary: (city, countryKey, button) => addToItinerary(cityItineraryEntry(city, countryKey), button),
+    onShowRegion: city => openCityRegion(city),
     onZoom: target => state.map?.flyTo(target.lat, target.lng, 1.1, 700),
     onClose: () => closeCityCard(),
     partnerLinks: city => cityPartnerLinks(city),
@@ -917,7 +946,7 @@ async function shareFrom(button, { title, text, hash = '', url = hash ? shareUrl
 const TRIP_SHARE_PREFIX = '#/viagem/';
 // O roteiro vai junto, sem as anotações (são pessoais). 'days' fica por
 // compatibilidade com links antigos; a duração escolhida é 'duration'.
-const SHARED_TRIP_FIELDS = ['countryKey', 'city', 'origin', 'startDate', 'endDate', 'month', 'days', 'duration', 'travelers', 'group', 'cabin', 'payWith', 'flightPreference', 'style', 'lodging', 'transport', 'interests', 'budgetBRL', 'itinerary'];
+const SHARED_TRIP_FIELDS = ['countryKey', 'city', 'origin', 'startDate', 'endDate', 'month', 'days', 'duration', 'travelers', 'group', 'cabin', 'payWith', 'flightPreference', 'style', 'lodging', 'transport', 'interests', 'budgetBRL', 'itinerary', 'itineraryDays'];
 const MAX_SHARED_HASH = 12000;
 const encodeTrip = payload => {
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
@@ -1245,11 +1274,16 @@ function bindUiEvents() {
   // Link colado com o site já aberto.
   window.addEventListener('hashchange', () => openFromHash());
   elements.media.addEventListener('click', event => {
-    const button = event.target.closest('[data-save-landmark]');
+    const button = event.target.closest('[data-save-landmark], [data-itinerary-landmark]');
     if (!button || !state.countryKey) return;
-    getCountryMedia(state.countryKey, COUNTRIES[state.countryKey]).then(media => {
-      const item = media.find(entry => entry.wikidataId === button.dataset.saveLandmark);
-      if (item) savedStore.toggle(landmarkEntry(state.countryKey, item));
+    const countryKey = state.countryKey;
+    const id = button.dataset.saveLandmark ?? button.dataset.itineraryLandmark;
+    getCountryMedia(countryKey, COUNTRIES[countryKey]).then(media => {
+      const item = media.find(entry => entry.wikidataId === id);
+      if (!item) return;
+      const entry = landmarkEntry(countryKey, item);
+      if (button.dataset.saveLandmark) savedStore.toggle(entry);
+      else addToItinerary(savedItineraryEntry(entry), button);
     });
   });
   elements.savedLauncher.addEventListener('click', () => setSavedOpen(!isSavedOpen()));
@@ -1264,6 +1298,12 @@ function bindUiEvents() {
       if (keys.includes(key)) { if (keys.length > 2) state.compareKeys = keys.filter(item => item !== key); }
       else state.compareKeys = [...keys, key].slice(-3);
       renderSaved();
+      return;
+    }
+    const itinerary = event.target.closest('[data-saved-itinerary]');
+    if (itinerary) {
+      const item = savedStore.get(itinerary.dataset.savedItinerary);
+      if (item) addToItinerary(savedItineraryEntry(item), itinerary);
       return;
     }
     const open = event.target.closest('[data-saved-open]');
@@ -1664,8 +1704,9 @@ function ensurePlanner() {
     import('./planner/live.flights.section.js'),
     import('./planner/live.hotels.section.js'),
     import('./planner/cost.section.js'),
-    import('./planner/partners.section.js')
-  ]).then(([{ PlannerUI }, { createFlightSections, createRouteEstimator }, { createPrepSection }, { rateTable, rateFor }, { createLiveFlightsSection }, { createLiveHotelsSection }, { createCostSection }, { createPartnerSections }]) => {
+    import('./planner/partners.section.js'),
+    import('./planner/itinerary.section.js')
+  ]).then(([{ PlannerUI }, { createFlightSections, createRouteEstimator }, { createPrepSection }, { rateTable, rateFor }, { createLiveFlightsSection }, { createLiveHotelsSection }, { createCostSection }, { createPartnerSections }, { createItinerarySection }]) => {
     const getRates = () => rateTable({ snapshot: state.fxSnapshot, live: { ...state.liveRates, ...(state.brlPerUsd ? { USD: state.brlPerUsd } : {}) } });
     // Uma estimativa de rota por viagem, usada pela etapa Voo e pelo custo no resumo.
     const routes = createRouteEstimator({
@@ -1724,6 +1765,8 @@ function ensurePlanner() {
         // Links de parceiros (Aviasales, aluguel de carro, passes, eSIM), sem script.
         ...createPartnerSections({ routes, countryName: key => COUNTRIES[key]?.namePt ?? null }),
         createPrepSection({ countries: COUNTRIES }),
+        // Resumo: roteiro dia a dia (cidade da viagem, salvos do país e anotações).
+        createItinerarySection({ getSaved: () => savedStore.items, onShowOnGlobe: item => showItineraryItem(item) }),
         // Resumo: quanto vai custar (estimativas, cotações anexadas e gastos anotados).
         createCostSection({ routes, getRates, getFx: () => state.brlPerUsd })
       ]
@@ -1767,12 +1810,65 @@ function setPlannerOpen(open, restoreFocus = false) {
   } else if (restoreFocus) elements.tripsLauncher.focus();
 }
 
+// "＋ Roteiro" de uma cidade, região ou lugar: escolhe a viagem e o dia. O
+// diálogo só cria viagem se a pessoa pedir (salvar nunca cria).
+let itineraryAdder = null;
+async function addToItinerary(entry, trigger) {
+  if (!entry) return;
+  const { createItineraryAdder } = await import('./planner/itinerary.add.js');
+  itineraryAdder ??= createItineraryAdder({
+    store: tripStore,
+    countries: COUNTRIES,
+    onOpenTrip: id => openItinerary(id)
+  });
+  itineraryAdder.open(entry, trigger);
+}
+
+// Abre a viagem no Resumo, com o roteiro à vista.
+function openItinerary(tripId) {
+  setPlannerOpen(true);
+  ensurePlanner().then(planner => {
+    planner.openTrip(tripId, { step: 6 });
+    planner.render();
+    const card = elements.plannerContent.querySelector('#planner-itinerary');
+    card?.scrollIntoView({ block: 'start' });
+    card?.querySelector('.planner-block-title')?.setAttribute('tabindex', '-1');
+    card?.querySelector('.planner-block-title')?.focus({ preventScroll: true });
+  }).catch(() => {});
+}
+
+// "Ver no globo" de um item do roteiro: cidade abre o cartão; o resto voa até o ponto.
+async function showItineraryItem(item) {
+  if (window.innerWidth < 1200) setPlannerOpen(false);
+  const countryKey = item.countryKey ?? state.planner?.trip?.countryKey;
+  if (item.type === 'city' && countryKey) {
+    const cities = await loadCities(COUNTRIES[countryKey]?.alpha2).catch(() => []);
+    const city = resolveCity(cities, { id: item.ref?.slice(5), name: item.name, lat: item.lat, lng: item.lng, geonameId: Number(item.ref?.match(/-gn(\d+)$/)?.[1]) || undefined });
+    if (city) return selectCity(city, { fly: true });
+  }
+  if (Number.isFinite(item.lat)) state.map?.flyTo(item.lat, item.lng, item.type === 'region' ? 2 : 1.6);
+}
+
+const cityItineraryEntry = (city, countryKey) => ({
+  type: 'city', ref: `city:${city.id}`, name: city.name, countryKey,
+  context: [city.region, COUNTRIES[countryKey]?.namePt].filter(Boolean).join(' · '), lat: city.lat, lng: city.lng,
+  cityRef: { id: city.id, name: city.name, lat: city.lat, lng: city.lng, region: city.region ?? undefined, geonameId: city.geonameId ?? undefined }
+});
+
+const savedItineraryEntry = item => ({
+  type: item.type, ref: item.id, name: item.name, countryKey: item.countryKey, context: item.context, lat: item.lat, lng: item.lng,
+  ...(item.type === 'city' && item.cityId ? { cityRef: { id: item.cityId, name: item.name, lat: item.lat, lng: item.lng, geonameId: item.geonameId } } : {})
+});
+
 // "Planejar viagem": abre o Planner com o destino (e a cidade, se houver)
 // preenchidos. Nada é criado até a pessoa confirmar na tela do Planner; se já
 // houver viagem para o país, ela aparece ali como opção.
 function planTrip(countryKey, prefill = {}) {
   if (!countryKey || !COUNTRIES[countryKey]) return;
-  const city = prefill.city ? { id: prefill.city.id, name: prefill.city.name, lat: prefill.city.lat, lng: prefill.city.lng, region: prefill.city.region } : null;
+  const city = prefill.city ? {
+    id: prefill.city.id, name: prefill.city.name, lat: prefill.city.lat, lng: prefill.city.lng, region: prefill.city.region,
+    ...(Number.isInteger(prefill.city.geonameId) ? { geonameId: prefill.city.geonameId } : {})
+  } : null;
   ensurePlanner().then(planner => {
     planner.startDraft(countryKey, { city, profileId: prefill.profileId ?? null, budgetBRL: prefill.budgetBRL ?? null });
     if (isPlannerOpen()) planner.render();

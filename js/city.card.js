@@ -37,7 +37,7 @@ function coordinate(value, positive, negative) {
  * @param {() => void} deps.onClose
  * @param {object} [deps.saved]   { isSaved(city) → boolean, toggle(city, countryKey) → boolean }
  */
-export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, onShare = null, partnerLinks = null, saved = null }) {
+export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom, onClose, onShare = null, partnerLinks = null, saved = null, onAddToItinerary = null, onShowRegion = null }) {
   const byAlpha2 = new Map(Object.entries(countries).map(([key, country]) => [country.alpha2, key]));
   let current = null;
   let clock = 0;
@@ -59,7 +59,9 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
         <div class="city-card__titles">
           ${RANK_LABELS[city.rank] ? `<span class="eyebrow">${RANK_LABELS[city.rank]}</span>` : ''}
           <h2 class="city-card__name" id="city-card-title" tabindex="-1">${escapeHtml(city.name)}</h2>
-          <small>${escapeHtml([city.region, country?.namePt ?? city.country].filter(Boolean).join(' · '))}</small>
+          <small>${city.region && onShowRegion && countryKey
+            ? `<button class="city-card__region" type="button" data-city-action="region" aria-label="Ver a região ${escapeHtml(city.region)}">${escapeHtml(city.region)}</button> · ${escapeHtml(country?.namePt ?? city.country)}`
+            : escapeHtml([city.region, country?.namePt ?? city.country].filter(Boolean).join(' · '))}</small>
         </div>
         <div class="city-card__tools">
           ${saved && countryKey ? `<button class="save-toggle" type="button" data-city-action="save" aria-pressed="false">Salvar</button>` : ''}
@@ -71,6 +73,7 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
       </dl>
       <div class="city-card__actions">
         <button class="secondary-button" type="button" data-city-action="zoom">Aproximar</button>
+        ${onAddToItinerary && countryKey ? '<button class="secondary-button" type="button" data-city-action="itinerary">＋ Roteiro</button>' : ''}
         ${onShare ? '<button class="secondary-button" type="button" data-city-action="share">Compartilhar</button>' : ''}
         ${countryKey ? `<button class="secondary-button" type="button" data-city-action="country">Guia de ${escapeHtml(country.namePt)}</button>
         <button class="primary-button" type="button" data-city-action="plan">Planejar viagem para ${escapeHtml(city.name)}</button>` : ''}
@@ -100,6 +103,8 @@ export function createCityCard({ root, countries, onShowCountry, onPlan, onZoom,
     if (action === 'save' && countryKey) { saved?.toggle(current, countryKey); syncSave(); }
     if (action === 'country' && countryKey) { hide(); onShowCountry(countryKey); }
     if (action === 'plan' && countryKey) { const city = current; hide(); onPlan(countryKey, city); }
+    if (action === 'itinerary' && countryKey) onAddToItinerary?.(current, countryKey, event.target.closest('[data-city-action]'));
+    if (action === 'region' && countryKey) onShowRegion?.(current);
   });
 
   let leaving = 0;

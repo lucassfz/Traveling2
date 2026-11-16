@@ -60,16 +60,18 @@ export function normalizeItinerary(raw, options = {}) {
  * item ficou num dia depois do fim (as datas mudaram), os dias até ele — nada é
  * escondido nem apagado. Sem datas nem itens: 1 dia.
  */
-export function itineraryDayCount(tripDayCount, items = []) {
+export function itineraryDayCount(tripDayCount, items = [], extraDays = 0) {
   const planned = Number.isInteger(tripDayCount) && tripDayCount > 0 ? Math.min(tripDayCount, MAX_ITINERARY_DAYS) : 0;
   const used = items.reduce((max, item) => Math.max(max, item.day), 0);
-  return Math.max(1, planned, used);
+  const asked = Number.isInteger(extraDays) && extraDays > 0 ? Math.min(extraDays, MAX_ITINERARY_DAYS) : 0;
+  return Math.max(1, planned, used, asked);
 }
 
 /** [{ day, date, outside, items }]: date "AAAA-MM-DD" quando a viagem tem ida. */
 export function itineraryByDay(trip, tripDayCount) {
   const items = trip?.itinerary ?? [];
-  const count = itineraryDayCount(tripDayCount, items);
+  // itineraryDays: dias pedidos no roteiro ("＋ Mais um dia") além das datas.
+  const count = itineraryDayCount(tripDayCount, items, trip?.itineraryDays);
   const start = trip?.startDate ? Date.parse(`${trip.startDate}T00:00:00Z`) : null;
   return Array.from({ length: count }, (_, index) => {
     const day = index + 1;

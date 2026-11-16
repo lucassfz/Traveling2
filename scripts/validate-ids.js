@@ -241,4 +241,25 @@ const memoryIo = initial => {
   assert.deepEqual(normalizeItinerary([{ type: 'city', ref: 'city:<script>', name: 'x', day: 1 }]), []);
 }
 
+// ---------- Roteiro: o que dá para adicionar e dias pedidos além das datas ----------
+{
+  // A seção usa CSS.escape só no navegador; a função de opções é pura.
+  const { itineraryOptions } = await import('../js/planner/itinerary.section.js');
+  {
+    const trip = { countryKey: 'Brazil', city: { id: 'BR-gn3452640', name: 'Porto Seguro', lat: -16.45, lng: -39.065, region: 'Bahia' } };
+    const saved = [
+      { id: 'city:BR-gn3452640', type: 'city', countryKey: 'Brazil', name: 'Porto Seguro' },
+      { id: 'region:BR-BA', type: 'region', countryKey: 'Brazil', name: 'Bahia', lat: -12.5, lng: -41.7 },
+      { id: 'place:Q39231', type: 'place', countryKey: 'Japan', name: 'Monte Fuji' },
+      { id: 'country:Brazil', type: 'country', countryKey: 'Brazil', name: 'Brasil' }
+    ];
+    assert.deepEqual(itineraryOptions(trip, saved).map(option => option.ref), ['city:BR-gn3452640', 'region:BR-BA'], 'cidade da viagem + salvos do mesmo país, sem repetir nem país');
+  }
+  const trip = normalizeTrip({ countryKey: 'Brazil', itineraryDays: 4 }, { countries: COUNTRIES });
+  assert.equal(trip.itineraryDays, 4);
+  assert.equal(itineraryByDay(trip, null).length, 4, 'dias pedidos no roteiro sem datas');
+  assert.equal(normalizeTrip({ countryKey: 'Brazil', itineraryDays: 999 }, { countries: COUNTRIES }).itineraryDays, undefined);
+  assert.equal(itineraryByDay({ ...trip, startDate: '2026-12-20', endDate: '2026-12-21' }, 2).filter(day => day.outside).length, 2, 'dias além da volta ficam marcados');
+}
+
 console.log(`Ids: ${cityTotal} cidades e ${regionTotal} regiões com id estável (${regionIso} pelo ISO 3166-2); ids antigos, migração com backup, idempotência e roteiro por dia verificados.`);

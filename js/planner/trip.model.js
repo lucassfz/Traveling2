@@ -2,7 +2,7 @@
 // novos, sem DOM nem armazenamento, para serem testadas em Node.
 // Valores sempre em reais (BRL). Datas como texto AAAA-MM-DD (sem fuso horário).
 import { CITY_ID_RE } from '../geo/destination.id.js';
-import { normalizeItinerary } from './itinerary.model.js';
+import { MAX_ITINERARY_DAYS, normalizeItinerary } from './itinerary.model.js';
 
 // 2: cada viagem guarda o próprio checklist (antes era um só por país, em
 // traveling.checklist). Ver migrateLegacyChecklist.
@@ -289,6 +289,7 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     entryReviewed: raw.entryReviewed === true,
     checklist,
     itinerary: normalizeItinerary(raw.itinerary, { idFactory: () => idFactory('i') }),
+    ...(Number.isInteger(raw.itineraryDays) && raw.itineraryDays > 1 && raw.itineraryDays <= MAX_ITINERARY_DAYS ? { itineraryDays: raw.itineraryDays } : {}),
     month: Number.isInteger(raw.month) && raw.month >= 0 && raw.month <= 11 ? raw.month : null,
     duration: DURATION_DAYS.has(raw.duration) ? raw.duration : null,
     group: choice(TRAVEL_GROUPS, raw.group),
