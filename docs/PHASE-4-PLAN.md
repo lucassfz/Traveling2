@@ -42,9 +42,19 @@ Base auditada: `origin/main` em `a93eae8` (16/11/2026). CI do GitHub verde nesse
 | 4.7 | **Voos e hotéis reais:** ativar Duffel (voos) e LiteAPI (hotéis) no Worker | Contas e tokens (responsável pelo projeto) | `/providers/status` mostra o fornecedor real; rótulos de procedência corretos |
 | 4.8 | Acabamento: acessibilidade × painéis, animações, 320–1440 px, temas | — | Teste de fumaça + verificação de sobreposição nas 6 larguras |
 
-## 4. Decisões que precisam do Lucas ou do Leo
+## 4. Andamento (branch `feature/phase-4-global-travel-experience`)
 
-- Rodar `npm run build:admin` (Node.js) e versionar o `data/admin` regenerado — desbloqueia 4.1, 4.3, 4.4 e 4.5.
+| Etapa | Situação | Observação |
+|---|---|---|
+| 4.1 | Feita | `data/admin` regenerado (geonameid e ISO 3166-2), id único em `js/geo/destination.id.js`, migração com backup e relatório, links antigos traduzidos. |
+| 4.2 | Feita | Nomes de país sem sobreposição em 320–1440 px (teste de fumaça confere). Capitais e cidades continuam pelas faixas de zoom existentes. |
+| 4.3 | Parcial | Regiões e cidades para todos os países; cidade sempre no mesmo cartão. Falta: "Quando ir" por região, informações práticas por região e as páginas `cidades/` levarem ao cartão (hoje levam ao globo pelo link estável). |
+| 4.4 | Feita | Salvar região, "＋ Roteiro" em cidade, região, lugar e salvos; salvar no Descobrir. |
+| 4.5 | Feita | Roteiro por dia no Resumo do Planner, no backup, na impressão e no link compartilhado. Sem custos (de propósito). |
+| 4.0, 4.6–4.8 | Não iniciadas | 4.0 continua no branch `fix/auditoria-dados-pendente`, que não foi juntado a este. |
+
+## 5. Decisões que precisam do Lucas ou do Leo
+
 - Contas Duffel e LiteAPI e os Secrets no Worker — desbloqueia 4.7.
 - Ordem das etapas 4.2 a 4.6 (cada uma é um PR independente depois da 4.1).
 - Passos para reproduzir o problema do painel de acessibilidade.
