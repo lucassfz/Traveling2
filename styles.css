@@ -3183,6 +3183,18 @@ body.route-mode .city-card { visibility: hidden; }
   background: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent), 0 0 12px var(--color-accent);
 }
+/* Nome de país (vista ampla e vizinhos no zoom médio): centrado no ponto. */
+.globe-label--country .globe-label__text {
+  bottom: auto;
+  top: 0;
+  translate: -50% -50%;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  color: var(--color-text-secondary);
+  text-shadow: 0 0 3px var(--color-background), 0 0 6px var(--color-background);
+}
+.globe-label--country-selected .globe-label__text { color: var(--color-accent-strong); font-weight: 700; font-size: 12px; }
 /* Sobre o país selecionado (preenchimento de destaque): cores invertidas. */
 .globe-label--on-selected .globe-label__text { color: var(--color-background); text-shadow: 0 0 3px var(--color-land-selected), 0 0 6px var(--color-land-selected); }
 .globe-label--on-selected.globe-label--state .globe-label__text { color: color-mix(in srgb, var(--color-background) 88%, var(--color-land-selected)); text-shadow: 0 0 2px var(--color-land-selected), 0 0 2px var(--color-land-selected); }

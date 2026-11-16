@@ -627,6 +627,7 @@ export class MapEngine {
     this.#buildGlobalBorders(topojson, topology);
     await this.#buildWorld(features);
     this.#buildSmallDestinationHotspots();
+    this.#buildCountryLabels();
     // Compila os shaders em paralelo (KHR_parallel_shader_compile) em vez de
     // travar a página no primeiro quadro com os países.
     if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera).catch(() => {});
@@ -781,6 +782,30 @@ export class MapEngine {
       this.hotspotRecords.set(countryKey, { marker, material });
     }
     this.#refreshCountryMaterials();
+  }
+
+  // Nome de cada país no ponto central do catálogo (latlng). A área aproximada
+  // do contorno desenhado decide a prioridade quando os nomes colidem.
+  #buildCountryLabels() {
+    const ringArea = ring => {
+      let sum = 0;
+      for (let index = 0, last = ring.length - 1; index < ring.length; last = index, index += 1) {
+        sum += (ring[last][0] - ring[index][0]) * (ring[last][1] + ring[index][1]);
+      }
+      const latitude = ring.reduce((total, point) => total + point[1], 0) / Math.max(1, ring.length);
+      return Math.abs(sum / 2) * Math.cos(THREE.MathUtils.degToRad(latitude));
+    };
+    const labels = [];
+    for (const [key, country] of Object.entries(COUNTRIES)) {
+      const [lat, lng] = Array.isArray(country.latlng) ? country.latlng : [];
+      const record = this.countryRecords.get(key);
+      if (!record && !this.hotspotRecords.has(key)) continue;
+      // Maior parte contínua (não a soma): ilhas e territórios distantes não
+      // devem dar a um país pequeno a prioridade de um grande.
+      const area = record ? record.borderPolygons.reduce((largest, polygon) => Math.max(largest, ringArea(polygon[0])), 0) : 0;
+      labels.push({ key, alpha2: country.alpha2, name: country.namePt, lat, lng, area: Math.round(area * 100) / 100 });
+    }
+    this.adminLayer.setCountryLabels(labels);
   }
 
   #buildGlobalBorders(_topojson, topology) {

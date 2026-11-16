@@ -45,6 +45,11 @@ const CITY_TIERS = [[1.13, 0], [1.22, 50000], [1.36, 180000], [1.6, 600000], [1.
 const DOT_TIERS = [[1.25, 0], [1.4, 40000], [1.65, 150000], [1.95, 500000]];
 const CAPITAL_DISTANCE = 2.15;
 const STATE_CAPITAL_DISTANCE = 1.6;
+// Nomes de país: na vista ampla (sem país em foco) disputam espaço pela área;
+// no zoom médio só os vizinhos aparecem, abaixo dos nomes do país em foco;
+// perto disso somem (o país em foco já mostra estados e cidades).
+const COUNTRY_LABEL_DISTANCE = 1.45;
+const MAX_COUNTRY_LABELS = 70;
 
 function tierPopulation(tiers, distance) {
   for (const [maxDistance, population] of tiers) if (distance <= maxDistance) return population;
@@ -171,6 +176,7 @@ export class AdminLayer {
     this.cameraDirection = new THREE.Vector3();
     this.lastLabelKey = '';
     this.version = 0;              // muda quando dados ou seleção mudam
+    this.countryLabels = [];       // { id, key, alpha2, name, area, position } (setCountryLabels)
     this.setTheme();
   }
 
@@ -209,6 +215,19 @@ export class AdminLayer {
     // A área inteira da cidade acende sob o ponteiro (exceto a já selecionada).
     const city = item?.kind === 'city' && item.id !== this.selectedCity?.id ? item : null;
     this.#setHighlight('hover', city, city && this.lastPick?.city === city ? this.lastPick.region : null);
+    this.#touch();
+  }
+
+  /**
+   * Nomes de país no globo. `area` (graus² aproximados) decide quem fica quando
+   * os nomes colidem: os maiores primeiro, o selecionado sempre.
+   * @param {{key: string, alpha2: string, name: string, lat: number, lng: number, area: number}[]} list
+   */
+  setCountryLabels(list) {
+    this.countryLabels = list
+      .filter(item => /^[A-Z]{2}$/.test(item.alpha2 ?? '') && item.name && Number.isFinite(item.lat) && Number.isFinite(item.lng))
+      .map(item => ({ ...item, id: `country:${item.key}`, kind: 'country', position: toVector(item.lat, item.lng, POINT_RADIUS) }))
+      .sort((a, b) => b.area - a.area);
     this.#touch();
   }
 
@@ -538,7 +557,7 @@ export class AdminLayer {
       for (const object of highlight?.objects ?? []) object.visible = highlight.city.country === code;
     }
     if (!record || record.status !== 'ready') {
-      this.#renderLabels([]);
+      this.#refreshLabels(null, distance);
       return;
     }
     this.#ensureRegions(record);
@@ -576,9 +595,13 @@ export class AdminLayer {
       this.dotMaterial.opacity = 0.55 + 0.4 * fade(1.95, 1.2);
     }
 
-    // Verificação suja: só reposiciona rótulos se câmera, tamanho, foco, seleção ou dados mudaram.
+    this.#refreshLabels(record, distance);
+  }
+
+  // Verificação suja: só reposiciona rótulos se câmera, tamanho, foco, seleção ou dados mudaram.
+  #refreshLabels(record, distance) {
     const e = this.camera.matrixWorld.elements;
-    const key = `${e[12].toFixed(5)},${e[13].toFixed(5)},${e[14].toFixed(5)},${e[0].toFixed(4)},${e[5].toFixed(4)},${this.camera.view?.offsetX ?? 0},${this.version}`;
+    const key = `${e[12].toFixed(5)},${e[13].toFixed(5)},${e[14].toFixed(5)},${e[0].toFixed(4)},${e[5].toFixed(4)},${this.camera.view?.offsetX ?? 0},${this.version},${record?.code ?? '-'}`;
     if (key === this.lastLabelKey) return;
     this.lastLabelKey = key;
     this.#placeLabels(record, distance);
@@ -596,13 +619,26 @@ export class AdminLayer {
 
   #placeLabels(record, distance) {
     const minPopulation = tierPopulation(CITY_TIERS, distance);
-    const maxLabels = distance < 1.2 ? 120 : 80;
+    const maxLabels = !record ? MAX_COUNTRY_LABELS : distance < 1.2 ? 120 : 80;
     const candidates = [];
     const consider = (item, priority) => {
       if (!this.#visible(item)) return;
       const point = this.#project(item);
       if (point) candidates.push({ item, priority, ...point });
     };
+    if (distance > COUNTRY_LABEL_DISTANCE) {
+      for (const country of this.countryLabels) {
+        // O país em foco já se apresenta pelos estados e cidades.
+        if (record && country.alpha2 === record.code) continue;
+        const selected = country.alpha2 === this.selectedCode;
+        // Vista ampla: país acima de tudo. Zoom médio: vizinhos abaixo das cidades do país em foco.
+        consider(country, (selected ? 1e13 : 0) + (record ? 0 : 1e10) + country.area);
+      }
+    }
+    if (!record) {
+      this.#placeCandidates(candidates, maxLabels);
+      return;
+    }
     if ((distance <= STATE_DISTANCE || record.code === this.selectedCode) && distance > 1.15) {
       // Estados competem com as cidades grandes; perto demais, cedem espaço às cidades.
       for (const division of record.divisions) consider(division, distance > 1.45 ? 2e7 : 1e5);
@@ -617,15 +653,46 @@ export class AdminLayer {
       consider(city, (selected ? 1e12 : hovered ? 1e11 : 0) + (city.rank === 0 ? 1e9 : city.rank === 1 ? 2e6 : 0) + city.population);
     }
 
+    this.#placeCandidates(candidates, maxLabels);
+  }
+
+  // Largura real do nome (mesma fonte do CSS), medida uma vez por nome e tipo:
+  // com a estimativa por letra, nomes vizinhos sobravam sem necessidade.
+  #textWidth(item) {
+    const key = `${item.kind}|${item.rank ?? ''}|${item.name}`;
+    let width = this.textWidths?.get(key);
+    if (width !== undefined) return width;
+    this.textWidths ??= new Map();
+    if (!this.measure) {
+      this.measure = document.createElement('canvas').getContext('2d');
+      this.fontFamily = getComputedStyle(this.overlay).fontFamily || 'sans-serif';
+    }
+    const [weight, size, spacing, upper] = item.kind === 'state' ? [600, 9.5, 0.09, true]
+      : item.kind === 'country' ? [700, 12, 0.03, false]
+        : item.rank === 0 ? [700, 12.5, 0, false] : [600, 13, 0, false];
+    const text = upper ? item.name.toUpperCase() : item.name;
+    if (this.measure) {
+      this.measure.font = `${weight} ${size}px ${this.fontFamily}`;
+      width = this.measure.measureText(text).width + spacing * size * text.length;
+    } else {
+      width = text.length * size * 0.62;
+    }
+    if (this.textWidths.size > 4000) this.textWidths.clear();
+    this.textWidths.set(key, width);
+    return width;
+  }
+
+  // Coloca os rótulos por prioridade; um rótulo que encosta em outro já colocado fica de fora.
+  #placeCandidates(candidates, maxLabels) {
     candidates.sort((a, b) => b.priority - a.priority);
     const placed = [];
     for (const candidate of candidates) {
       if (placed.length >= maxLabels) break;
       const { item, x, y } = candidate;
-      const width = item.name.length * (item.kind === 'state' ? 6.6 : 6.9) + 6;
-      // Estado: nome centrado no ponto. Cidade: nome centrado logo acima do ponto.
-      const box = item.kind === 'state'
-        ? [x - width / 2, y - 7, x + width / 2, y + 7]
+      const width = this.#textWidth(item) + 6;
+      // Estado e país: nome centrado no ponto. Cidade: nome centrado logo acima do ponto.
+      const box = item.kind === 'state' || item.kind === 'country'
+        ? [x - width / 2, y - (item.kind === 'country' ? 8 : 7), x + width / 2, y + (item.kind === 'country' ? 8 : 7)]
         : [x - width / 2, y - 22, x + width / 2, y + 4];
       if (box[2] < 0 || box[0] > this.size.width || box[3] < 0 || box[1] > this.size.height) continue;
       if (placed.some(({ box: other }) => box[0] < other[2] + 3 && box[2] + 3 > other[0] && box[1] < other[3] + 2 && box[3] + 2 > other[1])) continue;
@@ -658,12 +725,14 @@ export class AdminLayer {
         // Entrada suave (só opacidade: a posição usa transform a cada quadro).
         if (!this.reducedMotion.matches) element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
       }
-      let className = item.kind === 'state'
-        ? 'globe-label globe-label--state'
-        : `globe-label globe-label--city${item.rank === 0 ? ' globe-label--capital' : item.rank === 1 ? ' globe-label--seat' : ''}`;
+      let className = item.kind === 'country'
+        ? `globe-label globe-label--country${item.alpha2 === this.selectedCode ? ' globe-label--country-selected' : ''}`
+        : item.kind === 'state'
+          ? 'globe-label globe-label--state'
+          : `globe-label globe-label--city${item.rank === 0 ? ' globe-label--capital' : item.rank === 1 ? ' globe-label--seat' : ''}`;
       if (item.id && item.id === this.selectedCity?.id) className += ' globe-label--selected';
       if (item === this.hoveredItem) className += ' globe-label--hover';
-      if (item.country === this.selectedCode) className += ' globe-label--on-selected';
+      if (item.kind !== 'country' && item.country === this.selectedCode) className += ' globe-label--on-selected';
       if (element.className !== className) element.className = className;
       element.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
     }
@@ -702,6 +771,7 @@ export class AdminLayer {
     this.lastPick = null;
     const record = this.focus;
     if (!record || record.status !== 'ready') return null;
+    // Nome de país não escolhe cidade: o clique segue para o país desenhado embaixo.
     const regionOf = name => record.regionAreas?.find(area => area.name === name) ?? null;
     const found = (city, region = null) => {
       if (!city) return null;
@@ -718,7 +788,7 @@ export class AdminLayer {
       const { item, box } = this.placed[index];
       if (x < box[0] - 3 || x > box[2] + 3 || y < box[1] - 3 || y > box[3] + 3) continue;
       if (item.kind === 'city') return found(item);
-      stateLabel ??= regionOf(item.name);
+      if (item.kind === 'state') stateLabel ??= regionOf(item.name);
     }
 
     let point;
@@ -745,7 +815,7 @@ export class AdminLayer {
     }
 
     const minimum = tierPopulation(DOT_TIERS, this.distance);
-    const labeled = new Set(this.placed.map(({ item }) => item));
+    const labeled = new Set(this.placed.filter(({ item }) => item.kind === 'city').map(({ item }) => item));
     let best = null;
     let bestDistance = MIN_HIT_PX;
     for (const city of record.cities) {
