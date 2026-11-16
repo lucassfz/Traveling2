@@ -441,9 +441,18 @@ async function main() {
     const divisions = features.length > 1 ? features.map(feature => {
       const p = feature.properties;
       const name = divisionName(p);
+      // 5ª coluna: código ISO 3166-2 da divisão (ex.: BR-BA), quando o Natural
+      // Earth tem um código válido e do próprio país: é o id estável da região.
+      const iso = String(p.iso_3166_2 ?? '');
       return name && Number.isFinite(p.latitude) && Number.isFinite(p.longitude)
-        ? [name, round(p.latitude), round(p.longitude), p.type_en || 'Region'] : null;
+        ? [name, round(p.latitude), round(p.longitude), p.type_en || 'Region',
+          new RegExp(`^${code}-[A-Z0-9]{1,3}$`).test(iso) ? iso : null] : null;
     }).filter(Boolean) : [];
+    // Código repetido no mesmo país (o Natural Earth junta algumas divisões sob
+    // um código, ex.: BA-BIH, IE-D) não identifica nada: fica sem código.
+    const codeCount = new Map();
+    for (const division of divisions) if (division[4]) codeCount.set(division[4], (codeCount.get(division[4]) ?? 0) + 1);
+    for (const division of divisions) if (codeCount.get(division[4]) > 1) division[4] = null;
     const lines = features.length > 1
       ? innerLines(features).map(line => flatLine(simplify(line, SIMPLIFY_TOLERANCE))).filter(Boolean)
       : [];

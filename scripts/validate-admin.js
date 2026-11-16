@@ -34,8 +34,12 @@ for (const file of files) {
   assert.equal(data.country, code, `${file}: country`);
   const [west, south, east, north] = index.countries[code];
   assert.ok(lng(west) && lng(east) && lat(south) && lat(north) && south <= north, `${file}: caixa inválida`);
-  for (const [name, y, x] of data.divisions) {
+  const divisionCodes = new Set();
+  for (const [name, y, x, , isoCode] of data.divisions) {
     assert.ok(/^[\p{Lu}\d]/u.test(name), `${file}: nome de divisão "${name}"`);
+    // 5ª coluna: ISO 3166-2 único no país (id estável da região) ou null.
+    assert.ok(isoCode === null || (new RegExp(`^${code}-[A-Z0-9]{1,3}$`).test(isoCode) && !divisionCodes.has(isoCode)), `${file}: código de divisão inválido ou repetido (${name})`);
+    if (isoCode) divisionCodes.add(isoCode);
     assert.ok(lat(y) && lng(x), `${file}: rótulo fora do globo (${name})`);
   }
   for (const line of data.lines) {
@@ -47,11 +51,9 @@ for (const file of files) {
   const flagged = new Set();
   const geonameIds = new Set();
   for (const [index, [name, y, x, population, rank, zone, region, urban, geonameId]] of data.cities.entries()) {
-    // Coluna 8 (opcional até o arquivo ser regenerado): geonameid, a identidade estável da cidade.
-    if (geonameId !== undefined) {
-      assert.ok(Number.isInteger(geonameId) && geonameId > 0 && !geonameIds.has(geonameId), `${file}: geonameid inválido ou repetido (${name})`);
-      geonameIds.add(geonameId);
-    }
+    // Coluna 8: geonameid, a identidade estável da cidade (obrigatória e única no país).
+    assert.ok(Number.isInteger(geonameId) && geonameId > 0 && !geonameIds.has(geonameId), `${file}: geonameid ausente, inválido ou repetido (${name})`);
+    geonameIds.add(geonameId);
     assert.ok(urban === 0 || urban === 1, `${file}: marca de contorno (${name})`);
     if (urban) flagged.add(index);
     assert.ok(zone === -1 || (Number.isInteger(zone) && zone < data.zones.length), `${file}: índice de fuso (${name})`);
