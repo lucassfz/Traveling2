@@ -22,6 +22,8 @@ import { historyCatalogIfLoaded, loadHistoryCatalog } from './history.loader.js'
 import { createTripStore } from './planner/trip.store.js';
 import { createTrip } from './planner/trip.model.js';
 import { loadCities, resolveCity } from './geo/cities.js';
+import { legacyGeonameId, loadLegacyCities } from './geo/destination.id.js';
+import { migrateCityIds, upgradeTripCity } from './geo/id.migration.js';
 import { cityHash, countryHash, pageUrl, parseHash, setHash, shareLink, shareUrl } from './share.link.js';
 import { capitalPagePath, countryPagePath } from './country.slug.js';
 import { createSavedStore } from './saved.store.js';
@@ -125,6 +127,26 @@ const state = {
 const airportRepository = new AirportRepository();
 const tripStore = createTripStore({ countries: COUNTRIES });
 const savedStore = createSavedStore({ countries: COUNTRIES });
+
+// Ids antigos de cidade (antes da Fase 4.1) em salvos e viagens, inclusive as
+// que chegam por backup importado: troca pelo id estável no tempo ocioso. Os
+// dois armazenamentos já gravaram o backup da versão anterior ao abrir.
+let idMigration = null;
+function scheduleIdMigration() {
+  if (idMigration) return;
+  const run = () => {
+    idMigration = migrateCityIds({
+      savedStore, tripStore, countries: COUNTRIES, loadCities, loadLegacy: loadLegacyCities, resolveCity,
+      writeReport: report => writeJsonStorage(STORAGE_KEYS.migrations, { cityIds: report })
+    }).catch(error => console.warn('Traveling: troca de ids de cidade adiada.', error))
+      .finally(() => { idMigration = null; });
+  };
+  idMigration = true;
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 4000 });
+  else setTimeout(run, 1500);
+}
+scheduleIdMigration();
+tripStore.subscribe(() => scheduleIdMigration());
 const {
   resolveDestinationAirport,
   primeDestinationAirport,
@@ -893,16 +915,31 @@ async function shareFrom(button, { title, text, hash = '', url = hash ? shareUrl
 // Viagem compartilhada por link: #/viagem/<dados>. Leva destino, datas e
 // escolhas; não leva gastos anotados, checklist nem milhas (são pessoais).
 const TRIP_SHARE_PREFIX = '#/viagem/';
-const SHARED_TRIP_FIELDS = ['countryKey', 'city', 'origin', 'startDate', 'endDate', 'month', 'days', 'travelers', 'group', 'cabin', 'payWith', 'flightPreference', 'style', 'lodging', 'transport', 'interests', 'budgetBRL'];
+// O roteiro vai junto, sem as anotações (são pessoais). 'days' fica por
+// compatibilidade com links antigos; a duração escolhida é 'duration'.
+const SHARED_TRIP_FIELDS = ['countryKey', 'city', 'origin', 'startDate', 'endDate', 'month', 'days', 'duration', 'travelers', 'group', 'cabin', 'payWith', 'flightPreference', 'style', 'lodging', 'transport', 'interests', 'budgetBRL', 'itinerary'];
+const MAX_SHARED_HASH = 12000;
+const encodeTrip = payload => {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+};
 function tripShareUrl(trip) {
   const payload = Object.fromEntries(SHARED_TRIP_FIELDS.filter(key => trip[key] !== undefined && trip[key] !== null).map(key => [key, trip[key]]));
-  const bytes = new TextEncoder().encode(JSON.stringify(payload));
-  const data = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+  if (Array.isArray(payload.itinerary)) payload.itinerary = payload.itinerary.map(({ note, ...item }) => item);
+  if (!payload.itinerary?.length) delete payload.itinerary;
+  let data = encodeTrip(payload);
+  // Roteiro grande demais para um link: compartilha a viagem sem ele.
+  if (data.length + TRIP_SHARE_PREFIX.length > MAX_SHARED_HASH) {
+    delete payload.itinerary;
+    data = encodeTrip(payload);
+  }
   return pageUrl(`${TRIP_SHARE_PREFIX}${data}`);
 }
 
 function readSharedTrip(hash) {
-  if (!hash.startsWith(TRIP_SHARE_PREFIX) || hash.length > 4000) return null;
+  if (!hash.startsWith(TRIP_SHARE_PREFIX) || hash.length > MAX_SHARED_HASH) return null;
   try {
     const base64 = hash.slice(TRIP_SHARE_PREFIX.length).replaceAll('-', '+').replaceAll('_', '/');
     const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
@@ -914,8 +951,10 @@ function readSharedTrip(hash) {
   }
 }
 
-function openSharedTrip(payload) {
+async function openSharedTrip(shared) {
   setHash('');
+  // Link de antes da Fase 4.1: a cidade vem com o id antigo (posição no arquivo).
+  const payload = await upgradeTripCity(shared, { countries: COUNTRIES, loadCities, loadLegacy: loadLegacyCities, resolveCity });
   // A mesma viagem já está aqui (ex.: a pessoa abriu o próprio link): só abre.
   const same = tripStore.trips.find(trip => trip.countryKey === payload.countryKey && (trip.city?.id ?? null) === (payload.city?.id ?? null)
     && trip.startDate === (payload.startDate ?? null) && trip.endDate === (payload.endDate ?? null) && trip.travelers === (payload.travelers ?? 1));
@@ -945,9 +984,10 @@ async function openFromHash() {
   if (state.countryKey !== countryKey && !(wantsCity && narrow)) selectCountry(countryKey);
   if (!wantsCity) return;
   const cities = await loadCities(target.alpha2).catch(() => []);
-  const city = target.geonameId !== undefined
-    ? cities.find(item => item.geonameId === target.geonameId) ?? null
-    : cities.find(item => item.index === target.index) ?? null;
+  // Links "i<posição>" são de antes da Fase 4.1: a posição antiga é traduzida
+  // pela tabela de ids antigos (data/legacy-cities.json), nunca lida direto.
+  const geonameId = target.geonameId ?? legacyGeonameId(await loadLegacyCities(), cities, target.alpha2, target.index);
+  const city = geonameId ? cities.find(item => item.geonameId === geonameId) ?? null : null;
   if (city && (narrow || state.countryKey === countryKey)) selectCity(city, { fly: true });
 }
 

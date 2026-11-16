@@ -1,32 +1,60 @@
 // Cidades de um país (data/admin/<ISO2>.json), sem depender do globo 3D:
 // usadas pelo Planner (escolha da cidade) e pela Descoberta. O mesmo `id`
-// ("BR-12") identifica a cidade no globo, no Planner e no cartão da cidade.
+// ("BR-gn3452640", ver destination.id.js) identifica a cidade no globo, no
+// Planner, no roteiro, nos salvos e no cartão da cidade.
 
 import { displayCityName } from './city.names.js';
+import { cityIdOf, divisionCodes } from './destination.id.js';
 
 const cache = new Map();
 
 const normalize = value => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
+/** Linhas de data/admin/<ISO2>.json → cidades (exportado para os testes em Node). */
+export function parseCities(code, data) {
+  const zones = data.zones ?? [];
+  const regions = data.regions ?? [];
+  // id pelo geonameid (coluna 8). index = posição no arquivo, que muda
+  // quando o arquivo é regenerado: nunca é guardado.
+  const codes = divisionCodes(code, data.divisions ?? []);
+  const regionCodes = new Map((data.divisions ?? []).map(([name], index) => [name, codes[index]]));
+  return data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
+    id: cityIdOf(code, geonameId, index), index, name: displayCityName(code, rank, name), lat, lng, population, rank, kind: 'city', country: code,
+    geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
+    timeZone: zones[zone] ?? null, region: regions[region] ?? null, regionCode: regionCodes.get(regions[region]) ?? null, hasOutline: urban === 1,
+    search: normalize(`${displayCityName(code, rank, name)} ${name}`)
+  }));
+}
+
+/** Divisões (estados, províncias) com o código estável da região. */
+export function parseDivisions(code, data) {
+  const codes = divisionCodes(code, data.divisions ?? []);
+  return (data.divisions ?? []).map(([name, lat, lng, type], index) => ({ name, lat, lng, type, country: code, code: codes[index] }));
+}
+
+const fileCache = new Map();
+/** O arquivo do país, uma vez por sessão (cidades e divisões saem dele). */
+export function loadAdmin(alpha2) {
+  const code = String(alpha2 ?? '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return Promise.resolve(null);
+  if (!fileCache.has(code)) {
+    const promise = fetch(new URL(`../../data/admin/${code}.json`, import.meta.url))
+      .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+      .catch(error => {
+        fileCache.delete(code);
+        throw error;
+      });
+    fileCache.set(code, promise);
+  }
+  return fileCache.get(code);
+}
+
 export function loadCities(alpha2) {
   const code = String(alpha2 ?? '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(code)) return Promise.resolve([]);
   if (!cache.has(code)) {
-    const promise = fetch(new URL(`../../data/admin/${code}.json`, import.meta.url))
-      .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
-      .then(data => {
-        const zones = data.zones ?? [];
-        const regions = data.regions ?? [];
-        // id = posição no arquivo, que muda quando o arquivo é regenerado (a
-        // ordem segue a população). geonameId (coluna 8, quando existe) é a
-        // identidade estável; ver resolveCity.
-        return data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
-          id: `${code}-${index}`, index, name: displayCityName(code, rank, name), lat, lng, population, rank, kind: 'city', country: code,
-          geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
-          timeZone: zones[zone] ?? null, region: regions[region] ?? null, hasOutline: urban === 1,
-          search: normalize(`${displayCityName(code, rank, name)} ${name}`)
-        }));
-      })
+    const promise = loadAdmin(code)
+      .then(data => parseCities(code, data))
       .catch(error => {
         cache.delete(code);
         throw error;
@@ -34,6 +62,12 @@ export function loadCities(alpha2) {
     cache.set(code, promise);
   }
   return cache.get(code);
+}
+
+/** Divisões do país com código de região (vazio para microestados). */
+export function loadDivisions(alpha2) {
+  const code = String(alpha2 ?? '').toUpperCase();
+  return loadAdmin(code).then(data => (data ? parseDivisions(code, data) : []));
 }
 
 /** Maiores cidades (capital primeiro). */

@@ -20,8 +20,10 @@ export function createTripStore({ countries = null, read = readJsonStorage, writ
     // 2. Só então grava o formato novo, para a migração acontecer uma vez só.
     // Se o backup não puder ser gravado, a migração fica só na memória desta
     // sessão e o conjunto antigo continua intacto no armazenamento.
-    const backedUp = read(STORAGE_KEYS.tripsBackupV1, null) !== null
-      || write(STORAGE_KEYS.tripsBackupV1, { savedAt: new Date().toISOString(), data: raw }) !== false;
+    // Uma chave por versão de origem: a cópia da v1 nunca é trocada pela da v2.
+    const backupKey = Number(raw.version) >= 2 ? STORAGE_KEYS.tripsBackupV2 : STORAGE_KEYS.tripsBackupV1;
+    const backedUp = read(backupKey, null) !== null
+      || write(backupKey, { savedAt: new Date().toISOString(), data: raw }) !== false;
     persistent = backedUp && write(STORAGE_KEYS.trips, data) !== false;
   }
   const listeners = new Set();
@@ -94,6 +96,12 @@ export function createTripStore({ countries = null, read = readJsonStorage, writ
       }
       if (added.length) commit({ ...data, trips: [...data.trips, ...added], activeTripId: data.activeTripId ?? added[0].id });
       return added.length;
+    },
+    // Troca de ids antigos de cidade (geo/id.migration.js): grava as viagens já
+    // corrigidas sem mudar a ordem nem a viagem ativa. O conjunto anterior já
+    // está no backup da versão (gravado ao abrir).
+    replaceTrips(trips) {
+      commit({ ...data, trips });
     },
     setActive(id) {
       if (data.trips.some(trip => trip.id === id)) commit({ ...data, activeTripId: id });

@@ -1,10 +1,13 @@
 // Modelo de viagem do Planner v0. Funções puras: recebem e devolvem objetos
 // novos, sem DOM nem armazenamento, para serem testadas em Node.
 // Valores sempre em reais (BRL). Datas como texto AAAA-MM-DD (sem fuso horário).
+import { CITY_ID_RE } from '../geo/destination.id.js';
+import { normalizeItinerary } from './itinerary.model.js';
 
 // 2: cada viagem guarda o próprio checklist (antes era um só por país, em
 // traveling.checklist). Ver migrateLegacyChecklist.
-export const TRIP_SCHEMA_VERSION = 2;
+// 3: roteiro por dia (trip.itinerary) e cidade com id estável (BR-gn3452640).
+export const TRIP_SCHEMA_VERSION = 3;
 export const MAX_CHECKLIST_KEYS = 400;
 
 // Etapas do Planner, na ordem do passo a passo.
@@ -227,9 +230,12 @@ export function normalizeCity(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const lat = Number(raw.lat);
   const lng = Number(raw.lng);
-  if (!/^[A-Z]{2}-\d{1,6}$/.test(raw.id ?? '') || !text(raw.name) || !(Math.abs(lat) <= 90) || !(Math.abs(lng) <= 180)) return null;
+  // Id novo (BR-gn3452640) ou antigo (BR-174, posição no arquivo antes da Fase
+  // 4.1): o antigo é mantido como está até geo/id.migration.js trocá-lo.
+  if (!CITY_ID_RE.test(raw.id ?? '') || !text(raw.name) || !(Math.abs(lat) <= 90) || !(Math.abs(lng) <= 180)) return null;
   return {
     id: raw.id,
+    ...(Number.isInteger(raw.geonameId) && raw.geonameId > 0 ? { geonameId: raw.geonameId } : {}),
     name: text(raw.name, 80),
     lat: Math.round(lat * 1000) / 1000,
     lng: Math.round(lng * 1000) / 1000,
@@ -282,6 +288,7 @@ export function normalizeTrip(raw, { countries = null, idFactory = randomId } = 
     step: clampStep(raw.step),
     entryReviewed: raw.entryReviewed === true,
     checklist,
+    itinerary: normalizeItinerary(raw.itinerary, { idFactory: () => idFactory('i') }),
     month: Number.isInteger(raw.month) && raw.month >= 0 && raw.month <= 11 ? raw.month : null,
     duration: DURATION_DAYS.has(raw.duration) ? raw.duration : null,
     group: choice(TRAVEL_GROUPS, raw.group),

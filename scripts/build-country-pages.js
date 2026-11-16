@@ -344,7 +344,8 @@ export function capitalPage(country, city) {
   const name = country.capital;
   const url = `${SITE_URL}${CITY_PAGES_DIR}/${capitalSlug(country)}/`;
   const countryPath = `../../${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/`;
-  const globe = `../../#/${country.alpha2}/i${city.index}`;
+  // Link estável pelo geonameid (a posição no arquivo muda ao regenerar).
+  const globe = `../../#/${country.alpha2}/${city.geonameId ? `c${city.geonameId}` : `i${city.index}`}`;
   const landmarks = capitalLandmarks(country).filter(item => httpsUrl(item.media.url)).slice(0, 6);
   const visa = visaInfo(country);
   const months = bestMonths(country);
@@ -454,8 +455,8 @@ export async function capitalsWithPages(countries) {
     try { admin = JSON.parse(await readFile(new URL(`data/admin/${country.alpha2}.json`, ROOT), 'utf8')); } catch { continue; }
     const index = (admin.cities ?? []).findIndex(row => row[4] === 0);
     if (index < 0) continue;
-    const [, lat, lng, population] = admin.cities[index];
-    list.push({ country, city: { index, lat, lng, population } });
+    const [, lat, lng, population, , , , , geonameId] = admin.cities[index];
+    list.push({ country, city: { index, lat, lng, population, geonameId } });
   }
   return list;
 }

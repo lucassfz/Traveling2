@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { geographicToCartesian } from './geospatial.js';
 import { inFlatRing, inFlatShape, nearestRegion, shapesBox } from './map.pick.js';
 import { displayCityName } from './geo/city.names.js';
+import { cityIdOf, divisionCodes } from './geo/destination.id.js';
 
 // Camada "aproxime para ver mais". Mostra estados, cidades e contornos urbanos
 // de UM país por vez, o país em foco:
@@ -310,15 +311,17 @@ export class AdminLayer {
       record.lines = this.#add(record, new THREE.LineSegments(geometry, this.stateMaterial));
       record.lines.renderOrder = 4.2;
     }
-    record.divisions = data.divisions.map(([name, lat, lng, type]) => ({
-      name, type, lat, lng, kind: 'state', country: record.code, position: toVector(lat, lng, POINT_RADIUS)
+    const codes = divisionCodes(record.code, data.divisions);
+    record.divisions = data.divisions.map(([name, lat, lng, type], index) => ({
+      name, type, lat, lng, kind: 'state', country: record.code, code: codes[index],
+      position: toVector(lat, lng, POINT_RADIUS)
     }));
     const zones = data.zones ?? [];
     const regions = data.regions ?? [];
-    // id = posição no arquivo (compatível com viagens e salvos antigos); geonameId,
-    // quando o arquivo já traz a coluna 8, é a identidade estável da cidade.
+    // id estável pelo geonameid (geo/destination.id.js); index = posição no arquivo,
+    // usada só para os contornos urbanos e as regiões deste mesmo arquivo.
     record.cities = data.cities.map(([name, lat, lng, population, rank, zone = -1, region = -1, urban = 0, geonameId = null], index) => ({
-      id: `${record.code}-${index}`, index, name: displayCityName(record.code, rank, name), population, rank, lat, lng, kind: 'city', country: record.code,
+      id: cityIdOf(record.code, geonameId, index), index, name: displayCityName(record.code, rank, name), population, rank, lat, lng, kind: 'city', country: record.code,
       geonameId: Number.isInteger(geonameId) && geonameId > 0 ? geonameId : null,
       timeZone: zones[zone] ?? null, region: regions[region] ?? null, hasOutline: urban === 1,
       position: toVector(lat, lng, POINT_RADIUS)

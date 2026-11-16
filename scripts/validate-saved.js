@@ -22,7 +22,7 @@ assert.equal(normalizeSavedEntry({ id: 'country:Japan', type: 'city', countryKey
 assert.equal(normalizeSavedEntry({ id: 'country:Atlantis', type: 'country', countryKey: 'Atlantis', name: 'Atlântida' }, { countries: COUNTRIES }), null);
 assert.equal(normalizeSavedEntry({ id: 'place:Q39231', type: 'place', countryKey: 'Japan', name: '' }), null);
 assert.equal(normalizeSavedEntry({ id: 'place:Q39231', type: 'place', countryKey: 'Japan', name: 'Monte Fuji', image: 'https://exemplo.com/x.jpg' }).image, undefined, 'imagem só do Wikimedia');
-assert.deepEqual(normalizeSaved('lixo'), { version: 1, items: [] });
+assert.deepEqual(normalizeSaved('lixo'), { version: 2, items: [] });
 
 // Migração da lista "Quero ir": países viram destinos salvos, chave antiga intacta.
 const legacy = memoryStore({ 'traveling.wishlist': ['Japan', 'Atlantis', 'Portugal'] });

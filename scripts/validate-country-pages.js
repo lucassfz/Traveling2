@@ -35,7 +35,7 @@ assert.equal(cityDirs.length, capitalPages.length, 'páginas de capitais sem sob
 assert.ok(capitalPages.length >= 40, 'páginas de capitais: menos do que o esperado');
 for (const path of capitalPages) {
   const html = files[path];
-  assert.match(html, /href="\.\.\/\.\.\/#\/[A-Z]{2}\/i\d+"/, `${path}: link para a cidade no globo`);
+  assert.match(html, /href="\.\.\/\.\.\/#\/[A-Z]{2}\/c\d+"/, `${path}: link estável (geonameid) para a cidade no globo`);
   assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}${path.replace(/index\.html$/, '')}">`), `${path}: canonical`);
   assert.match(html, /href="\.\.\/\.\.\/paises\/[a-z0-9-]+\/"/, `${path}: volta para o país`);
   assert.match(html, /property="og:image" content="https:\/\//, `${path}: imagem https`);
