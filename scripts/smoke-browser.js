@@ -77,6 +77,9 @@ socket.addEventListener('message', event => {
   if (message.id && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
   if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text);
   if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params.args.map(arg => arg.value ?? arg.description).join(' '));
+  // CSP bloqueando algo ou SRI recusando um arquivo da CDN só aparecem no log do navegador.
+  const entry = message.method === 'Log.entryAdded' ? message.params.entry : null;
+  if (entry?.level === 'error' && (entry.source === 'security' || /Content Security Policy|integrity/i.test(entry.text))) errors.push(`${entry.text} ${entry.url ?? ''}`.trim());
 });
 const send = (method, params = {}) => new Promise(resolve => { const id = ++nextId; pending.set(id, resolve); socket.send(JSON.stringify({ id, method, params })); });
 const evaluate = async expression => (await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.result?.value;
@@ -91,6 +94,7 @@ const waitFor = async (expression, timeout = 30000) => {
 
 try {
   await send('Runtime.enable');
+  await send('Log.enable');
   await send('Page.enable');
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` });
 
@@ -134,8 +138,23 @@ try {
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/paises/japao/` });
   check(await waitFor("document.querySelector('h1')?.textContent === 'Japão'", 10000), 'página do Japão abre');
   check(await evaluate("Boolean(document.querySelector('a.cta[href=\"../../#/JP\"]'))"), 'página do Japão leva ao globo');
+  // Páginas com outros scripts inline (capital, 404 com sugestões): a CSP não pode bloqueá-los.
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/cidades/lisboa-portugal/` });
+  check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página de Lisboa abre');
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/404.html` });
+  check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página 404 abre');
 
-  check(errors.length === 0, `sem erros de JavaScript${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
+  check(errors.length === 0, `sem erros de JavaScript, CSP ou SRI${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
+
+  // 5. A CSP está valendo: um script inline injetado (como faria um XSS) não roda.
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` });
+  await waitFor("document.readyState === 'complete'", 10000);
+  check(await evaluate(`(() => {
+    const script = document.createElement('script');
+    script.textContent = 'window.__injected = true';
+    document.head.append(script);
+    return window.__injected !== true;
+  })()`), 'CSP bloqueia script inline injetado');
 } finally {
   socket.close();
   chrome.kill();

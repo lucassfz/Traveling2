@@ -209,6 +209,23 @@ const expectError = (fn, code, field) => {
   assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429, 429]);
   assert.equal(clientKey(new Request('https://x.test', { headers: { 'cf-connecting-ip': '2001:db8:1:2:3::1' } })), '2001:db8:1');
 
+  // Limite global da Cloudflare (binding SEARCH_LIMITER): recusa vira 429 antes do
+  // contador local, e a chave enviada é a mesma do cliente (/24).
+  const globalKeys = [];
+  const globalLimited = createApp({ now: () => NOW, log: () => {} });
+  const globalEnv = { ...env, SEARCH_LIMITER: { limit: async ({ key }) => ({ success: globalKeys.push(key) <= 2 }) } };
+  const globalStatuses = [];
+  for (let index = 0; index < 3; index += 1) {
+    const response = await globalLimited.fetch(new Request('https://api.test/api/v1/flights/search', {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN, 'cf-connecting-ip': '203.0.113.7' },
+      body: JSON.stringify({ ...flight, departureDate: `2027-04-0${index + 1}` })
+    }), globalEnv);
+    globalStatuses.push(response.status);
+    if (response.status === 429) assert.equal(response.headers.get('retry-after'), '60');
+  }
+  assert.deepEqual(globalStatuses, [200, 200, 429]);
+  assert.deepEqual(globalKeys, Array(3).fill(clientKey(new Request('https://x.test', { headers: { 'cf-connecting-ip': '203.0.113.7' } }))));
+
   // Busca desligada.
   assert.equal((await call('/flights/search', { body: flight, ip: '198.51.100.9' }).then(() => app.fetch(new Request('https://api.test/api/v1/flights/search', {
     method: 'POST', headers: { 'content-type': 'application/json', origin: ORIGIN }, body: JSON.stringify(flight)

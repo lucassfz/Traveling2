@@ -5,7 +5,8 @@
 //
 // Para ligar a busca no site local, adicione temporariamente ao <head> do index.html:
 //   <meta name="traveling-api" content="http://localhost:8787/api/v1">
-// (não commitar a meta apontando para localhost).
+// (não commitar a meta apontando para localhost). Rode o site com npm run dev: só
+// ele libera localhost:8787 na Content-Security-Policy.
 //
 // Variáveis: PORT (padrão 8787), ALLOWED_ORIGINS (padrão: servidores locais comuns),
 // FLIGHT_PROVIDERS/HOTEL_PROVIDERS (padrão "mock"), DUFFEL_TOKEN (só se usar "duffel"),

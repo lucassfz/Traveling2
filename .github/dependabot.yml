@@ -1,0 +1,11 @@
+# Mantém as GitHub Actions em dia. Os workflows fixam cada action pelo hash do
+# commit (uma tag como @v5 pode ser movida para outro código); o Dependabot abre
+# um Pull Request quando sai versão nova, trocando o hash e o comentário.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "CI"

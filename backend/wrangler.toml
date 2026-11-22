@@ -1,6 +1,7 @@
 # Cloudflare Worker do Traveling (fase 3.2). SEM SEGREDOS AQUI.
 # Chaves de fornecedores entram só como Secrets:  npx wrangler secret put NOME
-# Ainda não publicado: o deploy depende da aprovação da decisão D1 (docs/PHASE-3.1-…).
+# Publicado em traveling-api.travelingorgsenac.workers.dev (preços vistos recentemente,
+# Travelpayouts). Busca de voos e hotéis segue com o fornecedor mock.
 name = "traveling-api"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
@@ -13,3 +14,12 @@ FLIGHT_PROVIDERS = "mock"
 HOTEL_PROVIDERS = "mock"
 RATE_PER_MINUTE = "10"
 RATE_PER_DAY = "100"
+
+# Limite de buscas por IP que vale para todas as instâncias do Worker (recurso
+# Rate Limiting da Cloudflare; criado no próximo deploy, nada a fazer no painel).
+# O contador em memória (RATE_PER_MINUTE / RATE_PER_DAY) continua como segunda
+# camada e é o único limite diário. period aceita só 10 ou 60 segundos.
+[[ratelimits]]
+name = "SEARCH_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

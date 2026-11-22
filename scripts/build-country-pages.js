@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url';
 import { COUNTRIES, CONTINENT_LABELS } from '../js/countries.dataset.js';
 import { CITY_PAGES_DIR, COUNTRY_PAGES_DIR, capitalLandmarks, capitalPagePath, countrySlug } from '../js/country.slug.js';
 import { PARTNERS, klookUrl } from '../js/planner/partners.section.js';
+import { withCsp } from './csp.js';
 
 // Endereço público do site. Ao trocar de domínio, mude aqui e rode o gerador.
 export const SITE_URL = 'https://lucassfz.github.io/Traveling2/';
@@ -571,6 +572,8 @@ export async function buildAll() {
     files[`${COUNTRY_PAGES_DIR}/${countrySlug(country.namePt)}/index.html`] = countryPage(country, summaries.countries?.[country.alpha2], capitalPaths.get(country.alpha2));
   }
   for (const { country, city } of capitals) files[`${CITY_PAGES_DIR}/${capitalSlug(country)}/index.html`] = capitalPage(country, city);
+  // Content-Security-Policy com o hash dos scripts inline de cada página (scripts/csp.js).
+  for (const path of Object.keys(files)) if (path.endsWith('.html')) files[path] = withCsp(files[path]);
   return files;
 }
 
