@@ -1,16 +1,14 @@
 import { COUNTRIES } from '../js/countries.dataset.js';
 import { atlasFeatureParts } from '../js/map.topology.js';
 import { prepareGeometry, preparedGeometryContains, unwrapRing } from '../js/geospatial.js';
+import * as topojson from '../js/vendor/topojson-client.js';
 
 const errors = [];
 const assert = (condition, message) => { if (!condition) errors.push(message); };
-// Mesmas versões exatas usadas por js/map.engine.js.
+// Mesma versão exata usada por js/map.engine.js; o leitor TopoJSON é a cópia local.
 const atlasResponse = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json');
-const clientResponse = await fetch('https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm');
-if (!atlasResponse.ok || !clientResponse.ok) throw new Error('Não foi possível carregar a topologia para validação.');
+if (!atlasResponse.ok) throw new Error('Não foi possível carregar a topologia para validação.');
 const atlas = await atlasResponse.json();
-const clientSource = await clientResponse.text();
-const topojson = await import(`data:text/javascript;base64,${Buffer.from(clientSource).toString('base64')}`);
 const features = topojson.feature(atlas, atlas.objects.countries).features;
 const parts = features.flatMap(atlasFeatureParts);
 const byKey = new Map();

@@ -86,8 +86,15 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
     return limiters.get(key);
   }
 
-  function checkRate(request, env) {
+  async function checkRate(request, env) {
     const key = clientKey(request);
+    // Limite global da Cloudflare ([[ratelimits]] SEARCH_LIMITER no wrangler.toml):
+    // vale para todas as instâncias do Worker, ao contrário do contador em memória
+    // abaixo, que cada instância tem o seu. Sem o binding (dev, testes), só o local.
+    if (env.SEARCH_LIMITER?.limit) {
+      const { success } = await env.SEARCH_LIMITER.limit({ key });
+      if (!success) throw new ApiError('RATE_LIMITED', 'Muitas buscas em pouco tempo. Tente de novo em instantes.', { retryAfter: 60 });
+    }
     const time = now().getTime();
     for (const [name, limit, windowMs] of [
       ['minute', Number(env.RATE_PER_MINUTE ?? 10), 60_000],
@@ -215,7 +222,7 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
       };
       if (!/^[A-Z]{3}$/.test(query.origin) || !/^[A-Z]{3}$/.test(query.destination) || query.origin === query.destination) throw new ApiError('INVALID_AIRPORT', 'Aeroportos inválidos.', { field: 'origin' });
       if (!/^\d{4}-\d{2}(-\d{2})?$/.test(query.departure) || (query.returnDate && !/^\d{4}-\d{2}(-\d{2})?$/.test(query.returnDate))) throw new ApiError('INVALID_DATES', 'Período inválido.', { field: 'departure' });
-      checkRate(request, env);
+      await checkRate(request, env);
       const { value, cache: cacheState } = await cache.through(
         cacheKey('cheapest', query),
         () => withTimeout(signal => cheapestFlights(query, { token: env.TRAVELPAYOUTS_TOKEN, marker: env.TRAVELPAYOUTS_MARKER ?? '806253', signal }), LIMITS.flightTimeoutMs)
@@ -230,7 +237,7 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
     if (env.SEARCH_ENABLED === 'false') throw new ApiError('SEARCH_DISABLED', 'A busca está temporariamente desligada.');
     const body = await readBody(request);
     const normalized = kind === 'flights' ? validateFlightSearch(body, { now: now() }) : validateHotelSearch(body, { now: now() });
-    checkRate(request, env);
+    await checkRate(request, env);
     const { value, cache: cacheState } = await cache.through(
       cacheKey(kind, normalized),
       () => (kind === 'flights' ? searchFlights(normalized, env) : searchHotels(normalized, env)),

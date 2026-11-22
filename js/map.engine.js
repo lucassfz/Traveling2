@@ -22,7 +22,12 @@ import { AdminLayer, URBAN_RADIUS } from './map.admin.layer.js';
 
 // Versões exatas: uma faixa (@2, @3) pode mudar a geometria ou a API sem aviso.
 const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json';
-const TOPOJSON_CLIENT_URL = 'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm';
+// SRI: o navegador recusa o arquivo se o conteúdo da CDN mudar. Deve ser igual
+// ao integrity do <link rel="preload"> em index.html (validate-page.js confere;
+// validate-sri.js confere contra a CDN).
+export const WORLD_ATLAS_INTEGRITY = 'sha384-yOCJ+8ShBm8UDqtAVtAvxTDDf4gXo5edxl/YG0FmVC5OTmqVLl7utuVGBDEeZWHf';
+// Cópia local: o /+esm do jsDelivr é gerado na hora e não aceita SRI.
+const TOPOJSON_CLIENT_URL = new URL('./vendor/topojson-client.js', import.meta.url).href;
 const GLOBE_RADIUS = 1;
 const LAND_RADIUS = 1.007;
 const BORDER_RADIUS = 1.012;
@@ -45,11 +50,11 @@ const CONTINENT_COLOR_TOKENS = Object.freeze({
 });
 
 
-async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+async function fetchJsonWithTimeout(url, timeoutMs = 7000, integrity = undefined) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { mode: 'cors', cache: 'force-cache', signal: controller.signal });
+    const response = await fetch(url, { mode: 'cors', cache: 'force-cache', signal: controller.signal, ...(integrity ? { integrity } : {}) });
     if (!response.ok) throw new Error(`Falha ao carregar geometria mundial (${response.status}).`);
     return await response.json();
   } catch (error) {
@@ -619,7 +624,7 @@ export class MapEngine {
     }
     this.callbacks.onProgress?.('Carregando geometria mundial…');
     const [topology, topojson] = await Promise.all([
-      fetchJsonWithTimeout(WORLD_ATLAS_URL, 7000),
+      fetchJsonWithTimeout(WORLD_ATLAS_URL, 7000, WORLD_ATLAS_INTEGRITY),
       import(TOPOJSON_CLIENT_URL)
     ]);
     const features = topojson.feature(topology, topology.objects.countries).features;

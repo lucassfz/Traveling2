@@ -2,6 +2,10 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="UTF-8">
+  <!-- CSP: de onde a página pode carregar código, estilos, imagens e dados. Os sha256 são
+       dos 3 scripts inline (tema, guarda de carregamento, import map): ao editar um deles,
+       rode npm run validate; validate-page.js mostra o hash novo. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com 'sha256-7vGUu5CYMyusxOfqTadujsrx4BDsNsAuG2j3k0pV270=' 'sha256-0DnPhGmuDqjhE9ZKwW4MyCgsboeZp2MTv7GMy8zDXss=' 'sha256-1wfWe6z05KTAknDEl1ggi+3UGEqVPzcSDpiJBZLh2cE='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://flagcdn.com https://commons.wikimedia.org https://upload.wikimedia.org; connect-src 'self' https://cdn.jsdelivr.net https://olinda.bcb.gov.br https://traveling-api.travelingorgsenac.workers.dev https://cloudflareinsights.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="description" content="Explore o mundo num globo 3D: guias de 196 países, cidades, vistos para brasileiros, estimativa de voos e milhas e um planejador de viagem passo a passo.">
   <meta name="theme-color" content="#05070c">
@@ -55,10 +59,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.min.js" crossorigin>
-  <!-- Geometria do mundo e leitor TopoJSON baixam junto com o three.js, não depois dele. -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" crossorigin>
-  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/+esm" crossorigin>
+  <!-- integrity (SRI): o navegador recusa o arquivo da CDN se o conteúdo mudar. Os hashes
+       se repetem no import map e em js/map.engine.js; npm run validate:online confere com a CDN. -->
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.min.js" integrity="sha384-8/hf5tabFfIo0BPku31TKUvGIKpWGYaMwNtlSNqNyZzXgZCMd4lnOGWbJElML9dv" crossorigin>
+  <!-- Geometria do mundo e leitor TopoJSON (cópia local) baixam junto com o three.js, não depois dele. -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json" as="fetch" integrity="sha384-yOCJ+8ShBm8UDqtAVtAvxTDDf4gXo5edxl/YG0FmVC5OTmqVLl7utuVGBDEeZWHf" crossorigin>
+  <link rel="modulepreload" href="js/vendor/topojson-client.js">
   <!-- ?v=: troque a versão ao mudar styles.css ou js/app.js, para o cache do GitHub Pages (~10 min) não misturar arquivos antigos e novos. -->
   <link rel="stylesheet" href="styles.css?v=2026.12.20">
   <!-- Cloudflare Web Analytics: contagem de visitas sem cookies (ver privacidade.html). -->
@@ -323,6 +329,10 @@
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.min.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    },
+    "integrity": {
+      "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.min.js": "sha384-8/hf5tabFfIo0BPku31TKUvGIKpWGYaMwNtlSNqNyZzXgZCMd4lnOGWbJElML9dv",
+      "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/controls/OrbitControls.js": "sha384-3anPGTlBKcc/CvgboxosXu8ob1ZuWpK+ev4PnyX4l9rK+TYLGi64psmw/Bg7I1Cs"
     }
   }
   </script>
