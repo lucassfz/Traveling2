@@ -37,7 +37,7 @@ node scripts/validate-planner.js
 node scripts/validate-geo.js
 node scripts/validate-admin.js
 node scripts/validate-page.js       # module preloads vs import map, pinned CDN versions, CSP hashes, SRI
-node scripts/validate-secrets.js    # no credentials in the repository
+node scripts/validate-secrets.js    # no credentials in the repository; GitHub Actions pinned by commit SHA
 node scripts/validate-backend.js    # backend contract + client, end to end with the mock provider
 
 # Need network (fetch the pinned CDN files)

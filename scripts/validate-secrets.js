@@ -1,4 +1,5 @@
-// Auditoria offline: nenhuma credencial no repositório. O site é público (GitHub
+// Auditoria offline: nenhuma credencial no repositório e actions dos workflows
+// fixadas pelo hash do commit. O site é público (GitHub
 // Pages) e chaves de fornecedores existem SOMENTE como Secrets do backend
 // (docs/PHASE-3.1-TRAVEL-INTEGRATION-ARCHITECTURE.md §10.1).
 import { readdir, readFile, stat } from 'node:fs/promises';
@@ -44,6 +45,17 @@ for await (const path of walk(ROOT)) {
   // visitante) e só identifica o site no painel; não é credencial.
   const text = (await readFile(path, 'utf8')).replace(/data-cf-beacon=(['"])\{[^}]*\}\1/g, 'data-cf-beacon');
   scanned += 1;
+  // Workflows: actions de terceiros fixadas pelo hash do commit. Uma tag (@v5)
+  // pode ser movida para outro código, que rodaria com as permissões do workflow
+  // (inclusive escrita no repositório). O Dependabot mantém os hashes em dia.
+  if (/^\.github\/workflows\/.+\.ya?ml$/.test(name)) {
+    for (const match of text.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)) {
+      const [action, ref = ''] = match[1].split('@');
+      if (!action.startsWith('./') && !/^[0-9a-f]{40}$/.test(ref)) {
+        problems.push(`${name}:${text.slice(0, match.index).split('\n').length}: ${match[1]} não está fixada pelo hash do commit`);
+      }
+    }
+  }
   for (const [label, pattern] of PATTERNS) {
     const match = pattern.exec(text);
     if (match) {
