@@ -138,6 +138,16 @@ try {
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/paises/japao/` });
   check(await waitFor("document.querySelector('h1')?.textContent === 'Japão'", 10000), 'página do Japão abre');
   check(await evaluate("Boolean(document.querySelector('a.cta[href=\"../../#/JP\"]'))"), 'página do Japão leva ao globo');
+  // Fotos (Wikimedia, com redirecionamento) e bandeira carregam: a CSP já
+  // bloqueou miniaturas de thumb.wikimedia.org. loading="lazy" não carregaria
+  // fora da tela, então força o carregamento.
+  const images = await evaluate(`(async () => {
+    const list = [...document.images];
+    list.forEach(img => { img.loading = 'eager'; });
+    await Promise.all(list.map(img => img.complete ? null : new Promise(done => { img.addEventListener('load', done); img.addEventListener('error', done); setTimeout(done, 15000); })));
+    return { total: list.length, broken: list.filter(img => !img.naturalWidth).map(img => img.currentSrc || img.src) };
+  })()`);
+  check(images && images.total > 0 && images.broken.length === 0, `imagens da página do Japão carregam (${images?.total ?? 0} imagens${images?.broken.length ? `; falharam: ${images.broken.slice(0, 2).join(', ')}` : ''})`);
   // Páginas com outros scripts inline (capital, 404 com sugestões): a CSP não pode bloqueá-los.
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/cidades/lisboa-portugal/` });
   check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página de Lisboa abre');

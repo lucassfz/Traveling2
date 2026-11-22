@@ -16,7 +16,9 @@ export const CSP_DIRECTIVES = Object.freeze({
   // <style> e style="" nas páginas e no app; CSS não executa código.
   'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
   'font-src': ["'self'", 'https://fonts.gstatic.com'],
-  'img-src': ["'self'", 'data:', 'blob:', 'https://flagcdn.com', 'https://commons.wikimedia.org', 'https://upload.wikimedia.org'],
+  // commons.wikimedia.org/wiki/Special:FilePath redireciona para thumb.wikimedia.org
+  // (miniaturas); a CSP vale para cada endereço da cadeia de redirecionamento.
+  'img-src': ["'self'", 'data:', 'blob:', 'https://flagcdn.com', 'https://commons.wikimedia.org', 'https://upload.wikimedia.org', 'https://thumb.wikimedia.org'],
   'connect-src': ["'self'", 'https://cdn.jsdelivr.net', 'https://olinda.bcb.gov.br', 'https://traveling-api.travelingorgsenac.workers.dev', 'https://cloudflareinsights.com'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],
