@@ -138,6 +138,11 @@ try {
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/paises/japao/` });
   check(await waitFor("document.querySelector('h1')?.textContent === 'Japão'", 10000), 'página do Japão abre');
   check(await evaluate("Boolean(document.querySelector('a.cta[href=\"../../#/JP\"]'))"), 'página do Japão leva ao globo');
+  // Páginas com outros scripts inline (capital, 404 com sugestões): a CSP não pode bloqueá-los.
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/cidades/lisboa-portugal/` });
+  check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página de Lisboa abre');
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/404.html` });
+  check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página 404 abre');
 
   check(errors.length === 0, `sem erros de JavaScript, CSP ou SRI${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 

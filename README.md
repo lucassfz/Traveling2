@@ -1,6 +1,6 @@
 # Traveling — GIS & Miles Overhaul
 
-Run with VS Code Live Server or any local HTTP server. Do not open `index.html` directly with `file://` because the app uses ES modules.
+Run with `npm run dev` (http://127.0.0.1:5500/, reloads on save) or any local HTTP server. Do not open `index.html` directly with `file://` because the app uses ES modules. Every page carries a Content-Security-Policy; VS Code Live Server still serves the site, but its injected auto-reload script is blocked by the policy, so `npm run dev` is the way to get live reload. After editing an inline `<script>` in `index.html`, `parceiros.html` or `privacidade.html`, run `npm run build:csp` (generated pages get the policy from `npm run build:pages`).
 
 The build is designed to avoid infinite loading: the UI is released immediately after app bootstrap, world-atlas loading has a timeout, and a non-module boot guard dismisses the loader if CDN/module loading fails.
 

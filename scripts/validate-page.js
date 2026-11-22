@@ -6,8 +6,11 @@
 // resolve esse import antes de conhecer o import map, a resolução falha, a falha
 // fica em cache e o globo 3D não carrega.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
+import { CSP_DIRECTIVES, HAND_WRITTEN_PAGES, cspFor, inlineScripts, scriptHash } from './csp.js';
+import { PRICES_API } from './build-country-pages.js';
+
+const ROOT = new URL('../', import.meta.url);
 
 // Caminho opcional (testes negativos); padrão: index.html do projeto.
 const html = await readFile(process.argv[2] ?? new URL('../index.html', import.meta.url), 'utf8');
@@ -51,33 +54,34 @@ if (!styleVersion || !appVersion) problems.push('styles.css e js/app.js precisam
 else if (styleVersion !== appVersion) problems.push(`?v= diferentes: styles.css=${styleVersion}, app.js=${appVersion}`);
 
 // --- Segurança: Content-Security-Policy e SRI -------------------------------
-const csp = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html);
-const directives = new Map((csp?.[1] ?? '').split(';').map(part => part.trim().split(/\s+/)).filter(([name]) => name).map(([name, ...values]) => [name, values]));
-let inlineScripts = 0;
-if (!csp) problems.push('index.html sem <meta http-equiv="Content-Security-Policy">');
-else {
-  if (csp.index > html.indexOf('<script')) problems.push('a CSP precisa vir antes do primeiro <script>');
-  for (const name of ['default-src', 'script-src', 'object-src', 'base-uri']) {
-    if (!directives.has(name)) problems.push(`CSP sem ${name}`);
-  }
-  const scriptSrc = directives.get('script-src') ?? [];
-  for (const unsafe of ["'unsafe-inline'", "'unsafe-eval'", '*', 'https:']) {
-    if (scriptSrc.includes(unsafe)) problems.push(`CSP script-src não pode ter ${unsafe}`);
-  }
-  if ((directives.get('object-src') ?? []).join(' ') !== "'none'") problems.push("CSP object-src deve ser 'none'");
-  // Cada script inline executável precisa do seu sha256 na CSP (senão o navegador o bloqueia).
-  for (const match of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)) {
-    const attributes = match[1] ?? '';
-    if (/\ssrc=/.test(attributes) || /type="application\/ld\+json"/.test(attributes)) continue;
-    inlineScripts += 1;
-    const hash = `'sha256-${createHash('sha256').update(match[2]).digest('base64')}'`;
-    if (!scriptSrc.includes(hash)) problems.push(`script inline ${attributes.trim() || '(clássico)'} na linha ${html.slice(0, match.index).split('\n').length} sem hash na CSP: troque o hash antigo por ${hash}`);
-  }
-  // Backends ligados pelas metas precisam estar em connect-src.
-  const connectSrc = directives.get('connect-src') ?? [];
-  for (const [, name, url] of html.matchAll(/<meta\s+name="(traveling-(?:api|prices))"\s+content="([^"]+)"/g)) {
-    if (!connectSrc.includes(new URL(url).origin)) problems.push(`CSP connect-src sem ${new URL(url).origin} (meta ${name})`);
-  }
+// A política em si (scripts/csp.js) não pode abrir brecha para scripts.
+const scriptSrc = CSP_DIRECTIVES['script-src'];
+for (const unsafe of ["'unsafe-inline'", "'unsafe-eval'", '*', 'https:', 'http:', 'data:']) {
+  if (scriptSrc.includes(unsafe)) problems.push(`CSP script-src não pode ter ${unsafe}`);
+}
+for (const name of ['default-src', 'script-src', 'object-src', 'base-uri']) if (!CSP_DIRECTIVES[name]) problems.push(`CSP sem ${name}`);
+if (CSP_DIRECTIVES['object-src'].join(' ') !== "'none'") problems.push("CSP object-src deve ser 'none'");
+// Backends ligados pelas metas e pelas páginas de país precisam estar em connect-src.
+for (const url of [...[...html.matchAll(/<meta\s+name="traveling-(?:api|prices)"\s+content="([^"]+)"/g)].map(match => match[1]), PRICES_API]) {
+  if (!CSP_DIRECTIVES['connect-src'].includes(new URL(url).origin)) problems.push(`CSP connect-src sem ${new URL(url).origin}`);
+}
+// Toda página do site tem a política em dia: antes do primeiro <script> e com o
+// sha256 de cada script inline (senão o navegador bloqueia o script).
+const pages = process.argv[2] ? [[process.argv[2], html]] : await Promise.all((await readdir(ROOT, { recursive: true }))
+  .map(file => file.replaceAll('\\', '/'))
+  .filter(file => file.endsWith('.html') && !/^(\.git|node_modules|\.wrangler|docs)\//.test(file))
+  .map(async file => [file, await readFile(new URL(file, ROOT), 'utf8')]));
+let inlineCount = 0;
+for (const [file, page] of pages) {
+  const fix = HAND_WRITTEN_PAGES.includes(file) ? 'npm run build:csp' : 'npm run build:pages';
+  const meta = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]*)"/.exec(page);
+  if (!meta) { problems.push(`${file}: sem Content-Security-Policy (rode ${fix})`); continue; }
+  if (page.includes('<script') && meta.index > page.indexOf('<script')) problems.push(`${file}: a CSP precisa vir antes do primeiro <script>`);
+  const scripts = inlineScripts(page);
+  inlineCount += scripts.length;
+  if (meta[1] === cspFor(page)) continue;
+  const stale = scripts.filter(script => !meta[1].includes(scriptHash(script.content)));
+  problems.push(`${file}: CSP fora de dia${stale.length ? ` (${stale.length} script inline sem hash)` : ''}: rode ${fix}`);
 }
 
 // SRI: todo arquivo da CDN carregado pela página tem integrity, e o mesmo hash
@@ -111,5 +115,5 @@ if (!/fetchJsonWithTimeout\(WORLD_ATLAS_URL, \d+, WORLD_ATLAS_INTEGRITY\)/.test(
 if (/cdn\.jsdelivr\.net[^'"\s]*\/\+esm/.test(html + engine)) problems.push('/+esm do jsDelivr não aceita SRI: use uma cópia em js/vendor/');
 
 for (const problem of problems) console.error(`ERRO ${problem}`);
-console.log(`Página: ${preloads.length} preloads de módulo, import map com ${Object.keys(imports).length} entradas, versão ${appVersion}; CSP com ${inlineScripts} scripts inline por hash; ${sri.size} arquivos da CDN com SRI; problemas: ${problems.length}.`);
+console.log(`Página: ${preloads.length} preloads de módulo, import map com ${Object.keys(imports).length} entradas, versão ${appVersion}; CSP em ${pages.length} páginas (${inlineCount} scripts inline por hash); ${sri.size} arquivos da CDN com SRI; problemas: ${problems.length}.`);
 if (problems.length) process.exitCode = 1;

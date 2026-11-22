@@ -13,8 +13,10 @@
     "check:visa": "node scripts/check-visa-age.js",
     "build:admin": "node scripts/build-admin.js",
     "build:backend-airports": "node scripts/build-backend-airports.js",
+    "dev": "node scripts/dev-server.js",
     "dev:backend": "node scripts/dev-backend.js",
     "build:pages": "node scripts/build-country-pages.js",
+    "build:csp": "node scripts/build-csp.js",
     "test:browser": "node scripts/smoke-browser.js"
   }
 }
