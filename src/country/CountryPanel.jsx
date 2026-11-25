@@ -66,7 +66,7 @@ function Guide({ countryKey, country }) {
           <Icon name="share" /><span>{shareResult || 'Compartilhar'}</span>
         </button>
         <SaveButton className="visit-button save-toggle" id="country-save-button" saved={saved} name={country.namePt} onToggle={() => toggleSavedCountry(countryKey)} />
-        <button className={`visit-button${visited ? ' visit-button--active' : ''}${pulse ? ' button--pulse' : ''}`} id="visit-button" type="button" aria-pressed={visited} aria-label={`Marcar ${country.namePt} como visitado`} onClick={visit}>{visited ? '✓ Visitado' : 'Marcar visitado'}</button>
+        <button className={`visit-button${visited ? ' visit-button--active' : ''}${pulse ? ' button--pulse' : ''}`} id="visit-button" type="button" aria-pressed={visited} aria-label={`${visited ? 'Visitado' : 'Marcar visitado'}: ${country.namePt}`} onClick={visit}>{visited ? '✓ Visitado' : 'Marcar visitado'}</button>
       </header>
 
       <div className="country-panel__identity">

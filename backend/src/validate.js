@@ -155,3 +155,25 @@ export function validateHotelSearch(body, { now = new Date() } = {}) {
     maxResults: integer(body.maxResults, { field: 'maxResults', min: 1, max: LIMITS.maxResults, fallback: LIMITS.defaultResults })
   };
 }
+
+// Códigos que o catálogo do site usa e que saíram da lista IATA atual.
+const LEGACY_IATA = new Set(['FRU']);
+
+function period(value, field, now) {
+  const month = /^(\d{4})-(\d{2})$/.exec(value);
+  const day = month ? dateDay(`${value}-01`, field) + 30 : dateDay(value, field);
+  const start = today(now);
+  // Um mês inteiro vale até o último dia dele; um ano e pouco à frente cobre "o mês no ano que vem".
+  if (day < start || day > start + 400 + 30) fail('INVALID_DATES', 'Período fora do intervalo de busca.', field);
+  return day;
+}
+
+/** Preços vistos recentemente: aeroportos reais e período entre hoje e ~13 meses. */
+export function validateCheapestQuery({ origin, destination, departure, returnDate }, { now = new Date() } = {}) {
+  for (const [code, field] of [[origin, 'origin'], [destination, 'destination']]) {
+    if (!/^[A-Z]{3}$/.test(code) || !(isKnownIata(code) || LEGACY_IATA.has(code))) fail('INVALID_AIRPORT', 'Aeroportos inválidos.', field);
+  }
+  if (origin === destination) fail('INVALID_AIRPORT', 'Aeroportos inválidos.', 'destination');
+  const go = period(departure, 'departure', now);
+  if (returnDate && period(returnDate, 'return', now) < go - 31) fail('INVALID_DATES', 'A volta precisa ser depois da ida.', 'return');
+}

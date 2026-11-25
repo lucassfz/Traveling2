@@ -25,7 +25,7 @@ export function normalizeSavedEntry(raw, { countries = null } = {}) {
   if (!raw || typeof raw !== 'object' || !TYPES.has(raw.type) || !ID_RE.test(raw.id ?? '')) return null;
   if (!raw.id.startsWith(`${raw.type}:`)) return null;
   const countryKey = text(raw.countryKey, 60);
-  if (!countryKey || (countries && !countries[countryKey])) return null;
+  if (!countryKey || (countries && !Object.hasOwn(countries, countryKey))) return null;
   const name = text(raw.name);
   if (!name) return null;
   const lat = number(raw.lat);
@@ -61,7 +61,7 @@ export function createSavedStore({ countries = null, read = readJsonStorage, wri
   if (raw === null) {
     const wishlist = read(STORAGE_KEYS.wishlist, []);
     const items = (Array.isArray(wishlist) ? wishlist : [])
-      .filter(key => typeof key === 'string' && (!countries || countries[key]))
+      .filter(key => typeof key === 'string' && (!countries || Object.hasOwn(countries, key)))
       .map(key => ({ id: `country:${key}`, type: 'country', countryKey: key, name: countries?.[key]?.namePt ?? key }));
     raw = { version: SAVED_SCHEMA_VERSION, items };
     if (items.length) persistent = write(STORAGE_KEYS.saved, normalizeSaved(raw, { countries })) !== false;

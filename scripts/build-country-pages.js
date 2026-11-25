@@ -518,7 +518,10 @@ export function notFoundPage(countries, capitals = []) {
         }
         return row[b.length];
       };
-      var parts = decodeURIComponent(location.pathname).split('/').filter(Boolean);
+      var path = location.pathname;
+      try { path = decodeURIComponent(path); } catch (error) { /* endereço malformado */ }
+      var parts = path.split('/').filter(Boolean);
+      if (!parts.length) return;
       var wanted = slug(parts[parts.length - 1] === 'index.html' ? parts[parts.length - 2] : parts[parts.length - 1]);
       if (wanted.length < 3) return;
       var scored = pages.map(function (page) {

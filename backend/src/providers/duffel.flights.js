@@ -152,7 +152,7 @@ export function createDuffelFlights(env, { fetchImpl = globalThis.fetch } = {}) 
     dataSource,
     async searchFlights(request, { signal, now = new Date() } = {}) {
       if (request.passengers.children || request.passengers.infants) {
-        throw new ProviderRequestError('A Duffel exige a idade de cada menor; esta busca aceita só adultos.');
+        throw Object.assign(new ProviderRequestError('A Duffel exige a idade de cada menor; esta busca aceita só adultos.'), { unsupported: true });
       }
       const slices = [{ origin: request.origin, destination: request.destination, departure_date: request.departureDate }];
       if (request.returnDate) slices.push({ origin: request.destination, destination: request.origin, departure_date: request.returnDate });

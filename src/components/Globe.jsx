@@ -10,6 +10,7 @@ import { openFromHash, selectCity, selectCountry, syncFilters, toggleHub } from 
 import { routeArrived } from '../state/route.js';
 import { announce } from '../state/focus.js';
 import { CityCard } from './CityCard.jsx';
+import { tourSeen } from './Tour.jsx';
 import { Icon } from './ui.jsx';
 
 const FALLBACK = 'O mapa 3D não carregou. A busca, a lista de países, os guias, as viagens e as milhas continuam disponíveis.';
@@ -98,7 +99,7 @@ async function startMap(stage, isCancelled) {
         app.set({ mapReady: true });
         openFromHash();
         // Primeira visita, sem link de país ou cidade: tour curto.
-        if (!location.hash) setTimeout(() => { if (!app.get().countryKey && !app.get().hub) app.set({ tourOpen: true }); }, 900);
+        if (!location.hash && !tourSeen()) setTimeout(() => { if (!app.get().countryKey && !app.get().hub) app.set({ tourOpen: true }); }, 900);
       }
     });
     globe.map.setVisitedCountries?.(app.get().visited);

@@ -70,7 +70,7 @@ function Landmark({ countryKey, country, item, primary, summary }) {
         <span className="media-card__title"><strong>{item.name}</strong>{item.wikidataId && <SaveButton className="save-toggle save-toggle--small" saved={saved} name={item.name} onToggle={toggle} />}</span>
         <span>{item.city}</span>
         <Summary entry={summary} className="media-card__about" />
-        <ExternalLink href={item.sourcePage} aria-label={`Crédito da imagem de ${item.name} (abre em nova aba)`}>Foto: {item.author} · {item.license}</ExternalLink>
+        <ExternalLink href={item.sourcePage}>Foto: {item.author} · {item.license}<span className="sr-only">, crédito da imagem de {item.name}</span></ExternalLink>
       </figcaption>
     </figure>
   );

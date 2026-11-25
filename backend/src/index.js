@@ -15,7 +15,7 @@
 //   RATE_PER_MINUTE   buscas por cliente por minuto (padrão 10)
 //   RATE_PER_DAY      buscas por cliente por dia (padrão 100)
 import { API_VERSION, ApiError, LIMITS } from './contract.js';
-import { validateFlightSearch, validateHotelSearch } from './validate.js';
+import { validateCheapestQuery, validateFlightSearch, validateHotelSearch } from './validate.js';
 import { checkFlightOffer, checkHotelOffer, checkHotelProperty, dedupeFlights, sortByPrice } from './models.js';
 import { allProviders, providersFor } from './providers/index.js';
 import { cheapestFlights } from './providers/travelpayouts.prices.js';
@@ -30,7 +30,8 @@ const WARNINGS = Object.freeze({
 
 // Agrupa o cliente sem guardar o IP inteiro: IPv4 /24, IPv6 /48.
 export function clientKey(request) {
-  const ip = request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  // Só o cabeçalho que a Cloudflare define: x-forwarded-for pode ser forjado pelo cliente.
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   if (ip.includes(':')) return ip.split(':').slice(0, 3).join(':');
   return ip.split('.').slice(0, 3).join('.');
 }
@@ -54,17 +55,40 @@ function corsHeaders(request, env) {
 function json(status, body, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+      'referrer-policy': 'no-referrer',
+      ...headers
+    }
   });
 }
 
 async function readBody(request) {
   const declared = Number(request.headers.get('content-length') ?? 0);
   if (declared > LIMITS.maxBodyBytes) throw new ApiError('PAYLOAD_TOO_LARGE', 'Requisição grande demais.');
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > LIMITS.maxBodyBytes) throw new ApiError('PAYLOAD_TOO_LARGE', 'Requisição grande demais.');
+  // Lê aos pedaços e para no limite: sem content-length (chunked), request.text()
+  // traria o corpo inteiro para a memória antes de qualquer verificação.
+  const chunks = [];
+  let size = 0;
+  const reader = request.body?.getReader();
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > LIMITS.maxBodyBytes) {
+      await reader.cancel().catch(() => {});
+      throw new ApiError('PAYLOAD_TOO_LARGE', 'Requisição grande demais.');
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   try {
-    return JSON.parse(text);
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new ApiError('INVALID_REQUEST', 'O corpo precisa ser um JSON válido.');
   }
@@ -125,7 +149,9 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
         breaker.success(slot(provider));
         results.push({ provider, value: outcome.value });
       } else {
-        breaker.failure(slot(provider), now().getTime());
+        // Pedido que o fornecedor não atende (ex.: menores na Duffel) não é falha dele:
+        // contar abriria o disjuntor para todo mundo com três buscas válidas.
+        if (!outcome.reason?.unsupported) breaker.failure(slot(provider), now().getTime());
         failures.push({ provider, timeout: Boolean(outcome.reason?.timeout) });
       }
     });
@@ -220,8 +246,7 @@ export function createApp({ now = () => new Date(), log = line => console.log(JS
         departure: url.searchParams.get('departure') ?? '',
         returnDate: url.searchParams.get('return') || null
       };
-      if (!/^[A-Z]{3}$/.test(query.origin) || !/^[A-Z]{3}$/.test(query.destination) || query.origin === query.destination) throw new ApiError('INVALID_AIRPORT', 'Aeroportos inválidos.', { field: 'origin' });
-      if (!/^\d{4}-\d{2}(-\d{2})?$/.test(query.departure) || (query.returnDate && !/^\d{4}-\d{2}(-\d{2})?$/.test(query.returnDate))) throw new ApiError('INVALID_DATES', 'Período inválido.', { field: 'departure' });
+      validateCheapestQuery(query, { now: now() });
       await checkRate(request, env);
       const { value, cache: cacheState } = await cache.through(
         cacheKey('cheapest', query),

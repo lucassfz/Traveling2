@@ -59,6 +59,9 @@ const scriptSrc = CSP_DIRECTIVES['script-src'];
 for (const unsafe of ["'unsafe-inline'", "'unsafe-eval'", '*', 'https:', 'http:', 'data:']) {
   if (scriptSrc.includes(unsafe)) problems.push(`CSP script-src não pode ter ${unsafe}`);
 }
+// CDN pública sem caminho = qualquer pacote de qualquer pessoa.
+if (scriptSrc.some(value => /^https:\/\/cdn\.jsdelivr\.net\/?$/.test(value))) problems.push('CSP script-src não pode liberar a jsDelivr inteira');
+for (const url of Object.values(imports)) if (!scriptSrc.some(value => value.endsWith('/') && url.startsWith(value))) problems.push(`CSP script-src não cobre ${url}`);
 for (const name of ['default-src', 'script-src', 'object-src', 'base-uri']) if (!CSP_DIRECTIVES[name]) problems.push(`CSP sem ${name}`);
 if (CSP_DIRECTIVES['object-src'].join(' ') !== "'none'") problems.push("CSP object-src deve ser 'none'");
 // Backends ligados pelas metas e pelas páginas de país precisam estar em connect-src.

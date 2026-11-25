@@ -46,13 +46,13 @@ export function Header({ inert }) {
           <Icon name="spark" /><span className="header-action__label">Descobrir</span>
         </button>
         <button className="header-action" id="trips-launcher" type="button" aria-expanded={hub === 'planner'} aria-controls="planner-panel" title="Planejar viagem"
-          aria-label={trips ? `Viagens (${trips} ${trips === 1 ? 'salva' : 'salvas'})` : 'Viagens'} onClick={() => toggleHub('planner')}>
-          <Icon name="suitcase" /><span className="header-action__label">Viagens</span>
+          aria-label={trips ? `Viagens ${trips} ${trips === 1 ? 'salva' : 'salvas'}` : 'Viagens'} onClick={() => toggleHub('planner')}>
+          <Icon name="suitcase" /><span className="header-action__label">Viagens</span>{' '}
           <span className="header-action__badge" id="trips-count" hidden={!trips}>{trips}</span>
         </button>
         <button className="header-action" id="saved-launcher" type="button" aria-expanded={hub === 'saved'} aria-controls="saved-panel" title="Destinos salvos"
-          aria-label={saved ? `Salvos: ${saved} ${saved === 1 ? 'destino' : 'destinos'}` : 'Salvos: destinos para ver depois'} onClick={() => toggleHub('saved')}>
-          <Icon name="bookmark" /><span className="header-action__label">Salvos</span>
+          aria-label={saved ? `Salvos ${saved} ${saved === 1 ? 'destino' : 'destinos'}` : 'Salvos: destinos para ver depois'} onClick={() => toggleHub('saved')}>
+          <Icon name="bookmark" /><span className="header-action__label">Salvos</span>{' '}
           <span className="header-action__badge" id="saved-count" hidden={!saved}>{saved}</span>
         </button>
         <button className="header-action" id="miles-launcher" type="button" aria-expanded={hub === 'miles'} aria-controls="miles-hub" aria-label="Milhas e aeroportos" title="Milhas e aeroportos" onClick={() => toggleHub('miles')}>

@@ -26,6 +26,12 @@ export function pricePeriod(trip, now = new Date()) {
   return { departure: month, return: month };
 }
 
+// Só mostra o que tem formato de preço e leva ao parceiro: a resposta vem da rede.
+export function safeOffer(offer) {
+  const amount = Number(offer?.price?.amount);
+  return Number.isFinite(amount) && amount > 0 && String(offer.url).startsWith('https://www.aviasales.com/') ? offer : null;
+}
+
 /** @returns {Promise<object|null>} A oferta mais barata, ou null. */
 export async function cheapestFlight({ origin, destination, departure, return: returnDate }, { base = pricesBase(), fetchImpl = fetch } = {}) {
   if (!base || !origin || !destination || !departure) return null;
@@ -36,7 +42,7 @@ export async function cheapestFlight({ origin, destination, departure, return: r
     const timer = setTimeout(() => controller.abort(), 12000);
     cache.set(key, fetchImpl(`${base}/flights/cheapest?${params}`, { signal: controller.signal })
       .then(response => (response.ok ? response.json() : null))
-      .then(body => body?.offers?.[0] ?? null)
+      .then(body => safeOffer(body?.offers?.[0]))
       .catch(() => { cache.delete(key); return null; })
       .finally(() => clearTimeout(timer)));
   }

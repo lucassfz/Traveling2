@@ -4,7 +4,7 @@ import { buildFlightRoute, estimatedTravelMinutes } from '../../js/flight.route.
 import { reducedMotion } from '../../js/core/motion.js';
 import { app } from './store.js';
 import { airports, globe, resolveDestinationAirport } from './services.js';
-import { announce, focusSoon } from './focus.js';
+import { announce, focusElement, focusSoon } from './focus.js';
 
 const NO_ROUTE = 'Rota ainda não disponível para este destino.';
 let requestId = 0;
@@ -44,7 +44,7 @@ export function closeRoute({ camera = true, restore = false } = {}) {
   document.body.classList.remove('route-mode');
   const target = returnFocus;
   returnFocus = null;
-  if (restore) requestAnimationFrame(() => (target?.isConnected ? target : document.getElementById('country-explore-button'))?.focus({ preventScroll: true }));
+  if (restore) focusElement(target, 'country-explore-button');
 }
 
 /**

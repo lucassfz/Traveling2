@@ -39,16 +39,16 @@ export function Dock({ inert }) {
         <div className="continent-nav has-indicator" role="group" aria-label="Ir para um continente">
           <Indicator active=".continent-nav__button--active" dependency={continent} />
           {CONTINENTS.map(([code, label, name]) => (
-            <button className={`continent-nav__button${continent === code ? ' continent-nav__button--active' : ''}`} type="button" key={code} data-continent={code} aria-pressed={continent === code} aria-label={name}
+            <button className={`continent-nav__button${continent === code ? ' continent-nav__button--active' : ''}`} type="button" key={code} data-continent={code} aria-pressed={continent === code} aria-label={label === name ? undefined : `${label} (${name})`}
               onClick={() => { selectContinent(code); announce(`${name} no globo.`); }}>{label}</button>
           ))}
         </div>
         <button className={`visa-filter${visaFilter ? ' visa-filter--active' : ''}`} id="visa-free-filter" type="button" aria-pressed={visaFilter}
           title={`${visaFilter ? 'Desativar filtro de' : 'Mostrar'} destinos sem visto prévio nem autorização eletrônica`}
-          aria-label={`Sem visto: destacar ${VISA_FREE_KEYS.length} destinos sem visto prévio nem autorização eletrônica para brasileiros`}
+          aria-label={`Sem visto ${VISA_FREE_KEYS.length}: destacar destinos sem visto prévio nem autorização eletrônica para brasileiros`}
           onClick={toggleVisaFilter}>
           <Icon name="shield" />
-          <span className="visa-filter__label">Sem visto</span>
+          <span className="visa-filter__label">Sem visto</span>{' '}
           <strong className="visa-filter__count" id="visa-free-count">{VISA_FREE_KEYS.length}</strong>
         </button>
         <button className={`visa-filter season-filter${hasSeason ? ' visa-filter--active' : ''}`} id="season-filter" type="button" aria-expanded={picking} aria-controls="season-picker" ref={seasonButton}
@@ -61,7 +61,7 @@ export function Dock({ inert }) {
       <div className="season-picker" id="season-picker" role="group" aria-label="Escolha o mês da viagem" hidden={!picking} inert={inert}
         onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setPicking(false); seasonButton.current?.focus(); } }}>
         {MONTHS.map((label, month) => (
-          <button className="discovery-chip" type="button" key={label} data-season-month={month} aria-pressed={month === seasonMonth} aria-label={MONTH_NAMES[month]} onClick={() => chooseMonth(month)}>{label}</button>
+          <button className="discovery-chip" type="button" key={label} data-season-month={month} aria-pressed={month === seasonMonth} aria-label={`${label} (${MONTH_NAMES[month]})`} onClick={() => chooseMonth(month)}>{label}</button>
         ))}
         {hasSeason && <button className="planner-text-action" type="button" data-season-month="off" onClick={() => chooseMonth(seasonMonth)}>Limpar</button>}
       </div>
