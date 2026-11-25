@@ -23,7 +23,7 @@
     "test:security": "node scripts/test-security.js"
   },
   "devDependencies": {
-    "axe-core": "4.14.0",
+    "axe-core": "4.14.1",
     "esbuild": "0.28.2"
   },
   "dependencies": {
