@@ -13,6 +13,6 @@ assert.ok(html.includes('<link rel="manifest" href="manifest.webmanifest">'), 'i
 const sw = await readFile(new URL('sw.js', root), 'utf8');
 assert.ok(/fetch\(request\)\.then/.test(sw), 'rede primeiro (nunca prende numa versão antiga)');
 assert.ok(!sw.includes('workers.dev'), 'não guarda as chamadas de preço');
-const app = await readFile(new URL('js/app.js', root), 'utf8');
+const app = await readFile(new URL('src/main.jsx', root), 'utf8');
 assert.ok(app.includes("navigator.serviceWorker.register('sw.js')"), 'app registra o service worker');
 console.log(`PWA: manifesto, ${manifest.icons.length} ícones e service worker (rede primeiro) verificados.`);

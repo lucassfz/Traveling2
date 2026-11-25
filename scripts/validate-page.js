@@ -47,11 +47,11 @@ for (const url of Object.values(imports)) {
   if (url.includes('cdn.jsdelivr.net') && !/@\d+\.\d+\.\d+/.test(url)) problems.push(`versão não fixada no import map: ${url}`);
 }
 
-// styles.css e js/app.js com o mesmo ?v= (evita misturar versões em cache).
+// styles.css e app/main.js com o mesmo ?v= (evita misturar versões em cache).
 const styleVersion = /styles\.css\?v=([\w.-]+)/.exec(html)?.[1];
-const appVersion = /js\/app\.js\?v=([\w.-]+)/.exec(html)?.[1];
-if (!styleVersion || !appVersion) problems.push('styles.css e js/app.js precisam de ?v= (cache do GitHub Pages)');
-else if (styleVersion !== appVersion) problems.push(`?v= diferentes: styles.css=${styleVersion}, app.js=${appVersion}`);
+const appVersion = /app\/main\.js\?v=([\w.-]+)/.exec(html)?.[1];
+if (!styleVersion || !appVersion) problems.push('styles.css e app/main.js precisam de ?v= (cache do GitHub Pages)');
+else if (styleVersion !== appVersion) problems.push(`?v= diferentes: styles.css=${styleVersion}, app/main.js=${appVersion}`);
 
 // --- Segurança: Content-Security-Policy e SRI -------------------------------
 // A política em si (scripts/csp.js) não pode abrir brecha para scripts.

@@ -120,3 +120,15 @@ export function noMatchAdvice(countries, preferences, profiles = DESTINATION_PRO
 export function nextDiscoveryIndex(matches, currentIndex) {
   return matches.length > 1 ? (currentIndex + 1) % matches.length : 0;
 }
+
+// Sem interesse escolhido: melhor resultado de cada país entre todos os interesses.
+export function rankWithoutInterests(countries, preferences) {
+  const best = new Map();
+  for (const interest of Object.keys(INTERESTS)) {
+    for (const match of rankDestinations(countries, { ...preferences, interests: [interest] })) {
+      const current = best.get(match.countryKey);
+      if (!current || match.score > current.score) best.set(match.countryKey, match);
+    }
+  }
+  return [...best.values()].sort((a, b) => Number(b.tier === 'strong') - Number(a.tier === 'strong') || b.score - a.score || a.countryKey.localeCompare(b.countryKey, 'en'));
+}

@@ -3867,11 +3867,68 @@ html[data-contrast='high'] :is(.visit-button, .secondary-button, .icon-button, .
 
 /* Impressão do resumo da viagem: só o planejamento, em papel branco. */
 @media print {
-  body.printing-trip > *:not(#planner-panel) { display: none !important; }
+  body.printing-trip > *:not(#root), body.printing-trip > #root > *:not(#planner-panel) { display: none !important; }
   body.printing-trip, body.printing-trip #planner-panel { background: #fff !important; color: #000 !important; }
   body.printing-trip #planner-panel { position: static !important; inset: auto !important; width: auto !important; max-width: none !important; height: auto !important; max-height: none !important; overflow: visible !important; transform: none !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
   body.printing-trip #planner-panel * { color: #000 !important; background: transparent !important; box-shadow: none !important; }
   body.printing-trip :is(.planner-actions, .planner-footer, .stepper, .wizard__nav, button, .planner-back, .icon-button) { display: none !important; }
   body.printing-trip .planner-card { border: 1px solid #999 !important; break-inside: avoid; }
   html, body { overflow: visible !important; height: auto !important; }
+}
+
+/* ---------- React: contêiner e busca com lista (combobox) ---------- */
+#root, .combobox { display: contents; }
+.search__option[aria-selected='true'],
+.planner-picker__option[aria-selected='true'] { background: var(--color-tint); box-shadow: inset 0 0 0 2px var(--color-focus); }
+.boot-error { position: fixed; z-index: 900; inset: auto 16px 16px; margin: 0 auto; max-width: 560px; padding: 16px 20px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-background-elevated, var(--color-background)); color: var(--color-text); }
+.boot-error[hidden] { display: none; }
+.boot-error h1 { margin: 0 0 6px; font-size: 1.1rem; }
+.boot-error p { margin: 0; }
+.boot-error a { color: var(--color-accent); }
+
+/* ---------- Teclado e leitor de tela ---------- */
+:is(button, a, input, select, summary, [tabindex='0']):focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.search__input:focus-visible { outline: none; }
+.globe__stage:focus-visible { outline-offset: -3px; }
+.country-tab:focus-visible, .miles-panel:focus-visible { outline-offset: -3px; border-radius: 8px; }
+.skip-links { position: fixed; z-index: 1000; top: 0; left: 0; }
+.miles-hub__title:focus, .discovery-header h2:focus { outline: none; }
+/* Botões "desligados" que continuam no Tab para explicar por quê. */
+[aria-disabled='true'] { opacity: .55; cursor: not-allowed; }
+.info-card { display: flex; flex-direction: column; }
+.info-card__label { order: 1; }
+.info-card dd { margin-left: 0; }
+.month-chart { margin: 0; padding: 0; list-style: none; }
+.month-chart__month { position: relative; }
+h3.section-heading, h4.section-heading { margin-top: 0; }
+.miles-card__head h4, .miles-card__head h5 { margin: 0; font-size: inherit; font-weight: 600; }
+.country-cities-search { margin-bottom: 10px; }
+#country-city-search { margin-bottom: 10px; }
+
+/* Lista de países: alternativa em texto ao globo. */
+.places { display: grid; gap: 14px; justify-items: start; }
+.places > * { width: 100%; }
+.places > .discovery-chip { width: auto; }
+.places .planner-block-title { margin: 8px 0; }
+.places .planner-block-title small { color: var(--color-text-muted); font-weight: 400; }
+.places__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.places__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; border: 1px solid var(--color-border-soft); border-radius: 12px; background: var(--color-tint); color: inherit; font: inherit; font-size: .88rem; text-align: left; cursor: pointer; }
+.places__item:hover, .places__item[aria-current='true'] { border-color: var(--color-accent); }
+.places__item strong { display: block; font-weight: 600; }
+.places__item small { display: block; color: var(--color-text-muted); font-size: .74rem; }
+.places__flag { flex: none; width: 28px; height: auto; max-height: 21px; border-radius: 3px; box-shadow: 0 0 0 1px var(--color-border-soft); }
+.globe-zoom__button .icon { width: 20px; height: 20px; vertical-align: middle; }
+
+/* Atalhos de teclado (tecla ?). */
+.help-dialog { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 18px 20px 20px; border: 1px solid var(--color-border); border-radius: 22px; background: var(--color-background-elevated, var(--color-background)); color: var(--color-text); }
+.help-dialog::backdrop { background: rgba(2, 6, 23, .55); }
+.help-dialog h3 { margin: 16px 0 6px; color: var(--color-text-muted); font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.help-dialog__keys { display: grid; gap: 6px; margin: 0; }
+.help-dialog__keys div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; font-size: .9rem; }
+.help-dialog__keys dt { margin: 0; }
+.help-dialog__keys dd { margin: 0; }
+.help-dialog kbd { padding: 2px 7px; border: 1px solid var(--color-border); border-radius: 6px; font: 600 .78rem/1.5 var(--font-sans); }
+@media (max-width: 600px) {
+  .places__list { grid-template-columns: 1fr; }
+  .help-dialog__keys div { grid-template-columns: 1fr; gap: 2px; }
 }

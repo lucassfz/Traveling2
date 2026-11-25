@@ -389,7 +389,7 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
 
 // 9. Seção de voos do Planner: ordenação, resumo e total anexado (funções puras).
 {
-  const { sortOffers, offerSummary, attachedFlightsTotal } = await import('../js/planner/live.flights.section.js');
+  const { sortOffers, offerSummary, attachedFlightsTotal } = await import('../js/planner/flight.offers.js');
   const request = validateFlightSearch({ origin: 'GRU', destination: 'LIS', departureDate: '2027-04-02', returnDate: '2027-04-10', passengers: { adults: 1 } }, { now: NOW });
   const { offers } = await mockFlights.searchFlights(request, { now: NOW });
   const byPrice = sortOffers(offers, 'price');
@@ -409,7 +409,7 @@ console.log('Backend: contrato, validação (voos e hotéis), modelos, confiabil
 
 // 10. Hospedagem no Planner: link do Booking.com e ordenação (funções puras).
 {
-  const { bookingSearchUrl, sortHotelOffers, filterByLodging } = await import('../js/planner/live.hotels.section.js');
+  const { bookingSearchUrl, sortHotelOffers, filterByLodging } = await import('../js/planner/hotel.offers.js');
   const trip = { startDate: '2027-04-03', endDate: '2027-04-10', travelers: 3, city: { name: 'Lisboa', lat: 38.72, lng: -9.14 } };
   const url = new URL(bookingSearchUrl(trip));
   assert.equal(url.origin + url.pathname, 'https://www.booking.com/searchresults.pt-br.html');

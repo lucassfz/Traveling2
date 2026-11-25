@@ -417,7 +417,9 @@ export class MapEngine {
     this.landTweens = new Map(); // material → transição de cor
     this.renderer.setClearAlpha(0);
     this.renderer.domElement.className = 'globe__canvas';
-    this.renderer.domElement.tabIndex = 0;
+    // Só o palco (com nome e instruções) recebe foco; o canvas seria uma parada muda no Tab.
+    this.renderer.domElement.tabIndex = -1;
+    this.renderer.domElement.setAttribute('aria-hidden', 'true');
     this.stage.appendChild(this.renderer.domElement);
 
     this.camera.position.copy(latLngToCartesian(18, -18, this.#homeDistance(), GLOBE_YAW, GLOBE_ORIGIN));

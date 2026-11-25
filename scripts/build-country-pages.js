@@ -14,7 +14,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { COUNTRIES, CONTINENT_LABELS } from '../js/countries.dataset.js';
 import { CITY_PAGES_DIR, COUNTRY_PAGES_DIR, capitalLandmarks, capitalPagePath, countrySlug } from '../js/country.slug.js';
-import { PARTNERS, klookUrl } from '../js/planner/partners.section.js';
+import { PARTNERS, klookUrl } from '../js/planner/partners.js';
 import { withCsp } from './csp.js';
 
 // Endereço público do site. Ao trocar de domínio, mude aqui e rode o gerador.

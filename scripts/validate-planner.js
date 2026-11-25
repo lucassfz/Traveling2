@@ -411,7 +411,7 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
 
 // Quanto vai custar (resumo): estimativas, cotações anexadas, gastos anotados e orçamento.
 {
-  const { tripCostSummary, localCostRange, costSummaryText, costHtml } = await import('../js/planner/cost.section.js');
+  const { tripCostSummary, localCostRange, costSummaryText, costRowProvenance, costRowRefreshStep } = await import('../js/planner/cost.model.js');
   const { DESTINATION_PROFILES } = await import('../js/destination.profiles.js');
   let id = 0;
   const idFactory = prefix => `${prefix}_cost${String(++id).padStart(4, '0')}`;
@@ -457,9 +457,10 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(byId.own.low, 300);
   assert.equal(byId.own.detail, 'Seguro e documentos');
   assert.ok(withQuotes.high < 99999, 'estimativas antigas guardadas não entram (o cálculo é refeito)');
-  const html = costHtml(withQuotes, { local });
-  assert.ok(html.includes('Preço expirado') && html.includes('data-planner-step="3"'), 'cotação vencida oferece atualizar');
-  assert.ok(html.includes('Dados de teste'));
+  assert.equal(costRowProvenance(byId.flights).options.label, 'Preço expirado');
+  assert.equal(costRowRefreshStep(byId.flights), 3, 'cotação vencida oferece atualizar na etapa Voo');
+  assert.equal(costRowProvenance(byId.lodging).kind, 'test', 'dados de teste declarados');
+  assert.equal(costRowRefreshStep(byId.lodging), null);
   assert.ok(costSummaryText(withQuotes)[0].startsWith('Custo estimado: '));
 
   // Sem nada para estimar: avisa o que falta, sem inventar valor.
@@ -468,7 +469,6 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.deepEqual(empty.incomplete, ['Passagens', 'Hospedagem', 'Gastos no destino']);
   assert.equal(empty.budget, null);
   assert.deepEqual(costSummaryText(empty), []);
-  assert.ok(costHtml(empty).includes('Ainda não há estimativa'));
   const over = tripCostSummary({ trip: { ...base, budgetBRL: 100 }, flight, local, now: at });
   assert.equal(over.budget.status, 'over');
   console.log('Planner: custo da viagem no resumo (estimativas, cotações, gastos anotados, orçamento) verificado.');
@@ -476,7 +476,7 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
 
 // Links de parceiros: busca do Aviasales preenchida com a viagem, com o marcador.
 {
-  const { aviasalesUrl, PARTNERS, PARTNER_MARKER } = await import('../js/planner/partners.section.js');
+  const { aviasalesUrl, PARTNERS, PARTNER_MARKER } = await import('../js/planner/partners.js');
   const trip = { travelers: 2, startDate: '2027-04-03', endDate: '2027-04-10' };
   assert.equal(aviasalesUrl(trip, { origin: 'GRU', destination: 'LIS' }), `https://www.aviasales.com/search/GRU0304LIS10042?marker=${PARTNER_MARKER}`);
   assert.equal(aviasalesUrl({ ...trip, endDate: null }, { origin: 'GRU', destination: 'LIS' }), `https://www.aviasales.com/search/GRU0304LIS2?marker=${PARTNER_MARKER}`, 'só ida');
@@ -484,17 +484,17 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
   assert.equal(aviasalesUrl(trip, { origin: 'GRU', destination: 'GRU' }), PARTNERS.aviasales.home);
   assert.equal(aviasalesUrl(trip, {}), PARTNERS.aviasales.home);
   assert.ok(Object.values(PARTNERS).every(partner => partner.home.startsWith('https://')));
-  const { klookUrl } = await import('../js/planner/partners.section.js');
+  const { klookUrl } = await import('../js/planner/partners.js');
   const klook = new URL(klookUrl('São Paulo'));
   assert.equal(klook.origin + klook.pathname, 'https://affiliate.klook.com/redirect');
   assert.ok(klook.searchParams.get('aid').includes('806253'), 'marcador de parceiro');
   assert.equal(new URL(klook.searchParams.get('k_site')).searchParams.get('query'), 'São Paulo', 'busca da cidade');
   assert.equal(klookUrl(''), PARTNERS.klook.home);
-  const { esimHtml, activePromo } = await import('../js/planner/partners.section.js');
-  assert.ok(esimHtml(new Date('2026-12-01T12:00:00Z')).includes('20% de desconto'), 'cupom dentro da validade');
+  const { esimOffer, activePromo } = await import('../js/planner/partners.js');
+  assert.ok(esimOffer(new Date('2026-12-01T12:00:00Z')).label.includes('20% de desconto'), 'cupom dentro da validade');
   assert.ok(activePromo('yesim', new Date('2027-02-28T23:00:00-03:00')), 'vale até o fim do último dia');
   assert.equal(activePromo('yesim', new Date('2027-03-01T00:30:00-03:00')), null, 'some depois de vencer');
-  assert.ok(!esimHtml(new Date('2027-03-02T12:00:00Z')).includes('desconto') && esimHtml(new Date('2027-03-02T12:00:00Z')).includes(PARTNERS.yesim.home), 'sem cupom: link normal');
+  assert.deepEqual(esimOffer(new Date('2027-03-02T12:00:00Z')), { url: PARTNERS.yesim.home, label: 'Ver eSIM no Yesim', note: '' }, 'sem cupom: link normal');
   console.log('Planner: links de parceiros (Aviasales e Klook preenchidos) verificados.');
 }
 
@@ -521,7 +521,7 @@ console.log('Planner: modelo, totais, normalização, armazenamento, sugestões 
 
 // Custo: preço de passagem visto recentemente entra no lugar da estimativa.
 {
-  const { tripCostSummary } = await import('../js/planner/cost.section.js');
+  const { tripCostSummary } = await import('../js/planner/cost.model.js');
   const base = createTrip({ countryKey: 'Portugal', travelers: 2, startDate: '2027-04-03', endDate: '2027-04-10' });
   const withSeen = tripCostSummary({ trip: base, flight: { low: 4000, high: 6000 }, seen: { amount: 4608, foundOn: '2026-11-13' } });
   const flights = withSeen.rows.find(row => row.id === 'flights');

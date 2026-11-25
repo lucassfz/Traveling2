@@ -9,3 +9,11 @@ updates:
       interval: monthly
     commit-message:
       prefix: "CI"
+  # React, esbuild e axe-core (versões exatas no package.json). Depois de aceitar,
+  # rode npm run build e versione app/.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Dependências"
