@@ -1,5 +1,3 @@
-import { escapeHtml } from './core/html.js';
-
 // Etiqueta única para dizer de onde vem cada número exibido: dado verificado em
 // fonte oficial, dado ao vivo, estimativa do próprio Traveling ou cálculo feito
 // com valores digitados pelo usuário. Sempre texto + cor (nunca só cor).
@@ -41,7 +39,7 @@ export function formatProvenanceDate(value) {
 }
 
 /**
- * Markup de uma etiqueta de procedência.
+ * Partes de uma etiqueta de procedência, prontas para <Provenance> (React).
  * @param {keyof PROVENANCE_KINDS} kind
  * @param {object} [options]
  * @param {string} [options.label]      Texto do tipo (padrão por `kind`).
@@ -50,18 +48,14 @@ export function formatProvenanceDate(value) {
  * @param {string} [options.detail]     Complemento curto.
  * @param {string} [options.source]     URL https da fonte; outras são ignoradas.
  * @param {string} [options.sourceText] Texto do link (padrão "Fonte").
- * @param {string} [options.tag]        'p' ou 'span'.
- * @param {string} [options.className]  Classes extras.
+ * @returns {{ kind: string, label: string, parts: { text: string, href?: string }[] }}
  */
-export function provenanceLabel(kind, options = {}) {
+export function provenanceParts(kind, { label = PROVENANCE_KINDS[kind], date, dateLabel, detail, source, sourceText = 'Fonte' } = {}) {
   if (!Object.hasOwn(PROVENANCE_KINDS, kind)) throw new Error(`Tipo de procedência desconhecido: ${kind}`);
-  const { label = PROVENANCE_KINDS[kind], date, dateLabel, detail, source, sourceText = 'Fonte', tag = 'p', className = '' } = options;
-  const element = tag === 'span' ? 'span' : 'p';
   const parts = [];
-  if (date) parts.push(`${dateLabel ? `${escapeHtml(dateLabel)} ` : ''}${escapeHtml(formatProvenanceDate(date))}`);
-  if (detail) parts.push(escapeHtml(detail));
-  const url = source ? safeHttpsUrl(source) : null;
-  if (url) parts.push(`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceText)}</a>`);
-  const classes = ['provenance', `provenance--${kind}`, ...String(className).split(/\s+/).filter(Boolean)].map(escapeHtml).join(' ');
-  return `<${element} class="${classes}"><span class="provenance__kind">${escapeHtml(label)}</span>${parts.map(part => `<span class="provenance__part">${part}</span>`).join('')}</${element}>`;
+  if (date) parts.push({ text: `${dateLabel ? `${dateLabel} ` : ''}${formatProvenanceDate(date)}` });
+  if (detail) parts.push({ text: String(detail) });
+  const href = source ? safeHttpsUrl(source) : null;
+  if (href) parts.push({ text: sourceText, href });
+  return { kind, label, parts };
 }

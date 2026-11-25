@@ -15,3 +15,6 @@
 *.pdf binary
 *.zip binary
 *.docx binary
+
+# Interface React compilada (npm run build): fora das estatísticas e do diff de revisão.
+app/** linguist-generated=true -diff

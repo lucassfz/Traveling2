@@ -1,9 +1,7 @@
 // Comparar destinos lado a lado (até 3 países salvos): visto, melhor época,
 // custo estimado de 7 dias, moeda, idioma, fuso e tomada. O preço de passagem
 // (visto recentemente) entra depois, quando o backend responde.
-import { escapeHtml } from './core/html.js';
 import { ideaEstimates } from './planner/ideas.js';
-import { flagImageUrl } from './country.exploration.js';
 
 export const MAX_COMPARE = 3;
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -51,23 +49,4 @@ export function compareRows(countries, { month = new Date().getMonth() } = {}) {
     { id: 'time', label: 'Fuso', cells: countries.map(country => ({ text: plain(country.timezoneLabel) || '—' })) },
     { id: 'plug', label: 'Tomada', cells: countries.map(country => ({ text: plain(country.voltage) || '—' })) }
   ];
-}
-
-/** Tabela: países nas colunas (rola na horizontal no celular). */
-export function compareHtml(countries, options) {
-  const rows = compareRows(countries, options);
-  const head = countries.map(country => {
-    const flag = flagImageUrl(country.alpha2);
-    return `<th scope="col">${flag ? `<img src="${flag}" alt="" width="28" height="21" loading="lazy">` : ''}<span>${escapeHtml(country.namePt)}</span></th>`;
-  }).join('');
-  return `
-    <div class="compare-scroll">
-      <table class="compare-table">
-        <thead><tr><td></td>${head}</tr></thead>
-        <tbody>
-          ${rows.map(row => `<tr data-compare-row="${row.id}"><th scope="row">${escapeHtml(row.label)}</th>${row.cells.map((cell, index) => `<td data-compare-cell="${index}" class="${cell.tone ? `compare--${cell.tone}` : ''}">${escapeHtml(cell.text)}</td>`).join('')}</tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-    <p class="planner-hint">Estimativas do Traveling e preços vistos recentemente por outros viajantes: confira antes de comprar. Visto: confirme na fonte oficial.</p>`;
 }

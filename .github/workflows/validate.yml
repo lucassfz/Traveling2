@@ -55,3 +55,20 @@ jobs:
           node-version: 22
       - name: Run browser smoke test
         run: npm run test:browser
+
+  react:
+    # A interface compilada (app/) é exatamente o que src/ gera, e o teste de
+    # teclado e leitor de tela (axe) passa num Chrome sem janela.
+    name: React build and accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build matches the committed app/
+        run: npm run build && git diff --exit-code --text -- app
+      - name: Keyboard and screen reader tests
+        run: npm run test:a11y
