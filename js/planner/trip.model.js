@@ -18,6 +18,8 @@ export const PLANNER_STEPS = Object.freeze([
 ]);
 export const MAX_TRAVELERS = 9;
 export const MAX_LINES = 60;
+// Importar (arquivo ou link) não pode encher o navegador de viagens.
+export const MAX_TRIPS = 200;
 const MAX_AMOUNT = 10_000_000;
 const MAX_TEXT = 120;
 
@@ -244,7 +246,8 @@ export function normalizeCity(raw) {
 export function normalizeTrip(raw, { countries = null, idFactory = randomId } = {}) {
   if (!raw || typeof raw !== 'object') return null;
   const countryKey = text(raw.countryKey, 60);
-  if (!countryKey || (countries && !countries[countryKey])) return null;
+  // hasOwn: 'constructor' e '__proto__' existem em todo objeto, mas não são países.
+  if (!countryKey || (countries && !Object.hasOwn(countries, countryKey))) return null;
   let startDate = isoDate(raw.startDate);
   let endDate = isoDate(raw.endDate);
   if (startDate && endDate && endDate < startDate) [startDate, endDate] = [endDate, startDate];

@@ -80,8 +80,8 @@ export function Stepper({ trip, current }) {
           const isCurrent = number === current;
           return (
             <li className={`stepper__item stepper__item--${isCurrent ? 'current' : done[index] ? 'done' : 'todo'}`} key={step.id}>
-              <button type="button" className="stepper__button" data-planner-step={number} disabled={!trip} aria-current={isCurrent ? 'step' : undefined} aria-label={`Etapa ${number}: ${step.label}${done[index] ? ' (concluída)' : ''}`} onClick={() => goToStep(trip, number)}>
-                <span className="stepper__dot">{done[index] && !isCurrent ? '✓' : number}</span>
+              <button type="button" className="stepper__button" data-planner-step={number} disabled={!trip} aria-current={isCurrent ? 'step' : undefined} aria-label={`Etapa ${number} ${step.label}${done[index] ? ', concluída' : ''}`} onClick={() => goToStep(trip, number)}>
+                <span className="stepper__dot">{done[index] && !isCurrent ? '✓' : number}</span>{' '}
                 <span className="stepper__label">{step.label}</span>
               </button>
             </li>

@@ -5,7 +5,7 @@ import { COUNTRIES } from '../../js/countries.dataset.js';
 import { PLANNER_STEPS, TRAVEL_STYLES, tripProgress, tripStatus, updateTrip } from '../../js/planner/trip.model.js';
 import { app, useApp, useExternal } from '../state/store.js';
 import { tripStore } from '../state/services.js';
-import { newTrip } from '../state/actions.js';
+import { importSharedTrip, newTrip } from '../state/actions.js';
 import { announce, focusSoon } from '../state/focus.js';
 import { Flag } from '../components/ui.jsx';
 import { Wizard, Stepper, STEP_LEADS } from './Wizard.jsx';
@@ -276,22 +276,24 @@ function NewTrip({ hasTrips }) {
 // "Planejar viagem" vindo do país, de uma cidade ou do Descobrir: mostra o
 // destino e só cria a viagem quando a pessoa confirma.
 function Draft({ draft, trips }) {
-  const { countryKey, city, profileId, budgetBRL } = draft;
+  const { countryKey, city, profileId, budgetBRL, shared = null } = draft;
   const country = COUNTRIES[countryKey];
   const existing = trips.filter(trip => trip.countryKey === countryKey);
   const create = () => {
     // País e cidade escolhidos: começa nas datas. Só o país: começa na cidade.
-    tripStore.save(newTrip(countryKey, { city, profileId, budgetBRL, step: city ? 2 : 1 }));
+    if (shared) {
+      if (!importSharedTrip(shared)) return announce('Não foi possível adicionar: o limite de viagens foi atingido.');
+    } else tripStore.save(newTrip(countryKey, { city, profileId, budgetBRL, step: city ? 2 : 1 }));
     setView('trip');
-    focusSoon('#wizard-title');
+    return focusSoon('#wizard-title');
   };
   return (
     <div className="wizard planner-draft">
       {trips.length > 0 && <BackToTrips />}
       <section className="wizard__step" aria-labelledby="wizard-title">
-        <span className="eyebrow">Nova viagem</span>
-        <h3 className="wizard__title" id="wizard-title" tabIndex={-1}>Planejar uma viagem para {city?.name || country.namePt}?</h3>
-        <p className="wizard__lead">A viagem só é criada quando você confirmar. Depois dá para trocar destino, cidade e datas.</p>
+        <span className="eyebrow">{shared ? 'Viagem recebida por link' : 'Nova viagem'}</span>
+        <h3 className="wizard__title" id="wizard-title" tabIndex={-1}>{shared ? 'Adicionar a viagem' : 'Planejar uma viagem'} para {city?.name || country.namePt}?</h3>
+        <p className="wizard__lead">{shared ? 'Alguém compartilhou este roteiro com você. Ele' : 'A viagem'} só é {shared ? 'salvo neste navegador' : 'criada'} quando você confirmar. Depois dá para trocar destino, cidade e datas.</p>
         <div className="planner-destination-card">
           <Flag country={country} className="planner-destination-card__flag" />
           <div className="planner-destination-card__body">
@@ -309,7 +311,7 @@ function Draft({ draft, trips }) {
           </div>
         )}
         <div className="planner-actions">
-          <button className="primary-button" type="button" data-planner-action="draft-create" onClick={create}>{existing.length ? 'Criar outra viagem' : 'Criar viagem'}</button>
+          <button className="primary-button" type="button" data-planner-action="draft-create" onClick={create}>{shared ? 'Adicionar às minhas viagens' : existing.length ? 'Criar outra viagem' : 'Criar viagem'}</button>
           <button className="secondary-button" type="button" onClick={startNew}>Escolher outro destino</button>
         </div>
       </section>

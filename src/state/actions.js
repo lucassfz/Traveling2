@@ -5,7 +5,7 @@ import { STORAGE_KEYS, writeJsonStorage, writeStorage } from '../../js/core/stor
 import { isVisaFreeForBrazil } from '../../js/country.exploration.js';
 import { applySettings, saveSettings } from '../../js/accessibility.js';
 import { cityHash, countryHash, pageUrl, parseHash, setHash } from '../../js/share.link.js';
-import { createTrip } from '../../js/planner/trip.model.js';
+import { createTrip, normalizeCity } from '../../js/planner/trip.model.js';
 import { loadCities } from '../../js/geo/cities.js';
 import { app } from './store.js';
 import { COUNTRY_BY_ALPHA2, findSavedCity, globe, matchGlobeCity, savedStore, tripStore } from './services.js';
@@ -313,7 +313,7 @@ function readSharedTrip(hash) {
   try {
     const base64 = hash.slice(TRIP_PREFIX.length).replaceAll('-', '+').replaceAll('_', '/');
     const raw = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(base64), char => char.charCodeAt(0))));
-    if (!raw || typeof raw !== 'object' || !COUNTRIES[raw.countryKey]) return null;
+    if (!raw || typeof raw !== 'object' || !Object.hasOwn(COUNTRIES, raw.countryKey)) return null;
     return Object.fromEntries(SHARED_FIELDS.filter(key => key in raw).map(key => [key, raw[key]]));
   } catch {
     return null;
@@ -323,18 +323,22 @@ function readSharedTrip(hash) {
 function openSharedTrip(payload) {
   setHash('');
   // A mesma viagem já está aqui (ex.: a pessoa abriu o próprio link): só abre.
-  let target = tripStore.trips.find(trip => trip.countryKey === payload.countryKey && (trip.city?.id ?? null) === (payload.city?.id ?? null)
+  const target = tripStore.trips.find(trip => trip.countryKey === payload.countryKey && (trip.city?.id ?? null) === (payload.city?.id ?? null)
     && trip.startDate === (payload.startDate ?? null) && trip.endDate === (payload.endDate ?? null) && trip.travelers === (payload.travelers ?? 1));
-  if (!target) {
-    const before = new Set(tripStore.trips.map(trip => trip.id));
-    tripStore.importData({ trips: [{ ...payload, step: 1 }] });
-    target = tripStore.trips.find(trip => !before.has(trip.id));
-  }
-  if (!target) return;
-  tripStore.setActive(target.id);
-  app.set({ planner: { view: 'trip', draft: null } });
+  if (target) tripStore.setActive(target.id);
+  // Viagem nova: só entra depois que a pessoa confirma (um link não grava nada sozinho).
+  app.set({ planner: target ? { view: 'trip', draft: null } : { view: 'draft', draft: { countryKey: payload.countryKey, city: normalizeCity(payload.city), shared: payload } } });
   openHub('planner', { focus: false });
   focusSoon('#wizard-title');
+}
+
+/** Grava a viagem recebida por link, depois da confirmação. @returns {object|null} */
+export function importSharedTrip(payload) {
+  const before = new Set(tripStore.trips.map(trip => trip.id));
+  tripStore.importData({ trips: [{ ...payload, step: 1 }] });
+  const added = tripStore.trips.find(trip => !before.has(trip.id)) ?? null;
+  if (added) tripStore.setActive(added.id);
+  return added;
 }
 
 export async function openFromHash() {

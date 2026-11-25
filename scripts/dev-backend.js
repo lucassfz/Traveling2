@@ -37,4 +37,4 @@ createServer(async (incoming, outgoing) => {
   const response = await app.fetch(request, env);
   outgoing.writeHead(response.status, Object.fromEntries(response.headers));
   outgoing.end(Buffer.from(await response.arrayBuffer()));
-}).listen(port, () => console.log(`Backend local em http://localhost:${port}/api/v1 (fornecedores: voos ${env.FLIGHT_PROVIDERS}, hotéis ${env.HOTEL_PROVIDERS})`));
+}).listen(port, '127.0.0.1', () => console.log(`Backend local em http://localhost:${port}/api/v1 (fornecedores: voos ${env.FLIGHT_PROVIDERS}, hotéis ${env.HOTEL_PROVIDERS})`));

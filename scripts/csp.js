@@ -12,16 +12,19 @@ import { createHash } from 'node:crypto';
 // cobre o que as páginas estáticas usam.
 export const CSP_DIRECTIVES = Object.freeze({
   'default-src': ["'self'"],
-  'script-src': ["'self'", 'https://cdn.jsdelivr.net', 'https://static.cloudflareinsights.com'],
+  // Só a versão fixada do three.js: a jsDelivr serve qualquer pacote do npm, e liberar
+  // o domínio inteiro deixaria carregar código de terceiros por ele.
+  'script-src': ["'self'", 'https://cdn.jsdelivr.net/npm/three@0.160.1/', 'https://static.cloudflareinsights.com'],
   // <style> e style="" nas páginas e no app; CSS não executa código.
   'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
   'font-src': ["'self'", 'https://fonts.gstatic.com'],
   // commons.wikimedia.org/wiki/Special:FilePath redireciona para thumb.wikimedia.org
   // (miniaturas); a CSP vale para cada endereço da cadeia de redirecionamento.
   'img-src': ["'self'", 'data:', 'blob:', 'https://flagcdn.com', 'https://commons.wikimedia.org', 'https://upload.wikimedia.org', 'https://thumb.wikimedia.org'],
-  'connect-src': ["'self'", 'https://cdn.jsdelivr.net', 'https://olinda.bcb.gov.br', 'https://traveling-api.travelingorgsenac.workers.dev', 'https://cloudflareinsights.com'],
+  'connect-src': ["'self'", 'https://cdn.jsdelivr.net/npm/', 'https://olinda.bcb.gov.br', 'https://traveling-api.travelingorgsenac.workers.dev', 'https://cloudflareinsights.com'],
   'manifest-src': ["'self'"],
   'worker-src': ["'self'"],
+  'frame-src': ["'none'"],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
   'form-action': ["'none'"]

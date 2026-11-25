@@ -32,7 +32,7 @@ export const app = createStore({
   // Vista de Estados e cidades no guia: { level: 'country' | 'division' | 'place', id }.
   region: { level: 'country', id: null },
   continent: null,
-  visited: new Set((Array.isArray(visited) ? visited : []).filter(key => COUNTRIES[key])),
+  visited: new Set((Array.isArray(visited) ? visited : []).filter(key => Object.hasOwn(COUNTRIES, key))),
   visaFilter: false,
   seasonMonth: null,
   // Painel da esquerda: 'miles' | 'planner' | 'saved' | 'places' | null.

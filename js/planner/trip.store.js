@@ -4,7 +4,7 @@
 // O checklist de cada viagem fica dentro dela; o antigo traveling.checklist
 // (um por país) só é lido uma vez, para migrar conjuntos da versão 1, e nunca apagado.
 import { STORAGE_KEYS, readJsonStorage, writeJsonStorage } from '../core/storage.js';
-import { TRIP_SCHEMA_VERSION, duplicateTrip, normalizeStore } from './trip.model.js';
+import { MAX_TRIPS, TRIP_SCHEMA_VERSION, duplicateTrip, normalizeStore } from './trip.model.js';
 
 export function createTripStore({ countries = null, read = readJsonStorage, write = writeJsonStorage } = {}) {
   const raw = read(STORAGE_KEYS.trips, null);
@@ -88,6 +88,7 @@ export function createTripStore({ countries = null, read = readJsonStorage, writ
       const byId = new Map(data.trips.map(trip => [trip.id, trip]));
       const added = [];
       for (const trip of incoming) {
+        if (data.trips.length + added.length >= MAX_TRIPS) break;
         const existing = byId.get(trip.id);
         if (existing && JSON.stringify(existing) === JSON.stringify(trip)) continue;
         added.push(existing ? duplicateTrip(trip) : trip);

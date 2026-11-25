@@ -53,7 +53,8 @@ export class TtlCache {
 
 // Janela fixa por chave (ex.: IP truncado). Devolve { allowed, retryAfter }.
 export class RateLimiter {
-  constructor({ limit, windowMs }) {
+  constructor({ limit, windowMs, maxKeys = 5000 }) {
+    this.maxKeys = maxKeys;
     this.limit = limit;
     this.windowMs = windowMs;
     this.windows = new Map();
@@ -64,7 +65,7 @@ export class RateLimiter {
     const entry = this.windows.get(key);
     if (!entry || entry.start !== start) {
       this.windows.set(key, { start, count: 1 });
-      if (this.windows.size > 5000) this.#prune(start);
+      if (this.windows.size > this.maxKeys) this.#prune(start);
       return { allowed: true, retryAfter: 0 };
     }
     entry.count += 1;
@@ -74,6 +75,13 @@ export class RateLimiter {
 
   #prune(currentStart) {
     for (const [key, entry] of this.windows) if (entry.start !== currentStart) this.windows.delete(key);
+    // Muitos clientes na mesma janela: descarta os mais antigos (10% de uma vez), para
+    // a memória ter teto e a limpeza não rodar a cada requisição.
+    const keep = this.maxKeys * 0.9;
+    for (const key of this.windows.keys()) {
+      if (this.windows.size <= keep) break;
+      this.windows.delete(key);
+    }
   }
 }
 

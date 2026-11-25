@@ -10,7 +10,8 @@ const STEPS = [
   { target: '#trips-launcher', title: 'Planeje a viagem', text: 'Em Viagens, monte o roteiro passo a passo: voo, hospedagem, custo total e documentos.' }
 ];
 
-function seen() {
+/** O tour já foi visto (ou não há como guardar que foi). */
+export function tourSeen() {
   try { return localStorage.getItem(KEY) === 'done'; } catch { return true; }
 }
 
@@ -20,7 +21,7 @@ function remember() {
 
 export function Tour() {
   const open = useApp(state => state.tourOpen);
-  const [available, setAvailable] = useState(() => !seen());
+  const [available, setAvailable] = useState(() => !tourSeen());
   const started = useRef(false);
   if (open) started.current = true;
   // Fechou por qualquer caminho: não volta.

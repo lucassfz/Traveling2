@@ -12,9 +12,9 @@ import { CloseButton } from './ui.jsx';
 export function A11yPanel() {
   const open = useApp(state => state.a11yOpen);
   return (
-    <aside className="a11y-panel" id="a11y-panel" role="dialog" aria-labelledby="a11y-title" hidden={!open}>
+    <div className="a11y-panel" id="a11y-panel" role="dialog" aria-labelledby="a11y-title" hidden={!open}>
       {open && <Content />}
-    </aside>
+    </div>
   );
 }
 

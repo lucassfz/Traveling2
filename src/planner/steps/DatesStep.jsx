@@ -63,7 +63,7 @@ function Months({ trip, country }) {
           const on = selected === index;
           return (
             <button className={`month-choice month-choice--${SEASON_CLASS[score] ?? 'none'} ${on ? 'choice--on' : ''}`} type="button" key={label} aria-pressed={on} disabled={Boolean(trip.startDate)}
-              aria-label={`${MONTH_NAMES[index]}${score === 2 ? ' (ótima época)' : score === 0 ? ' (época ruim)' : ''}`}
+              aria-label={`${label} (${MONTH_NAMES[index]}${score === 2 ? ', ótima época' : score === 0 ? ', época ruim' : ''})`}
               onClick={() => save(trip, { month: trip.month === index ? null : index, startDate: null, endDate: null })}>{label}</button>
           );
         })}

@@ -13,8 +13,16 @@ export function CloseButton({ label, onClick, id, className = '' }) {
   return <button className={`icon-button ${className}`.trim()} id={id} type="button" aria-label={label} onClick={onClick}><Icon name="close" /></button>;
 }
 
-/** Link para fora do site: avisa o leitor de tela que abre em outra aba. */
+const isHttps = value => {
+  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+};
+
+/**
+ * Link para fora do site: avisa o leitor de tela que abre em outra aba. Só https;
+ * qualquer outro endereço (javascript:, data:) vira texto comum.
+ */
 export function ExternalLink({ href, className, sponsored = false, children, ...rest }) {
+  if (!isHttps(href)) return <span className={className}>{children}</span>;
   return (
     <a className={className} href={href} target="_blank" rel={sponsored ? 'noopener sponsored' : 'noopener noreferrer'} {...rest}>
       {children}<span className="sr-only"> (abre em nova aba)</span>
@@ -63,7 +71,7 @@ export function SummaryImage({ entry, alt }) {
 /** Salvar / ✓ Salvo, com o nome do destino para o leitor de tela. */
 export function SaveButton({ saved, name, onToggle, className = 'save-toggle', id }) {
   return (
-    <button className={className} id={id} type="button" aria-pressed={saved} aria-label={`Salvar ${name}`} onClick={onToggle}>
+    <button className={className} id={id} type="button" aria-pressed={saved} aria-label={`${saved ? 'Salvo' : 'Salvar'}: ${name}`} onClick={onToggle}>
       {saved ? '✓ Salvo' : 'Salvar'}
     </button>
   );

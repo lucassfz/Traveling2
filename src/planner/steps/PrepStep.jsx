@@ -109,7 +109,7 @@ function Checklist({ trip, country }) {
       </div>
       <div className="checklist planner-checklist">
         {groups.map(group => (
-          <section className="checklist__group" key={group.group} aria-label={group.group}>
+          <div className="checklist__group" role="group" key={group.group} aria-label={group.group}>
             <h5 className="checklist__title">{group.group}</h5>
             {group.items.map(item => {
               const complete = Boolean(trip.checklist[item.key]);
@@ -121,7 +121,7 @@ function Checklist({ trip, country }) {
                 </button>
               );
             })}
-          </section>
+          </div>
         ))}
       </div>
       <div className="checklist__actions">

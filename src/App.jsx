@@ -18,6 +18,7 @@ import { A11yPanel } from './components/A11yPanel.jsx';
 import { HelpDialog } from './components/HelpDialog.jsx';
 import { Tour } from './components/Tour.jsx';
 import { Tooltip } from './components/Tooltip.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 const MilesHub = lazy(() => import('./components/MilesHub.jsx'));
 const Planner = lazy(() => import('./planner/Planner.jsx'));
@@ -29,6 +30,8 @@ function useOnce(open) {
   if (open && !seen) setSeen(true);
   return seen || open;
 }
+
+const Lazy = ({ children }) => <ErrorBoundary><Suspense fallback={<p className="planner-empty" role="status">Carregando…</p>}>{children}</Suspense></ErrorBoundary>;
 
 export function App({ onReady }) {
   const hub = useApp(state => state.hub);
@@ -69,24 +72,24 @@ export function App({ onReady }) {
       <Dock inert={routeActive} />
 
       <HubPanel hub="miles" open={hub === 'miles'} inert={routeActive} label="Milhas e pontos" eyebrow="Milhas" title="Milhas e pontos" subtitle="Converta pontos, veja quanto valem e se compensa usar." closeLabel="Fechar Milhas e Aeroportos">
-        {milesReady && <Suspense fallback={<p className="planner-empty">Carregando…</p>}><MilesHub /></Suspense>}
+        {milesReady && <Lazy><MilesHub /></Lazy>}
       </HubPanel>
       <HubPanel hub="planner" open={hub === 'planner'} inert={routeActive} id="planner-panel" className="planner-panel" label="Planejamento de viagem" eyebrow="Planejamento de viagem" title="Minhas viagens" closeLabel="Fechar planejamento" reset>
         <div className="planner" id="planner-content">
-          {plannerReady && <Suspense fallback={<p className="planner-empty">Carregando…</p>}><Planner /></Suspense>}
+          {plannerReady && <Lazy><Planner /></Lazy>}
         </div>
       </HubPanel>
       <HubPanel hub="saved" open={hub === 'saved'} inert={routeActive} id="saved-panel" className="saved-panel" label="Destinos salvos" eyebrow="Para ver depois" title="Destinos salvos" subtitle="Países, cidades e lugares que chamaram sua atenção. Salvar não cria viagem." closeLabel="Fechar destinos salvos" reset>
-        {hub === 'saved' && <Saved />}
+        {hub === 'saved' && <ErrorBoundary><Saved /></ErrorBoundary>}
       </HubPanel>
       <HubPanel hub="places" open={hub === 'places'} inert={routeActive} id="places-panel" className="places-panel" label="Lista de países" eyebrow="Sem usar o globo" title="Lista de países" subtitle="Todos os países por continente. Escolha um para abrir o guia." closeLabel="Fechar lista de países">
         {hub === 'places' && <Places />}
       </HubPanel>
 
-      <CountryPanel inert={routeActive} />
+      <ErrorBoundary><CountryPanel inert={routeActive} /></ErrorBoundary>
       <Tooltip />
       <aside className="discovery-panel" id="discovery-panel" aria-labelledby="discovery-title" hidden={!discoveryOpen} inert={routeActive}>
-        {discoveryReady && <Suspense fallback={<p className="planner-empty">Carregando…</p>}><Discovery open={discoveryOpen} /></Suspense>}
+        {discoveryReady && <Lazy><Discovery open={discoveryOpen} /></Lazy>}
       </aside>
       <RoutePreview />
       <A11yPanel />
@@ -106,9 +109,9 @@ function SkipLinks() {
   return (
     <nav className="skip-links" aria-label="Atalhos">
       <a className="skip-link" href="#country-search-input" onClick={go('country-search-input')}>Pular para a busca de países</a>
-      <a className="skip-link" href="#places-panel" onClick={event => { event.preventDefault(); openHub('places', { opener: event.currentTarget }); }}>Abrir a lista de países</a>
+      <button className="skip-link" type="button" onClick={() => openHub('places')}>Abrir a lista de países</button>
       <a className="skip-link" href="#globe-stage" onClick={go('globe-stage')}>Pular para o globo</a>
-      <a className="skip-link" href="#help" onClick={event => { event.preventDefault(); setHelpOpen(true); }}>Atalhos de teclado</a>
+      <button className="skip-link" type="button" onClick={() => setHelpOpen(true)}>Atalhos de teclado</button>
     </nav>
   );
 }

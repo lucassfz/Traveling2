@@ -10,93 +10,15 @@
 //
 // Sem dependências: servidor estático e Chrome DevTools Protocol pelo
 // WebSocket do Node (22+). O three.js vem da CDN, então precisa de rede.
-import http from 'node:http';
-import { readFile, stat, mkdtemp, rm } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { openChrome, sleep } from './chrome.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 8790;
-const DEBUG_PORT = 9340;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.xml': 'application/xml' };
-
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const failures = [];
 const check = (ok, message) => { if (!ok) failures.push(message); console.log(`${ok ? 'ok  ' : 'FALHA'} ${message}`); };
 
-const server = http.createServer(async (request, response) => {
-  let file = path.join(ROOT, decodeURIComponent(new URL(request.url, 'http://x').pathname));
-  try {
-    if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');
-    const body = await readFile(file);
-    response.writeHead(200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream' });
-    response.end(body);
-  } catch {
-    response.writeHead(404);
-    response.end();
-  }
-}).listen(PORT);
-
-async function chromePath() {
-  for (const candidate of [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium-browser', '/usr/bin/chromium', 'C:/Program Files/Google/Chrome/Application/chrome.exe', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']) {
-    if (!candidate) continue;
-    try { await stat(candidate); return candidate; } catch { /* próximo */ }
-  }
-  return null;
-}
-
-const executable = await chromePath();
-if (!executable) {
-  console.error('Chrome não encontrado (defina CHROME_PATH).');
-  server.close();
-  process.exit(1);
-}
-const profile = await mkdtemp(path.join(tmpdir(), 'traveling-smoke-'));
-const chrome = spawn(executable, [
-  '--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, `--user-data-dir=${profile}`, '--window-size=1400,900',
-  '--no-sandbox', '--no-first-run', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', 'about:blank'
-], { stdio: 'ignore' });
-
-let socketUrl = null;
-for (let attempt = 0; attempt < 100 && !socketUrl; attempt += 1) {
-  await sleep(200);
-  try {
-    const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json`)).json();
-    socketUrl = targets.find(target => target.type === 'page')?.webSocketDebuggerUrl ?? null;
-  } catch { /* ainda subindo */ }
-}
-const socket = new WebSocket(socketUrl);
-await new Promise(resolve => socket.addEventListener('open', resolve));
-let nextId = 0;
-const pending = new Map();
-const errors = [];
-socket.addEventListener('message', event => {
-  const message = JSON.parse(event.data);
-  if (message.id && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
-  if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text);
-  if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') errors.push(message.params.args.map(arg => arg.value ?? arg.description).join(' '));
-  // CSP bloqueando algo ou SRI recusando um arquivo da CDN só aparecem no log do navegador.
-  const entry = message.method === 'Log.entryAdded' ? message.params.entry : null;
-  if (entry?.level === 'error' && (entry.source === 'security' || /Content Security Policy|integrity/i.test(entry.text))) errors.push(`${entry.text} ${entry.url ?? ''}`.trim());
-});
-const send = (method, params = {}) => new Promise(resolve => { const id = ++nextId; pending.set(id, resolve); socket.send(JSON.stringify({ id, method, params })); });
-const evaluate = async expression => (await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.result?.value;
-const waitFor = async (expression, timeout = 30000) => {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    if (await evaluate(expression)) return true;
-    await sleep(250);
-  }
-  return false;
-};
+const { send, evaluate, waitFor, errors, base, close } = await openChrome();
 
 try {
-  await send('Runtime.enable');
-  await send('Log.enable');
-  await send('Page.enable');
-  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` });
+  await send('Page.navigate', { url: `${base}` });
 
   // 1. Globo carregado, sem erros.
   check(await waitFor("document.getElementById('globe')?.classList.contains('globe--ready')"), 'globo carregado');
@@ -135,7 +57,7 @@ try {
   check(coverage && coverage.missing === 0, `todo ponto do Brasil escolhe uma cidade (${coverage?.missing ?? '?'} sem cidade)`);
 
   // 4. Página de país.
-  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/paises/japao/` });
+  await send('Page.navigate', { url: `${base}paises/japao/` });
   check(await waitFor("document.querySelector('h1')?.textContent === 'Japão'", 10000), 'página do Japão abre');
   check(await evaluate("Boolean(document.querySelector('a.cta[href=\"../../#/JP\"]'))"), 'página do Japão leva ao globo');
   // Fotos (Wikimedia, com redirecionamento) e bandeira carregam: a CSP já
@@ -149,15 +71,15 @@ try {
   })()`);
   check(images && images.total > 0 && images.broken.length === 0, `imagens da página do Japão carregam (${images?.total ?? 0} imagens${images?.broken.length ? `; falharam: ${images.broken.slice(0, 2).join(', ')}` : ''})`);
   // Páginas com outros scripts inline (capital, 404 com sugestões): a CSP não pode bloqueá-los.
-  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/cidades/lisboa-portugal/` });
+  await send('Page.navigate', { url: `${base}cidades/lisboa-portugal/` });
   check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página de Lisboa abre');
-  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/404.html` });
+  await send('Page.navigate', { url: `${base}404.html` });
   check(await waitFor("document.readyState === 'complete' && Boolean(document.querySelector('h1'))", 10000), 'página 404 abre');
 
   check(errors.length === 0, `sem erros de JavaScript, CSP ou SRI${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);
 
   // 5. A CSP está valendo: um script inline injetado (como faria um XSS) não roda.
-  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/` });
+  await send('Page.navigate', { url: `${base}` });
   await waitFor("document.readyState === 'complete'", 10000);
   check(await evaluate(`(() => {
     const script = document.createElement('script');
@@ -166,11 +88,7 @@ try {
     return window.__injected !== true;
   })()`), 'CSP bloqueia script inline injetado');
 } finally {
-  socket.close();
-  chrome.kill();
-  server.close();
-  await sleep(300);
-  await rm(profile, { recursive: true, force: true }).catch(() => {});
+  await close();
 }
 
 if (failures.length) {

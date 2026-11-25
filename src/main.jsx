@@ -16,7 +16,18 @@ setTheme(app.get().theme);
 trackModality();
 app.set({ originAirport: airports.coreAirports.find(airport => airport.iata === 'GRU') ?? null });
 
-createRoot(document.getElementById('root')).render(<App onReady={markReady} />);
+// Dentro de um <iframe> de outro site, não monta a interface (clickjacking): o GitHub
+// Pages não deixa enviar X-Frame-Options, e frame-ancestors não vale em <meta>.
+function framedByOther() {
+  if (window.top === window.self) return false;
+  try { return window.top.location.origin !== location.origin; } catch { return true; }
+}
+
+const root = createRoot(document.getElementById('root'));
+if (framedByOther()) {
+  root.render(<p className="boot-error"><a href={location.href} target="_top">Abrir o Traveling</a></p>);
+  markReady();
+} else root.render(<App onReady={markReady} />);
 
 // Só depois da primeira pintura do React: some a tela de abertura.
 function markReady() {

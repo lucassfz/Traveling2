@@ -3892,6 +3892,7 @@ html[data-contrast='high'] :is(.visit-button, .secondary-button, .icon-button, .
 .globe__stage:focus-visible { outline-offset: -3px; }
 .country-tab:focus-visible, .miles-panel:focus-visible { outline-offset: -3px; border-radius: 8px; }
 .skip-links { position: fixed; z-index: 1000; top: 0; left: 0; }
+button.skip-link { border: 0; font: inherit; font-weight: 600; cursor: pointer; }
 .miles-hub__title:focus, .discovery-header h2:focus { outline: none; }
 /* Botões "desligados" que continuam no Tab para explicar por quê. */
 [aria-disabled='true'] { opacity: .55; cursor: not-allowed; }
